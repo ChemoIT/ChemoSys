@@ -62,6 +62,7 @@ import {
 type EmployeeWithJoins = Employee & {
   companies?: { name: string } | null
   departments?: { name: string } | null
+  sub_departments?: { name: string } | null
   employee_role_tags?: { role_tags: { name: string } | null }[]
   role_tags?: { role_tag_id: string }[]
 }

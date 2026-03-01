@@ -24,7 +24,7 @@ export default async function EmployeesPage() {
   const [employeesRes, companiesRes, departmentsRes, roleTagsRes] = await Promise.all([
     supabase
       .from('employees')
-      .select('*, companies(name), departments(name), employee_role_tags(role_tags(name))')
+      .select('*, companies(name), departments!department_id(name), sub_departments:departments!sub_department_id(name), employee_role_tags(role_tags(name))')
       .is('deleted_at', null)
       .order('created_at', { ascending: false }),
     supabase
