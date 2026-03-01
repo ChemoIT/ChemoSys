@@ -5,33 +5,34 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** Phase 1 complete — ready for Phase 2
+**Current focus:** Phase 2 in progress — Employee CRUD complete (02-01)
 
 ## Current Position
 
-Phase: 1 of 5 (Foundation) — COMPLETE
-Plan: 4 of 4 in current phase
-Status: Phase 1 verified and complete
-Last activity: 2026-03-01 — Phase 1 executed, verified, and approved by user
+Phase: 2 of 5 (Employees) — IN PROGRESS
+Plan: 1 of 2 complete in current phase
+Status: 02-01 (Employee CRUD) complete — ready for 02-02 (Excel Import)
+Last activity: 2026-03-01 — Phase 2 Plan 01 executed (employee CRUD full feature)
 
-Progress: [██░░░░░░░░] 20%
+Progress: [███░░░░░░░] 25%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: ~5 min
-- Total execution time: ~21 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min)
+- Total plans completed: 5
+- Average duration: ~6 min
+- Total execution time: ~28 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min, 02-01: ~7 min)
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation | 4/4 | ~21 min | ~5 min |
+| 02-employees  | 1/2 | ~7 min  | ~7 min  |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (scaffold + RTL + Supabase clients), 01-02 (DB schema), 01-03 (auth + admin shell), 01-04 (Companies/Departments/RoleTags CRUD)
-- Trend: On track, consistent velocity
+- Last 5 plans: 01-02 (DB schema), 01-03 (auth + admin shell), 01-04 (Companies/Departments/RoleTags CRUD), 02-01 (Employee CRUD — 22 fields, cascading selectors, role tag multi-select)
+- Trend: On track, slightly longer for large feature plans
 
 *Updated after each plan completion*
 
@@ -62,6 +63,10 @@ Recent decisions affecting current work:
 - [01-04]: Hidden inputs alongside shadcn/ui Select — Select.onValueChange does not write to FormData; hidden inputs required for Server Action access
 - [01-04 checkpoint]: Department form simplified per user request — company_id and parent_dept_id removed from UI, company auto-assigned server-side
 - [01-04 checkpoint]: Table component RTL fix — text-left → text-start, pr-0 → pe-0
+- [02-01]: zodResolver cast (as any) for EmployeeForm — Zod v4 .default()/.optional() variance with RHF (same established [01-04] pattern)
+- [02-01]: Multi-filter toolbar pre-processes raw data array before TanStack Table — simpler than setFilterValue with join data
+- [02-01]: EmployeesTable does not reuse DataTable.tsx — multi-filter toolbar not supported by DataTable
+- [02-01]: CURRENT_PHASE advanced 1 → 2 in SidebarNav — employees nav item now active
 
 ### Pending Todos
 
@@ -77,5 +82,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Phase 1 complete and verified. Ready for Phase 2 planning.
+Stopped at: Completed 02-01-PLAN.md — Employee CRUD complete. Ready for 02-02 (Excel Import).
 Resume file: None
