@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-03-01)
 ## Current Position
 
 Phase: 1 of 5 (Foundation)
-Plan: 0 of 4 in current phase
-Status: Ready to plan
-Last activity: 2026-03-01 — Roadmap created, requirements mapped, ready to plan Phase 1
+Plan: 2 of 4 in current phase
+Status: In progress
+Last activity: 2026-03-01 — Completed plan 01-02: Foundation schema (12 tables, RLS, seed, TypeScript types)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 5%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: -
+- Total plans completed: 2
+- Average duration: ~5 min (plan 01-02 est.)
+- Total execution time: ~10 min (est. 01-01 + 01-02)
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01-foundation | 2 | ~10 min | ~5 min |
 
 **Recent Trend:**
-- Last 5 plans: -
-- Trend: -
+- Last 5 plans: 01-01 (scaffold), 01-02 (schema)
+- Trend: On track
 
 *Updated after each plan completion*
 
@@ -47,6 +47,9 @@ Recent decisions affecting current work:
 - [Pre-Phase 1]: All UNIQUE constraints must be partial (WHERE deleted_at IS NULL) for soft-delete compatibility
 - [Pre-Phase 1]: Use SECURITY DEFINER function for permission lookups to prevent RLS recursion
 - [Pre-Phase 1]: Always use supabase.auth.getUser() in server contexts — getSession() is unverified
+- [01-02]: RLS UPDATE policies use USING (true) — allows soft-delete UPDATEs that set deleted_at (Pitfall 9)
+- [01-02]: Phase 1 RLS permissive for authenticated users — business logic enforced in Server Actions
+- [01-02]: All future-proofing stubs (employees, projects, users) created now so FK relationships are ready
 
 ### Pending Todos
 
@@ -62,5 +65,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Roadmap created, all 59 v1 requirements mapped to 5 phases
+Stopped at: Completed 01-02-PLAN.md — Foundation schema, RLS, seed, TypeScript types
 Resume file: None
