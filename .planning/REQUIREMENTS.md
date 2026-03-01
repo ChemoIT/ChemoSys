@@ -159,13 +159,71 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (To be filled by roadmapper) | | |
+| FOUND-01 | Phase 1 | Pending |
+| FOUND-02 | Phase 1 | Pending |
+| FOUND-03 | Phase 1 | Pending |
+| FOUND-04 | Phase 1 | Pending |
+| FOUND-05 | Phase 1 | Pending |
+| AUTH-01 | Phase 1 | Pending |
+| AUTH-02 | Phase 1 | Pending |
+| AUTH-03 | Phase 1 | Pending |
+| AUTH-04 | Phase 1 | Pending |
+| COMP-01 | Phase 1 | Pending |
+| COMP-02 | Phase 1 | Pending |
+| COMP-03 | Phase 1 | Pending |
+| COMP-04 | Phase 1 | Pending |
+| DEPT-01 | Phase 1 | Pending |
+| DEPT-02 | Phase 1 | Pending |
+| DEPT-03 | Phase 1 | Pending |
+| DEPT-04 | Phase 1 | Pending |
+| RTAG-01 | Phase 1 | Pending |
+| RTAG-02 | Phase 1 | Pending |
+| RTAG-03 | Phase 1 | Pending |
+| AUDT-01 | Phase 1 | Pending |
+| EMPL-01 | Phase 2 | Pending |
+| EMPL-02 | Phase 2 | Pending |
+| EMPL-03 | Phase 2 | Pending |
+| EMPL-04 | Phase 2 | Pending |
+| EMPL-05 | Phase 2 | Pending |
+| EMPL-06 | Phase 2 | Pending |
+| EMPL-07 | Phase 2 | Pending |
+| EMPL-08 | Phase 2 | Pending |
+| EMPL-09 | Phase 2 | Pending |
+| EMPL-10 | Phase 2 | Pending |
+| USER-01 | Phase 3 | Pending |
+| USER-02 | Phase 3 | Pending |
+| USER-03 | Phase 3 | Pending |
+| USER-04 | Phase 3 | Pending |
+| USER-05 | Phase 3 | Pending |
+| USER-06 | Phase 3 | Pending |
+| USER-07 | Phase 3 | Pending |
+| TMPL-01 | Phase 3 | Pending |
+| TMPL-02 | Phase 3 | Pending |
+| TMPL-03 | Phase 3 | Pending |
+| TMPL-04 | Phase 3 | Pending |
+| TMPL-05 | Phase 3 | Pending |
+| NAVP-01 | Phase 3 | Pending |
+| NAVP-02 | Phase 3 | Pending |
+| NAVP-03 | Phase 3 | Pending |
+| PROJ-01 | Phase 4 | Pending |
+| PROJ-02 | Phase 4 | Pending |
+| PROJ-03 | Phase 4 | Pending |
+| PROJ-04 | Phase 4 | Pending |
+| PROJ-05 | Phase 4 | Pending |
+| PROJ-06 | Phase 4 | Pending |
+| SETT-01 | Phase 5 | Pending |
+| SETT-02 | Phase 5 | Pending |
+| SETT-03 | Phase 5 | Pending |
+| SETT-04 | Phase 5 | Pending |
+| AUDT-02 | Phase 5 | Pending |
+| DASH-01 | Phase 5 | Pending |
+| DASH-02 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 46 total
-- Mapped to phases: 0
-- Unmapped: 46 ⚠️
+- v1 requirements: 59 total (note: original stated 46, actual count is 59 — corrected at roadmap creation)
+- Mapped to phases: 59
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-01*
-*Last updated: 2026-03-01 after initial definition*
+*Last updated: 2026-03-01 after roadmap creation — traceability complete*
