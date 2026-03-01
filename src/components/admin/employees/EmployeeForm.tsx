@@ -311,14 +311,12 @@ export function EmployeeForm({
               />
 
               {/* gender — Select + hidden input */}
-              <FormItem>
-                <FormLabel>מגדר</FormLabel>
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">מגדר</label>
                 <Select value={selectedGender} onValueChange={setSelectedGender}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="בחר מגדר" />
-                    </SelectTrigger>
-                  </FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="בחר מגדר" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="male">זכר</SelectItem>
                     <SelectItem value="female">נקבה</SelectItem>
@@ -326,7 +324,7 @@ export function EmployeeForm({
                   </SelectContent>
                 </Select>
                 <input type="hidden" name="gender" value={selectedGender} />
-              </FormItem>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -346,21 +344,19 @@ export function EmployeeForm({
               />
 
               {/* citizenship — Select + hidden input */}
-              <FormItem>
-                <FormLabel>אזרחות</FormLabel>
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">אזרחות</label>
                 <Select value={selectedCitizenship} onValueChange={setSelectedCitizenship}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="בחר אזרחות" />
-                    </SelectTrigger>
-                  </FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="בחר אזרחות" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="israeli">ישראלית</SelectItem>
                     <SelectItem value="foreign">זרה</SelectItem>
                   </SelectContent>
                 </Select>
                 <input type="hidden" name="citizenship" value={selectedCitizenship} />
-              </FormItem>
+              </div>
             </div>
 
             {/* passport_number — visible only when citizenship = foreign */}
@@ -487,14 +483,12 @@ export function EmployeeForm({
             <SectionHeading title="שיוך ארגוני" />
 
             {/* company_id (required) — Select + hidden input */}
-            <FormItem>
-              <FormLabel>חברה *</FormLabel>
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none">חברה *</label>
               <Select value={selectedCompanyId} onValueChange={handleCompanyChange}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="בחר חברה" />
-                  </SelectTrigger>
-                </FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder="בחר חברה" />
+                </SelectTrigger>
                 <SelectContent>
                   {companies.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
@@ -509,21 +503,19 @@ export function EmployeeForm({
                   {form.formState.errors.company_id.message as string}
                 </p>
               )}
-            </FormItem>
+            </div>
 
             {/* department_id — filtered by company */}
-            <FormItem>
-              <FormLabel>מחלקה</FormLabel>
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none">מחלקה</label>
               <Select
                 value={selectedDeptId}
                 onValueChange={handleDeptChange}
                 disabled={!selectedCompanyId}
               >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder={selectedCompanyId ? 'בחר מחלקה' : 'בחר חברה תחילה'} />
-                  </SelectTrigger>
-                </FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder={selectedCompanyId ? 'בחר מחלקה' : 'בחר חברה תחילה'} />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">ללא מחלקה</SelectItem>
                   {filteredDepts.map((d) => (
@@ -534,21 +526,19 @@ export function EmployeeForm({
                 </SelectContent>
               </Select>
               <input type="hidden" name="department_id" value={selectedDeptId} />
-            </FormItem>
+            </div>
 
             {/* sub_department_id — filtered by department */}
-            <FormItem>
-              <FormLabel>תת-מחלקה</FormLabel>
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none">תת-מחלקה</label>
               <Select
                 value={selectedSubDeptId}
                 onValueChange={setSelectedSubDeptId}
                 disabled={!selectedDeptId}
               >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder={selectedDeptId ? 'בחר תת-מחלקה' : 'בחר מחלקה תחילה'} />
-                  </SelectTrigger>
-                </FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder={selectedDeptId ? 'בחר תת-מחלקה' : 'בחר מחלקה תחילה'} />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">ללא תת-מחלקה</SelectItem>
                   {filteredSubDepts.map((d) => (
@@ -559,7 +549,7 @@ export function EmployeeForm({
                 </SelectContent>
               </Select>
               <input type="hidden" name="sub_department_id" value={selectedSubDeptId} />
-            </FormItem>
+            </div>
 
             {/* ================================================================
                 Section 4 — תעסוקה
@@ -600,14 +590,12 @@ export function EmployeeForm({
 
             <div className="grid grid-cols-2 gap-4">
               {/* status — Select + hidden input */}
-              <FormItem>
-                <FormLabel>סטטוס</FormLabel>
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">סטטוס</label>
                 <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="active">פעיל</SelectItem>
                     <SelectItem value="suspended">מושהה</SelectItem>
@@ -615,17 +603,15 @@ export function EmployeeForm({
                   </SelectContent>
                 </Select>
                 <input type="hidden" name="status" value={selectedStatus} />
-              </FormItem>
+              </div>
 
               {/* correspondence_language — Select + hidden input */}
-              <FormItem>
-                <FormLabel>שפת התכתבות</FormLabel>
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">שפת התכתבות</label>
                 <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="hebrew">עברית</SelectItem>
                     <SelectItem value="english">אנגלית</SelectItem>
@@ -634,7 +620,7 @@ export function EmployeeForm({
                   </SelectContent>
                 </Select>
                 <input type="hidden" name="correspondence_language" value={selectedLanguage} />
-              </FormItem>
+              </div>
             </div>
 
             {/* profession */}
@@ -653,14 +639,14 @@ export function EmployeeForm({
             />
 
             {/* role_tags — multi-select with hidden inputs */}
-            <FormItem>
-              <FormLabel>תגיות תפקיד</FormLabel>
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none">תגיות תפקיד</label>
               <RoleTagMultiSelect
                 roleTags={roleTags}
                 selectedIds={selectedRoleTagIds}
                 onChange={setSelectedRoleTagIds}
               />
-            </FormItem>
+            </div>
 
             {/* ================================================================
                 Section 5 — הערות
