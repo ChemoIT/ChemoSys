@@ -6,10 +6,13 @@
  * First call: verifySession() — redirects to /login if unauthenticated.
  */
 
+import Link from 'next/link'
+import { Upload } from 'lucide-react'
 import { verifySession } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
 import { EmployeesTable } from '@/components/admin/employees/EmployeesTable'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
 export default async function EmployeesPage() {
   // Auth guard — redirects to /login if no valid session
@@ -63,6 +66,13 @@ export default async function EmployeesPage() {
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold text-foreground">ניהול עובדים</h1>
         <Badge variant="secondary">{employeeCount}</Badge>
+        <div className="me-auto" />
+        <Button asChild variant="outline" size="sm">
+          <Link href="/admin/employees/import" className="flex items-center gap-2">
+            <Upload className="h-4 w-4" />
+            ייבוא מ-Excel
+          </Link>
+        </Button>
       </div>
 
       {/* Employees data table with full CRUD */}
