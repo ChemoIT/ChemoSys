@@ -38,10 +38,10 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Project scaffold: Next.js 16 + Supabase clients + Tailwind v4 RTL + Heebo font + brand theme
-- [ ] 01-02-PLAN.md — DB schema: all tables with universal columns, soft-delete partial indexes, RLS policies, triggers, audit_log, modules seed, TypeScript types
-- [ ] 01-03-PLAN.md — Auth + admin shell: login page, session management, protected routes, DAL, audit utility, responsive sidebar layout
-- [ ] 01-04-PLAN.md — Reference entities: Companies, Departments (hierarchical), Role Tags CRUD with data tables, forms, soft delete, audit logging
+- [x] 01-01-PLAN.md — Project scaffold: Next.js 16 + Supabase clients + Tailwind v4 RTL + Heebo font + brand theme
+- [x] 01-02-PLAN.md — DB schema: all tables with universal columns, soft-delete partial indexes, RLS policies, triggers, audit_log, modules seed, TypeScript types
+- [x] 01-03-PLAN.md — Auth + admin shell: login page, session management, protected routes, DAL, audit utility, responsive sidebar layout
+- [x] 01-04-PLAN.md — Reference entities: Companies, Departments (hierarchical), Role Tags CRUD with data tables, forms, soft delete, audit logging
 
 ---
 
@@ -60,11 +60,11 @@ Plans:
   4. Admin can import employees from a payroll system Excel file — existing employees (matched by employee number + company) are updated automatically, and new employees are created
   5. The composite unique key (employee number + company) is enforced: the same employee number can exist in different companies but not twice in the same company
 
-**Plans:** TBD (estimated 2 plans)
+**Plans:** 2 plans
 
 Plans:
-- [ ] 02-01: Employee CRUD — all fields, soft delete, status management, role tag multi-select, company/department FKs, composite key enforcement, filtered list with search
-- [ ] 02-02: Excel import — payroll column mapping, composite key matching, batch upsert, import confirmation flow
+- [ ] 02-01-PLAN.md — Employee CRUD: Zod schema (22 fields), 4 Server Actions (create/update/softDelete/suspend), cascading company/department selectors, role tag multi-select (Popover+Command), filterable/searchable/sortable employee list
+- [ ] 02-02-PLAN.md — Excel import: exceljs parsing, SECURITY DEFINER RPC upsert function (partial index workaround), import wizard with company selector + preview + confirm flow, column mapping for demo.xlsx
 
 ---
 
@@ -140,12 +140,12 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 4/4 | Complete | 2026-03-01 |
-| 2. Employees | 0/2 | Not started | - |
+| 2. Employees | 0/2 | Planned | - |
 | 3. Access Control | 0/3 | Not started | - |
 | 4. Projects | 0/2 | Not started | - |
 | 5. Settings and Observability | 0/3 | Not started | - |
@@ -171,4 +171,4 @@ Note: REQUIREMENTS.md stated "46 total" but the file contains 59 v1 requirements
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-01 after Phase 1 planning*
+*Last updated: 2026-03-01 after Phase 2 planning*
