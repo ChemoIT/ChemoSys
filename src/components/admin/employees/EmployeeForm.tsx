@@ -222,8 +222,12 @@ export function EmployeeForm({
   }
 
   function handleDeptChange(value: string) {
-    setSelectedDeptId(value)
+    setSelectedDeptId(value === '__none__' ? '' : value)
     setSelectedSubDeptId('')
+  }
+
+  function handleSubDeptChange(value: string) {
+    setSelectedSubDeptId(value === '__none__' ? '' : value)
   }
 
   // ---------------------------------------------------------------------------
@@ -509,7 +513,7 @@ export function EmployeeForm({
             <div className="space-y-2">
               <label className="text-sm font-medium leading-none">מחלקה</label>
               <Select
-                value={selectedDeptId}
+                value={selectedDeptId || '__none__'}
                 onValueChange={handleDeptChange}
                 disabled={!selectedCompanyId}
               >
@@ -517,7 +521,7 @@ export function EmployeeForm({
                   <SelectValue placeholder={selectedCompanyId ? 'בחר מחלקה' : 'בחר חברה תחילה'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">ללא מחלקה</SelectItem>
+                  <SelectItem value="__none__">ללא מחלקה</SelectItem>
                   {filteredDepts.map((d) => (
                     <SelectItem key={d.id} value={d.id}>
                       {d.name}
@@ -532,15 +536,15 @@ export function EmployeeForm({
             <div className="space-y-2">
               <label className="text-sm font-medium leading-none">תת-מחלקה</label>
               <Select
-                value={selectedSubDeptId}
-                onValueChange={setSelectedSubDeptId}
+                value={selectedSubDeptId || '__none__'}
+                onValueChange={handleSubDeptChange}
                 disabled={!selectedDeptId}
               >
                 <SelectTrigger>
                   <SelectValue placeholder={selectedDeptId ? 'בחר תת-מחלקה' : 'בחר מחלקה תחילה'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">ללא תת-מחלקה</SelectItem>
+                  <SelectItem value="__none__">ללא תת-מחלקה</SelectItem>
                   {filteredSubDepts.map((d) => (
                     <SelectItem key={d.id} value={d.id}>
                       {d.name}
