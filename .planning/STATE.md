@@ -5,33 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** Phase 1 — Foundation
+**Current focus:** Phase 1 — Foundation (awaiting Task 3 human verification checkpoint)
 
 ## Current Position
 
 Phase: 1 of 5 (Foundation)
-Plan: 3 of 4 in current phase
-Status: In progress
-Last activity: 2026-03-01 — Completed plan 01-03: login page, auth actions, admin shell with RTL sidebar, verifySession DAL, writeAuditLog utility
+Plan: 4 of 4 in current phase (code complete, checkpoint pending)
+Status: Checkpoint — awaiting human verification (Task 3 of Plan 01-04)
+Last activity: 2026-03-01 — Completed plan 01-04 Tasks 1 & 2: Companies/Departments/RoleTags CRUD, DataTable, DeleteConfirmDialog, Zod schemas
 
-Progress: [██████░░░░] 15%
+Progress: [████████░░] 20%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
+- Total plans completed: 4 (01-04 code complete, checkpoint pending)
 - Average duration: ~5 min
-- Total execution time: ~15 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min)
+- Total execution time: ~21 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min)
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-foundation | 3/4 | ~15 min | ~5 min |
+| 01-foundation | 4/4 | ~21 min | ~5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (scaffold + RTL + Supabase clients), 01-02 (DB schema), 01-03 (auth + admin shell)
-- Trend: On track, accelerating
+- Last 5 plans: 01-01 (scaffold + RTL + Supabase clients), 01-02 (DB schema), 01-03 (auth + admin shell), 01-04 (Companies/Departments/RoleTags CRUD)
+- Trend: On track, consistent velocity
 
 *Updated after each plan completion*
 
@@ -57,10 +57,13 @@ Recent decisions affecting current work:
 - [Phase 01-foundation]: getClaims() in verifySession — fast local JWT check, O(1), no network; proxy.ts uses getUser() for token refresh but DAL can use getClaims()
 - [Phase 01-foundation]: React cache() wraps verifySession — deduplicates JWT verification across nested layouts per request
 - [Phase 01-foundation]: SidebarNav as client component inside server Sidebar — only nav needs usePathname(), rest stays SSR
+- [01-04]: No Zod .transform() in DepartmentSchema — zodResolver type conflict with React Hook Form v7; null coercion moved to Server Action
+- [01-04]: DeleteConfirmDialog uses Dialog (not AlertDialog) — AlertDialog not in installed components; Dialog provides identical UX
+- [01-04]: Hidden inputs alongside shadcn/ui Select — Select.onValueChange does not write to FormData; hidden inputs required for Server Action access
 
 ### Pending Todos
 
-None yet.
+- [01-04 Checkpoint]: User must complete Task 3 visual/functional verification before Phase 1 is officially complete. See 01-04-SUMMARY.md for the 12-step verification checklist.
 
 ### Blockers/Concerns
 
@@ -72,5 +75,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Completed 01-03-PLAN.md — login page, auth actions, admin shell with RTL sidebar, verifySession DAL, writeAuditLog utility
+Stopped at: Completed 01-04-PLAN.md Tasks 1 & 2 — Companies/Departments/RoleTags CRUD with DataTable, DeleteConfirmDialog, Zod schemas, Server Actions, audit logging. Task 3 is checkpoint:human-verify pending user sign-off.
 Resume file: None
