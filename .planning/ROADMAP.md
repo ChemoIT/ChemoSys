@@ -35,13 +35,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Admin can create, edit, and soft-delete companies, departments (with parent-child hierarchy), and role tags — and soft-deleted records do not appear in lists
   5. Every create, update, and soft-delete action is automatically written to the audit log (who, what entity, when)
 
-**Plans:** TBD (estimated 4 plans)
+**Plans:** 4 plans
 
 Plans:
-- [ ] 01-01: Project scaffold — Next.js + Supabase + Tailwind RTL + Heebo font + brand theme
-- [ ] 01-02: DB schema — all tables with universal columns, soft-delete partial indexes, RLS, triggers, audit_log table, modules seed
-- [ ] 01-03: Auth — login page, session management, protected routes, DAL + permission infrastructure stubs
-- [ ] 01-04: Reference entities — Companies, Departments (hierarchical), Role Tags CRUD tabs with soft delete
+- [ ] 01-01-PLAN.md — Project scaffold: Next.js 16 + Supabase clients + Tailwind v4 RTL + Heebo font + brand theme
+- [ ] 01-02-PLAN.md — DB schema: all tables with universal columns, soft-delete partial indexes, RLS policies, triggers, audit_log, modules seed, TypeScript types
+- [ ] 01-03-PLAN.md — Auth + admin shell: login page, session management, protected routes, DAL, audit utility, responsive sidebar layout
+- [ ] 01-04-PLAN.md — Reference entities: Companies, Departments (hierarchical), Role Tags CRUD with data tables, forms, soft delete, audit logging
 
 ---
 
@@ -144,7 +144,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/4 | Not started | - |
+| 1. Foundation | 0/4 | Planned | - |
 | 2. Employees | 0/2 | Not started | - |
 | 3. Access Control | 0/3 | Not started | - |
 | 4. Projects | 0/2 | Not started | - |
@@ -171,4 +171,4 @@ Note: REQUIREMENTS.md stated "46 total" but the file contains 59 v1 requirements
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-01 after initial creation*
+*Last updated: 2026-03-01 after Phase 1 planning*
