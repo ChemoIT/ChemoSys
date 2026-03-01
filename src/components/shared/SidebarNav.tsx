@@ -41,7 +41,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 // Current phase — items below this phase are greyed out and non-interactive.
-const CURRENT_PHASE = 1;
+const CURRENT_PHASE = 2;
 
 export function SidebarNav() {
   const pathname = usePathname();

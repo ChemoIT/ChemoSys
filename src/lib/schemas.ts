@@ -49,3 +49,34 @@ export const RoleTagSchema = z.object({
 })
 
 export type RoleTagInput = z.infer<typeof RoleTagSchema>
+
+// ---------------------------------------------------------------------------
+// Employee
+// ---------------------------------------------------------------------------
+export const EmployeeSchema = z.object({
+  first_name:              z.string().min(1, 'שם פרטי הוא שדה חובה'),
+  last_name:               z.string().min(1, 'שם משפחה הוא שדה חובה'),
+  employee_number:         z.string().min(1, 'מספר עובד הוא שדה חובה'),
+  company_id:              z.string().uuid('חברה לא תקינה'),
+  id_number:               z.string().optional().or(z.literal('')),
+  gender:                  z.enum(['male', 'female', 'other']).optional(),
+  street:                  z.string().optional().or(z.literal('')),
+  house_number:            z.string().optional().or(z.literal('')),
+  city:                    z.string().optional().or(z.literal('')),
+  mobile_phone:            z.string().optional().or(z.literal('')),
+  additional_phone:        z.string().optional().or(z.literal('')),
+  email:                   z.string().optional().or(z.literal('')),
+  date_of_birth:           z.string().optional().or(z.literal('')),
+  start_date:              z.string().optional().or(z.literal('')),
+  end_date:                z.string().optional().or(z.literal('')),
+  status:                  z.enum(['active', 'suspended', 'inactive']).default('active'),
+  department_id:           z.string().uuid().optional().or(z.literal('')),
+  sub_department_id:       z.string().uuid().optional().or(z.literal('')),
+  passport_number:         z.string().optional().or(z.literal('')),
+  citizenship:             z.enum(['israeli', 'foreign']).optional(),
+  correspondence_language: z.enum(['hebrew', 'english', 'arabic', 'thai']).default('hebrew'),
+  profession:              z.string().optional().or(z.literal('')),
+  notes:                   z.string().optional().or(z.literal('')),
+})
+
+export type EmployeeInput = z.infer<typeof EmployeeSchema>
