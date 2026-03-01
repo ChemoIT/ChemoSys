@@ -5,34 +5,34 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** Phase 2 in progress — Employee CRUD complete (02-01)
+**Current focus:** Phase 2 — Employee CRUD + Excel Import built, awaiting human verification checkpoint
 
 ## Current Position
 
-Phase: 2 of 5 (Employees) — IN PROGRESS
-Plan: 1 of 2 complete in current phase
-Status: 02-01 (Employee CRUD) complete — ready for 02-02 (Excel Import)
-Last activity: 2026-03-01 — Phase 2 Plan 01 executed (employee CRUD full feature)
+Phase: 2 of 5 (Employees) — CHECKPOINT PENDING
+Plan: 2 of 2 automated tasks complete — awaiting Task 3 human-verify checkpoint
+Status: 02-02 automated tasks done — RPC migration must be applied in Supabase SQL editor before testing import
+Last activity: 2026-03-01 — Phase 2 Plan 02 executed (Excel import: migration, wizard, route)
 
-Progress: [███░░░░░░░] 25%
+Progress: [████░░░░░░] 30% (automated tasks done; checkpoint pending)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: ~6 min
-- Total execution time: ~28 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min, 02-01: ~7 min)
+- Total plans completed: 5 (+ 02-02 automated tasks, checkpoint pending)
+- Average duration: ~7 min
+- Total execution time: ~38 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min, 02-01: ~7 min, 02-02: ~10 min)
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation | 4/4 | ~21 min | ~5 min |
-| 02-employees  | 1/2 | ~7 min  | ~7 min  |
+| 02-employees  | 1/2 full + 1 checkpoint | ~17 min  | ~8 min  |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (DB schema), 01-03 (auth + admin shell), 01-04 (Companies/Departments/RoleTags CRUD), 02-01 (Employee CRUD — 22 fields, cascading selectors, role tag multi-select)
-- Trend: On track, slightly longer for large feature plans
+- Last 5 plans: 01-03 (auth + admin shell), 01-04 (Companies/Departments/RoleTags CRUD), 02-01 (Employee CRUD — 22 fields), 02-02 (Excel import wizard + RPC)
+- Trend: On track, feature plans averaging ~7-10 min
 
 *Updated after each plan completion*
 
@@ -67,20 +67,22 @@ Recent decisions affecting current work:
 - [02-01]: Multi-filter toolbar pre-processes raw data array before TanStack Table — simpler than setFilterValue with join data
 - [02-01]: EmployeesTable does not reuse DataTable.tsx — multi-filter toolbar not supported by DataTable
 - [02-01]: CURRENT_PHASE advanced 1 → 2 in SidebarNav — employees nav item now active
+- [02-02]: experimental.serverActions.bodySizeLimit in next.config.ts — Next.js 16 places serverActions under experimental, not top-level in NextConfig type
+- [02-02]: Buffer.from() + (as any) cast for ExcelJS — @types/node v22 Buffer<ArrayBuffer> vs exceljs types Buffer (non-generic) version mismatch; runtime-safe
+- [02-02]: audit log uses INSERT + entity_type='employee_import' — IMPORT is not a valid action enum value; distinct entity_type preserves audit trail query-ability
 
 ### Pending Todos
 
-None.
+- Apply migration 00004_employee_import_function.sql in Supabase SQL editor before testing import flow
 
 ### Blockers/Concerns
 
-- [Phase 2]: Get a real payroll Excel export file before implementing import logic — column names in Hebrew, date formats, and company identifiers must match the actual file structure
-- [Phase 2]: Design the company code → company_id mapping before Phase 2 begins (mapping table? wizard step?)
+- [Phase 2 checkpoint]: Migration 00004 must be applied manually in Supabase SQL editor — upsert_employee() RPC will not exist until then
 - [Phase 5]: Research cPanel API capabilities for config.ini read/write before Phase 5 planning
 - [Phase 4]: Decide react-leaflet vs Google Maps for project coordinates at Phase 4 planning time
 
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Completed 02-01-PLAN.md — Employee CRUD complete. Ready for 02-02 (Excel Import).
+Stopped at: 02-02 Task 3 checkpoint (human-verify) — automated tasks 1+2 complete, awaiting Sharon's verification of Phase 2 employee module
 Resume file: None
