@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-03-01)
 ## Current Position
 
 Phase: 1 of 5 (Foundation)
-Plan: 2 of 4 in current phase
+Plan: 3 of 4 in current phase
 Status: In progress
-Last activity: 2026-03-01 — Completed plan 01-01: Next.js 16 scaffold, RTL layout, brand theme, Supabase clients, proxy.ts
+Last activity: 2026-03-01 — Completed plan 01-03: login page, auth actions, admin shell with RTL sidebar, verifySession DAL, writeAuditLog utility
 
-Progress: [████░░░░░░] 10%
+Progress: [██████░░░░] 15%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: ~6 min
-- Total execution time: ~12 min (01-01: 6 min, 01-02: ~6 min est.)
+- Total plans completed: 3
+- Average duration: ~5 min
+- Total execution time: ~15 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min)
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-foundation | 2/4 | ~12 min | ~6 min |
+| 01-foundation | 3/4 | ~15 min | ~5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (scaffold + RTL + Supabase clients), 01-02 (DB schema)
-- Trend: On track
+- Last 5 plans: 01-01 (scaffold + RTL + Supabase clients), 01-02 (DB schema), 01-03 (auth + admin shell)
+- Trend: On track, accelerating
 
 *Updated after each plan completion*
 
@@ -54,6 +54,9 @@ Recent decisions affecting current work:
 - [01-02]: RLS UPDATE policies use USING (true) — allows soft-delete UPDATEs that set deleted_at (Pitfall 9)
 - [01-02]: Phase 1 RLS permissive for authenticated users — business logic enforced in Server Actions
 - [01-02]: All future-proofing stubs (employees, projects, users) created now so FK relationships are ready
+- [Phase 01-foundation]: getClaims() in verifySession — fast local JWT check, O(1), no network; proxy.ts uses getUser() for token refresh but DAL can use getClaims()
+- [Phase 01-foundation]: React cache() wraps verifySession — deduplicates JWT verification across nested layouts per request
+- [Phase 01-foundation]: SidebarNav as client component inside server Sidebar — only nav needs usePathname(), rest stays SSR
 
 ### Pending Todos
 
@@ -69,5 +72,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Completed 01-01-PLAN.md — Next.js 16 scaffold, RTL Hebrew layout, brand theme, Supabase clients, proxy.ts
+Stopped at: Completed 01-03-PLAN.md — login page, auth actions, admin shell with RTL sidebar, verifySession DAL, writeAuditLog utility
 Resume file: None
