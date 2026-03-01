@@ -12,7 +12,7 @@ ChemoSys is a Hebrew-first internal admin panel for Chemo Aharon Ltd. The system
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation** - Auth, DB schema, RTL shell, and all reference entities (companies, departments, role tags)
+- [x] **Phase 1: Foundation** - Auth, DB schema, RTL shell, and all reference entities (companies, departments, role tags)
 - [ ] **Phase 2: Employees** - Full employee CRUD with Excel import from payroll system
 - [ ] **Phase 3: Access Control** - Users, role templates, permissions matrix, and enforced navigation
 - [ ] **Phase 4: Projects** - Project management with employee-linked roles
@@ -144,7 +144,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/4 | Planned | - |
+| 1. Foundation | 4/4 | Complete | 2026-03-01 |
 | 2. Employees | 0/2 | Not started | - |
 | 3. Access Control | 0/3 | Not started | - |
 | 4. Projects | 0/2 | Not started | - |

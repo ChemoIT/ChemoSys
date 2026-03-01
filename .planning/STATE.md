@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** Phase 1 — Foundation (awaiting Task 3 human verification checkpoint)
+**Current focus:** Phase 1 complete — ready for Phase 2
 
 ## Current Position
 
-Phase: 1 of 5 (Foundation)
-Plan: 4 of 4 in current phase (code complete, checkpoint pending)
-Status: Checkpoint — awaiting human verification (Task 3 of Plan 01-04)
-Last activity: 2026-03-01 — Completed plan 01-04 Tasks 1 & 2: Companies/Departments/RoleTags CRUD, DataTable, DeleteConfirmDialog, Zod schemas
+Phase: 1 of 5 (Foundation) — COMPLETE
+Plan: 4 of 4 in current phase
+Status: Phase 1 verified and complete
+Last activity: 2026-03-01 — Phase 1 executed, verified, and approved by user
 
-Progress: [████████░░] 20%
+Progress: [██░░░░░░░░] 20%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4 (01-04 code complete, checkpoint pending)
+- Total plans completed: 4
 - Average duration: ~5 min
 - Total execution time: ~21 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min)
 
@@ -60,10 +60,12 @@ Recent decisions affecting current work:
 - [01-04]: No Zod .transform() in DepartmentSchema — zodResolver type conflict with React Hook Form v7; null coercion moved to Server Action
 - [01-04]: DeleteConfirmDialog uses Dialog (not AlertDialog) — AlertDialog not in installed components; Dialog provides identical UX
 - [01-04]: Hidden inputs alongside shadcn/ui Select — Select.onValueChange does not write to FormData; hidden inputs required for Server Action access
+- [01-04 checkpoint]: Department form simplified per user request — company_id and parent_dept_id removed from UI, company auto-assigned server-side
+- [01-04 checkpoint]: Table component RTL fix — text-left → text-start, pr-0 → pe-0
 
 ### Pending Todos
 
-- [01-04 Checkpoint]: User must complete Task 3 visual/functional verification before Phase 1 is officially complete. See 01-04-SUMMARY.md for the 12-step verification checklist.
+None.
 
 ### Blockers/Concerns
 
@@ -75,5 +77,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Completed 01-04-PLAN.md Tasks 1 & 2 — Companies/Departments/RoleTags CRUD with DataTable, DeleteConfirmDialog, Zod schemas, Server Actions, audit logging. Task 3 is checkpoint:human-verify pending user sign-off.
+Stopped at: Phase 1 complete and verified. Ready for Phase 2 planning.
 Resume file: None
