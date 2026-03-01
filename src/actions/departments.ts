@@ -35,15 +35,27 @@ export async function createDepartment(
 
   const { data: input } = parsed
 
+  // Auto-assign to first active company
+  const { data: firstCompany } = await supabase
+    .from('companies')
+    .select('id')
+    .is('deleted_at', null)
+    .order('created_at')
+    .limit(1)
+    .single()
+
+  if (!firstCompany) {
+    return { success: false, error: { _form: ['יש ליצור חברה לפני יצירת מחלקה'] } }
+  }
+
   // Insert into DB
   const { data, error } = await supabase
     .from('departments')
     .insert({
       name: input.name,
       dept_number: input.dept_number,
-      company_id: input.company_id,
-      // Empty string means top-level (no parent) — convert to null
-      parent_dept_id: input.parent_dept_id || null,
+      company_id: firstCompany.id,
+      parent_dept_id: null,
       notes: input.notes || null,
       created_by: session.userId,
     })
@@ -102,15 +114,12 @@ export async function updateDepartment(
     .eq('id', id)
     .single()
 
-  // Update record
+  // Update record (company_id and parent_dept_id unchanged)
   const { data, error } = await supabase
     .from('departments')
     .update({
       name: input.name,
       dept_number: input.dept_number,
-      company_id: input.company_id,
-      // Empty string means top-level (no parent) — convert to null
-      parent_dept_id: input.parent_dept_id || null,
       notes: input.notes || null,
       updated_by: session.userId,
     })

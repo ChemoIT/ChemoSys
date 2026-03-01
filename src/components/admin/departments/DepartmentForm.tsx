@@ -2,14 +2,7 @@
 
 /**
  * DepartmentForm — create/edit dialog for a Department record.
- *
- * Supports parent-child hierarchy:
- *   - Company dropdown populated from companies prop
- *   - Parent department dropdown filters by selected company_id
- *   - When company changes, parent department is reset
- *   - Cannot select itself as parent (edit mode guard)
- *
- * Uses React Hook Form + Zod resolver + useActionState Server Action binding.
+ * Simplified: only dept_number, name, notes. Company auto-assigned server-side.
  */
 
 import * as React from 'react'
@@ -17,7 +10,7 @@ import { useActionState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2 } from 'lucide-react'
-import type { Company, Department } from '@/types/entities'
+import type { Department } from '@/types/entities'
 import { DepartmentSchema, type DepartmentFormValues } from '@/lib/schemas'
 import { createDepartment, updateDepartment } from '@/actions/departments'
 import {
@@ -34,13 +27,6 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
@@ -48,8 +34,6 @@ interface DepartmentFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   department?: Department
-  companies: Pick<Company, 'id' | 'name'>[]
-  departments: Pick<Department, 'id' | 'name' | 'dept_number' | 'company_id'>[]
 }
 
 type ActionState = {
@@ -61,8 +45,6 @@ export function DepartmentForm({
   open,
   onOpenChange,
   department,
-  companies,
-  departments,
 }: DepartmentFormProps) {
   const isEdit = !!department
 
@@ -83,23 +65,9 @@ export function DepartmentForm({
     defaultValues: {
       name: department?.name ?? '',
       dept_number: department?.dept_number ?? '',
-      company_id: department?.company_id ?? '',
-      parent_dept_id: department?.parent_dept_id ?? '',
       notes: department?.notes ?? '',
     },
   })
-
-  // Track selected company_id to filter parent department options
-  const selectedCompanyId = form.watch('company_id')
-
-  // Filter available parent departments:
-  //   - Must belong to the selected company
-  //   - Must NOT be the current department (no self-reference)
-  const availableParents = departments.filter(
-    (d) =>
-      d.company_id === selectedCompanyId &&
-      (!isEdit || d.id !== department?.id)
-  )
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -107,18 +75,10 @@ export function DepartmentForm({
       form.reset({
         name: department?.name ?? '',
         dept_number: department?.dept_number ?? '',
-        company_id: department?.company_id ?? '',
-        parent_dept_id: department?.parent_dept_id ?? '',
         notes: department?.notes ?? '',
       })
     }
   }, [open, department, form])
-
-  // When company changes, reset parent_dept_id
-  useEffect(() => {
-    form.setValue('parent_dept_id', '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCompanyId])
 
   // Close dialog on success
   useEffect(() => {
@@ -176,73 +136,6 @@ export function DepartmentForm({
                   <FormControl>
                     <Input placeholder="שם המחלקה" {...field} />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* company_id — Select */}
-            <FormField
-              control={form.control}
-              name="company_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>חברה *</FormLabel>
-                  {/* Hidden input so formAction receives the value */}
-                  <input type="hidden" name="company_id" value={field.value} />
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="בחר חברה" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {companies.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* parent_dept_id — Select (optional) */}
-            <FormField
-              control={form.control}
-              name="parent_dept_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>מחלקת-אב (אופציונלי)</FormLabel>
-                  {/* Hidden input so formAction receives the value */}
-                  <input
-                    type="hidden"
-                    name="parent_dept_id"
-                    value={field.value ?? ''}
-                  />
-                  <Select
-                    value={field.value ?? ''}
-                    onValueChange={field.onChange}
-                    disabled={!selectedCompanyId}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="ללא מחלקת-אב (מחלקה ראשית)" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {availableParents.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.dept_number} — {d.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

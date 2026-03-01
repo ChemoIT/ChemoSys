@@ -32,10 +32,6 @@ export type CompanyInput = z.infer<typeof CompanySchema>
 export const DepartmentSchema = z.object({
   name: z.string().min(1, 'שם מחלקה הוא שדה חובה'),
   dept_number: z.string().min(1, 'מספר מחלקה הוא שדה חובה'),
-  company_id: z.string().uuid('יש לבחור חברה'),
-  // parent_dept_id: empty string means "no parent" (top-level department).
-  // The Server Action converts '' to null before inserting.
-  parent_dept_id: z.string().optional().or(z.literal('')),
   notes: z.string().optional().or(z.literal('')),
 })
 

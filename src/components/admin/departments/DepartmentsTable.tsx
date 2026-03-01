@@ -2,66 +2,41 @@
 
 /**
  * DepartmentsTable — data table for Department management.
- *
- * Columns: מספר מחלקה, שם מחלקה, חברה (name), מחלקת-אב (name or "---"), פעולות
+ * Columns: מספר מחלקה, שם מחלקה, הערות, פעולות
  * Search by department name.
- *
- * Props:
- *   departments — fetched with companies join: Department & { companies: { name: string } | null }
- *   companies   — for the create/edit form company dropdown
- *   allDepts    — all active departments (for parent dropdown in form)
  */
 
 import * as React from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Pencil, Trash2, Plus } from 'lucide-react'
-import type { Company, Department } from '@/types/entities'
+import type { Department } from '@/types/entities'
 import { softDeleteDepartment } from '@/actions/departments'
 import { DataTable } from '@/components/shared/DataTable'
 import { DeleteConfirmDialog } from '@/components/shared/DeleteConfirmDialog'
 import { DepartmentForm } from '@/components/admin/departments/DepartmentForm'
 import { Button } from '@/components/ui/button'
 
-// Extended type: departments fetched with company join
-export type DepartmentWithCompany = Department & {
-  companies: { name: string } | null
-}
-
 interface DepartmentsTableProps {
-  departments: DepartmentWithCompany[]
-  companies: Pick<Company, 'id' | 'name'>[]
-  allDepts: Pick<Department, 'id' | 'name' | 'dept_number' | 'company_id'>[]
+  departments: Department[]
 }
 
-export function DepartmentsTable({
-  departments,
-  companies,
-  allDepts,
-}: DepartmentsTableProps) {
+export function DepartmentsTable({ departments }: DepartmentsTableProps) {
   const [formOpen, setFormOpen] = React.useState(false)
   const [editingDept, setEditingDept] = React.useState<Department | undefined>()
-  const [deleteTarget, setDeleteTarget] = React.useState<DepartmentWithCompany | null>(null)
+  const [deleteTarget, setDeleteTarget] = React.useState<Department | null>(null)
   const [deleting, setDeleting] = React.useState(false)
-
-  // Build a lookup map: id -> name for parent department resolution
-  const deptNameMap = React.useMemo(() => {
-    const map = new Map<string, string>()
-    allDepts.forEach((d) => map.set(d.id, d.name))
-    return map
-  }, [allDepts])
 
   function openCreate() {
     setEditingDept(undefined)
     setFormOpen(true)
   }
 
-  function openEdit(dept: DepartmentWithCompany) {
-    // Pass the base Department type (without join) to the form
-    setEditingDept(dept as Department)
+  function openEdit(dept: Department) {
+    setEditingDept(dept)
     setFormOpen(true)
   }
 
-  function openDelete(dept: DepartmentWithCompany) {
+  function openDelete(dept: Department) {
     setDeleteTarget(dept)
   }
 
@@ -76,7 +51,7 @@ export function DepartmentsTable({
     }
   }
 
-  const columns: ColumnDef<DepartmentWithCompany>[] = [
+  const columns: ColumnDef<Department>[] = [
     {
       accessorKey: 'dept_number',
       header: 'מספר מחלקה',
@@ -84,20 +59,6 @@ export function DepartmentsTable({
     {
       accessorKey: 'name',
       header: 'שם מחלקה',
-    },
-    {
-      id: 'company_name',
-      header: 'חברה',
-      cell: ({ row }) => row.original.companies?.name ?? '---',
-    },
-    {
-      id: 'parent_name',
-      header: 'מחלקת-אב',
-      cell: ({ row }) => {
-        const parentId = row.original.parent_dept_id
-        if (!parentId) return '---'
-        return deptNameMap.get(parentId) ?? '---'
-      },
     },
     {
       id: 'actions',
@@ -149,8 +110,6 @@ export function DepartmentsTable({
         open={formOpen}
         onOpenChange={setFormOpen}
         department={editingDept}
-        companies={companies}
-        departments={allDepts}
       />
 
       {/* Delete confirmation dialog */}
