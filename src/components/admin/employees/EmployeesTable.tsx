@@ -418,15 +418,17 @@ export function EmployeesTable({
         </Table>
       </div>
 
-      {/* EmployeeForm dialog */}
-      <EmployeeForm
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        employee={editingEmployee}
-        companies={companies}
-        departments={departments}
-        roleTags={roleTags}
-      />
+      {/* EmployeeForm dialog — only mount when open to avoid heavy init cost */}
+      {formOpen && (
+        <EmployeeForm
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          employee={editingEmployee}
+          companies={companies}
+          departments={departments}
+          roleTags={roleTags}
+        />
+      )}
 
       {/* Delete confirmation dialog */}
       <DeleteConfirmDialog

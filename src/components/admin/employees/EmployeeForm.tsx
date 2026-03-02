@@ -179,6 +179,7 @@ export function EmployeeForm({
   // ---------------------------------------------------------------------------
 
   // Reset all state when dialog opens
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (open) {
       form.reset(buildDefaultValues(employee))
@@ -191,16 +192,18 @@ export function EmployeeForm({
       setSelectedLanguage(employee?.correspondence_language ?? 'hebrew')
       setSelectedRoleTagIds(employee?.role_tags?.map((r) => r.role_tag_id) ?? [])
     }
-  }, [open, employee, form])
+  }, [open, employee])
 
   // Close dialog on success
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (state?.success) {
       onOpenChange(false)
     }
-  }, [state, onOpenChange])
+  }, [state])
 
   // Apply server-side field errors
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (state?.error) {
       Object.entries(state.error).forEach(([field, messages]) => {
@@ -209,7 +212,7 @@ export function EmployeeForm({
         }
       })
     }
-  }, [state, form])
+  }, [state])
 
   // ---------------------------------------------------------------------------
   // Cascading handlers
