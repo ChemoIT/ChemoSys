@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-01)
 ## Current Position
 
 Phase: 05-settings-observability 🔄 IN PROGRESS
-Plan: 1/3 — Plan 01 (Dashboard) complete
-Status: Plan 05-01 complete. Dashboard live at /admin/dashboard. Next: Plan 05-02 (Audit Log).
-Last activity: 2026-03-03 — Plan 05-01 executed. Dashboard with StatsCards + ActivityFeed.
+Plan: 2/3 — Plan 02 (Audit Log) complete
+Status: Plan 05-02 complete. Audit log viewer live at /admin/audit-log. Next: Plan 05-03 (Settings).
+Last activity: 2026-03-03 — Plan 05-02 executed. AuditLogTable + filters + export + AuditDiffView.
 
-Progress: [████████████████████] Phases 1–4 + 03.1 complete | Phase 5: 1/3 plans done
+Progress: [████████████████████] Phases 1–4 + 03.1 complete | Phase 5: 2/3 plans done
 
 ## Performance Metrics
 
@@ -32,7 +32,7 @@ Progress: [████████████████████] Phases 
 | 03-access-control | 3/3 | ~9 min  | ~4.5 min |
 | 03.1-security-hardening | 3/3 COMPLETE | ~13 min | ~4 min |
 | 04-projects | 3/3 COMPLETE ✓ | ~20 min | ~7 min |
-| 05-settings-observability | 1/3 | ~3 min | ~3 min |
+| 05-settings-observability | 2/3 | ~25 min | ~12 min |
 
 **Recent Trend:**
 - Phase 4 completed with 5 feedback fixes from Sharon + 1 browser client bugfix
@@ -118,6 +118,11 @@ Recent decisions affecting current work:
 - [05-01]: Two-step user name resolution for audit_log: audit_log.user_id → auth.users(id), NOT public.users; must query public.users WHERE auth_user_id IN (distinct_user_ids) and merge via Map
 - [05-01]: 7 parallel queries in DashboardPage via Promise.all — 6 entity counts + 1 audit_log fetch, fresh load on every visit with no caching
 - [05-01]: ActivityFeed uses formatDistanceToNow with date-fns/locale/he for Hebrew relative timestamps
+- [05-02]: AuditLogTable is a dedicated component — DataTable.tsx does not support getExpandedRowModel and cannot be reused
+- [05-02]: Server-side filtering via URL search params for audit log — scalable for large tables, aligns with "fresh load on every page visit" requirement
+- [05-02]: Separate /api/export-audit Route Handler (not extending /api/export) — filter params via query string, clean separation of concerns
+- [05-02]: Date filter UTC boundaries: gte 'T00:00:00.000Z', lte 'T23:59:59.999Z' to avoid timezone cutoff (Pitfall 6)
+- [05-02]: Max 10,000 rows for audit export — prevents memory issues on large datasets
 
 ### Roadmap Evolution
 
@@ -135,5 +140,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 05-01-PLAN.md — Dashboard page at /admin/dashboard with StatsCards and ActivityFeed
+Stopped at: Completed 05-02-PLAN.md — Audit log viewer at /admin/audit-log with filters, expandable rows, and export
 Resume file: None
