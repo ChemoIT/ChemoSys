@@ -82,3 +82,13 @@ export const EmployeeSchema = z.object({
 })
 
 export type EmployeeInput = z.infer<typeof EmployeeSchema>
+
+// ---------------------------------------------------------------------------
+// Role Template
+// ---------------------------------------------------------------------------
+export const TemplateSchema = z.object({
+  name: z.string().min(1, 'שם תבנית הוא שדה חובה'),
+  description: z.string().optional().or(z.literal('')),
+})
+
+export type TemplateInput = z.infer<typeof TemplateSchema>
