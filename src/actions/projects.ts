@@ -90,12 +90,11 @@ export async function createProject(
 
   const input = parsed.data
 
-  // Insert project — project_number = '' triggers PR26XXXXXX auto-generation
+  // Insert project — if no project_number given, '' triggers PR26XXXXXX auto-generation
   const { data, error } = await supabase
     .from('projects')
     .insert({
       name:           input.name,
-      project_number: '',  // DB trigger fills this in
       open_date:      nullIfEmpty(input.open_date),
       expense_number: nullIfEmpty(input.expense_number),
       description:    nullIfEmpty(input.description),
@@ -117,6 +116,7 @@ export async function createProject(
       // CVC
       camp_vehicle_coordinator_id: nullIfEmpty(input.camp_vehicle_coordinator_id),
       cvc_is_employee:             input.cvc_is_employee,
+      cvc_name:                    nullIfEmpty(input.cvc_name),
       cvc_phone:                   nullIfEmpty(input.cvc_phone),
 
       // Client
@@ -135,6 +135,9 @@ export async function createProject(
       latitude:  input.latitude  ?? null,
       longitude: input.longitude ?? null,
       radius:    input.radius,
+
+      // Project number: if user entered one, use it; otherwise trigger auto-generates
+      project_number: nullIfEmpty(input.project_number) ?? '',
 
       created_by: session.userId,
     })
@@ -259,6 +262,7 @@ export async function updateProject(
       // CVC
       camp_vehicle_coordinator_id: nullIfEmpty(input.camp_vehicle_coordinator_id),
       cvc_is_employee:             input.cvc_is_employee,
+      cvc_name:                    nullIfEmpty(input.cvc_name),
       cvc_phone:                   nullIfEmpty(input.cvc_phone),
 
       // Client

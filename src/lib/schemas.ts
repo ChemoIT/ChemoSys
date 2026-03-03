@@ -122,6 +122,7 @@ export const ProjectSchema = z
     // Camp/Vehicle Coordinator
     camp_vehicle_coordinator_id: z.string().uuid('רכז מחנה/רכב לא תקין').optional().or(z.literal('')),
     cvc_is_employee:             z.boolean().default(true),
+    cvc_name:                    z.string().optional().or(z.literal('')),
     cvc_phone:                   z.string().optional().or(z.literal('')),
 
     // Client
@@ -145,24 +146,30 @@ export const ProjectSchema = z
     attendance_clocks: z.string().optional().or(z.literal('')),
   })
   .superRefine((data, ctx) => {
-    // Conditional CVC phone validation:
-    // When cvc_is_employee is false (external contact), cvc_phone is required
-    // and must be a valid Israeli mobile number.
+    // Conditional CVC validation:
+    // When cvc_is_employee is false (external contact), both name and phone are required.
     if (!data.cvc_is_employee) {
+      if (!data.cvc_name || data.cvc_name.trim() === '') {
+        ctx.addIssue({
+          code:    z.ZodIssueCode.custom,
+          path:    ['cvc_name'],
+          message: 'שם אחראי רכב/מחנה הוא שדה חובה כאשר הרכז אינו עובד',
+        })
+      }
       if (!data.cvc_phone || data.cvc_phone.trim() === '') {
         ctx.addIssue({
           code:    z.ZodIssueCode.custom,
           path:    ['cvc_phone'],
-          message: 'טלפון רכז רכב/מחנה הוא שדה חובה כאשר הרכז אינו עובד',
+          message: 'טלפון אחראי רכב/מחנה הוא שדה חובה כאשר הרכז אינו עובד',
         })
       } else {
-        // Israeli mobile: 05X-XXXXXXX format (050-059)
+        // Israeli mobile: 05X-XXXXXXX format (050-059), allow dashes
         const israeliMobileRegex = /^0(5[0-9])[0-9]{7}$/
         if (!israeliMobileRegex.test(data.cvc_phone.replace(/[-\s]/g, ''))) {
           ctx.addIssue({
             code:    z.ZodIssueCode.custom,
             path:    ['cvc_phone'],
-            message: 'מספר טלפון נייד ישראלי לא תקין (דוגמה: 0521234567)',
+            message: 'מספר טלפון נייד ישראלי לא תקין (דוגמה: 052-1234567)',
           })
         }
       }

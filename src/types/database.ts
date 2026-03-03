@@ -398,6 +398,7 @@ export interface Database {
           // Camp/Vehicle Coordinator
           camp_vehicle_coordinator_id: string | null
           cvc_is_employee: boolean
+          cvc_name: string | null
           cvc_phone: string | null
           // Client
           client_name: string | null
@@ -443,6 +444,7 @@ export interface Database {
           // Camp/Vehicle Coordinator
           camp_vehicle_coordinator_id?: string | null
           cvc_is_employee?: boolean
+          cvc_name?: string | null
           cvc_phone?: string | null
           // Client
           client_name?: string | null
