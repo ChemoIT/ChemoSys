@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-01)
 
 ## Current Position
 
-Phase: 03.1-security-hardening (COMPLETE)
-Plan: 3/3 complete (03.1-01 done, 03.1-02 done, 03.1-03 done)
-Status: Phase 03.1 complete — security headers + CSP + server-only + rate limiting + PII log fix + encryption key + admin-only RLS on user_permissions
-Last activity: 2026-03-03 — 03.1-03 complete: migration 00013 tightens user_permissions RLS to admin-only writes
+Phase: 04-projects (IN PROGRESS)
+Plan: 1/3 complete (04-01 done)
+Status: Phase 04 started — 04-01 complete: migration 00014 + ProjectSchema + 3 Server Actions + ProjectForm dialog
+Last activity: 2026-03-03 — 04-01 complete: project CRUD foundation (migration, schema, actions, form)
 
-Progress: [████████████] 68% (Phase 3 + 03.1 complete — Phase 4 next)
+Progress: [█████████████░] 72% (Phase 04 plan 1/3 complete)
 
 ## Performance Metrics
 
@@ -31,6 +31,7 @@ Progress: [████████████] 68% (Phase 3 + 03.1 complete �
 | 02-employees     | 2/2 | ~17 min | ~8 min |
 | 03-access-control | 3/3 | ~9 min  | ~4.5 min |
 | 03.1-security-hardening | 3/3 COMPLETE | ~13 min | ~4 min |
+| 04-projects             | 1/3         | ~5 min  | ~5 min |
 
 **Recent Trend:**
 - Last 5 plans: 03-03 (correction), 03.1-01 (security headers + CSP + server-only), 03.1-02 (rate limiting + PII fix + encryption key), 03.1-03 (admin-only RLS on user_permissions)
@@ -100,6 +101,11 @@ Recent decisions affecting current work:
 - [03.1-03]: user_permissions SELECT policy left permissive — reads are harmless; get_user_permissions() SECURITY DEFINER is the real guard
 - [03.1-03]: RLS admin gate pattern: EXISTS (SELECT 1 FROM users WHERE auth_user_id = auth.uid() AND is_admin = true AND deleted_at IS NULL)
 - [03.1-03]: Bootstrap admin (no public.users row) unaffected — createAdminClient() service role key bypasses RLS entirely
+- [04-01]: generate_project_number() returns PR{YY}{6-digit-seq} — year from CURRENT_DATE, sequence never resets between years
+- [04-01]: project_number is immutable after creation — updateProject never includes it in UPDATE payload
+- [04-01]: softDeleteProject uses SECURITY DEFINER RPC soft_delete_project() — same pattern as employees (00007)
+- [04-01]: EmployeeSearchDialog reused with linkedEmployeeIds=[] for PM/SM/CVC selectors — any active employee can be assigned
+- [04-01]: EmployeeSearchDialog portals rendered outside main ProjectForm dialog — avoids z-index stacking
 
 ### Roadmap Evolution
 
@@ -118,5 +124,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Phase 03.1 COMPLETE — all 3 plans done (including 03.1-03 RLS hardening). Next: Phase 4 (Projects, Map, Dashboard)
+Stopped at: Phase 04 plan 04-01 COMPLETE — project CRUD foundation: migration 00014 + ProjectSchema + 3 Server Actions + ProjectForm. Next: 04-02 (projects list page)
 Resume file: None
