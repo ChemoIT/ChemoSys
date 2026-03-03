@@ -12,7 +12,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { verifySession, requirePermission } from '@/lib/dal'
+import { verifySession } from '@/lib/dal'
 import { writeAuditLog } from '@/lib/audit'
 import { CompanySchema } from '@/lib/schemas'
 
@@ -25,7 +25,6 @@ export async function createCompany(
   formData: FormData
 ): Promise<{ success: boolean; error?: Record<string, string[]> }> {
   const session = await verifySession()
-  await requirePermission('companies', 2)
   const supabase = await createClient()
 
   // Validate form data
@@ -86,7 +85,6 @@ export async function updateCompany(
   formData: FormData
 ): Promise<{ success: boolean; error?: Record<string, string[]> }> {
   const session = await verifySession()
-  await requirePermission('companies', 2)
   const supabase = await createClient()
 
   // Validate form data
@@ -153,7 +151,6 @@ export async function softDeleteCompany(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
   const session = await verifySession()
-  await requirePermission('companies', 2)
   const supabase = await createClient()
 
   // Fetch old data for audit log

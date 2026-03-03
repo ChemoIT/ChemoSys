@@ -16,7 +16,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { verifySession, requirePermission } from '@/lib/dal'
+import { verifySession } from '@/lib/dal'
 import { writeAuditLog } from '@/lib/audit'
 import { TemplateSchema } from '@/lib/schemas'
 
@@ -65,7 +65,6 @@ export async function createTemplate(
   formData: FormData
 ): Promise<{ success: boolean; error?: Record<string, string[]> }> {
   const session = await verifySession()
-  await requirePermission('templates', 2)
   const supabase = await createClient()
 
   // Validate template metadata fields
@@ -138,7 +137,6 @@ export async function updateTemplate(
   formData: FormData
 ): Promise<{ success: boolean; error?: Record<string, string[]> }> {
   const session = await verifySession()
-  await requirePermission('templates', 2)
   const supabase = await createClient()
 
   // Validate template metadata fields
@@ -224,7 +222,6 @@ export async function softDeleteTemplate(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
   const session = await verifySession()
-  await requirePermission('templates', 2)
   const supabase = await createClient()
 
   // Fetch old data for audit log

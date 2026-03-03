@@ -44,7 +44,7 @@
 import { revalidatePath } from 'next/cache'
 import ExcelJS from 'exceljs'
 import { createClient } from '@/lib/supabase/server'
-import { verifySession, requirePermission } from '@/lib/dal'
+import { verifySession } from '@/lib/dal'
 import { writeAuditLog } from '@/lib/audit'
 import { EmployeeSchema } from '@/lib/schemas'
 
@@ -293,7 +293,6 @@ export async function createEmployee(
   formData: FormData
 ): Promise<ActionState> {
   const session = await verifySession()
-  await requirePermission('employees', 2)
   const supabase = await createClient()
 
   // Extract role_tag_ids before parsing (they're not in EmployeeSchema)
@@ -398,7 +397,6 @@ export async function updateEmployee(
   formData: FormData
 ): Promise<ActionState> {
   const session = await verifySession()
-  await requirePermission('employees', 2)
   const supabase = await createClient()
 
   // Extract role_tag_ids before parsing
@@ -517,7 +515,6 @@ export async function softDeleteEmployee(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
   const session = await verifySession()
-  await requirePermission('employees', 2)
   const supabase = await createClient()
 
   // Fetch old data for audit log (also verifies the row exists)
@@ -569,7 +566,6 @@ export async function bulkSoftDeleteEmployees(
   if (ids.length === 0) return { success: true, deleted: 0 }
 
   const session = await verifySession()
-  await requirePermission('employees', 2)
   const supabase = await createClient()
 
   // Soft-delete via RPC — SECURITY DEFINER function bypasses RLS.
@@ -608,7 +604,6 @@ export async function suspendEmployee(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
   const session = await verifySession()
-  await requirePermission('employees', 2)
   const supabase = await createClient()
 
   const { data: oldData } = await supabase
@@ -652,7 +647,6 @@ export async function reactivateEmployee(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
   const session = await verifySession()
-  await requirePermission('employees', 2)
   const supabase = await createClient()
 
   const { data: oldData } = await supabase

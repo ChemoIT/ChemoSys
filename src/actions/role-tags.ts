@@ -11,7 +11,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { verifySession, requirePermission } from '@/lib/dal'
+import { verifySession } from '@/lib/dal'
 import { writeAuditLog } from '@/lib/audit'
 import { RoleTagSchema } from '@/lib/schemas'
 
@@ -24,7 +24,6 @@ export async function createRoleTag(
   formData: FormData
 ): Promise<{ success: boolean; error?: Record<string, string[]> }> {
   const session = await verifySession()
-  await requirePermission('role_tags', 2)
   const supabase = await createClient()
 
   // Validate form data
@@ -82,7 +81,6 @@ export async function updateRoleTag(
   formData: FormData
 ): Promise<{ success: boolean; error?: Record<string, string[]> }> {
   const session = await verifySession()
-  await requirePermission('role_tags', 2)
   const supabase = await createClient()
 
   // Validate form data
@@ -146,7 +144,6 @@ export async function softDeleteRoleTag(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
   const session = await verifySession()
-  await requirePermission('role_tags', 2)
   const supabase = await createClient()
 
   // Fetch old data for audit log

@@ -16,7 +16,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { verifySession, requirePermission } from '@/lib/dal'
+import { verifySession } from '@/lib/dal'
 import { writeAuditLog } from '@/lib/audit'
 
 // ---------------------------------------------------------------------------
@@ -47,7 +47,6 @@ export async function createUser(
   formData: FormData
 ): Promise<ActionResult> {
   const session = await verifySession()
-  await requirePermission('users', 2)
   const supabase = await createClient()
   const adminClient = createAdminClient()
 
@@ -137,7 +136,6 @@ export async function updateUser(
   formData: FormData
 ): Promise<ActionResult> {
   const session = await verifySession()
-  await requirePermission('users', 2)
   const supabase = await createClient()
 
   const notes = formData.get('notes') as string | null
@@ -190,7 +188,6 @@ export async function updateUser(
  */
 export async function softDeleteUser(id: string): Promise<SimpleResult> {
   const session = await verifySession()
-  await requirePermission('users', 2)
   const supabase = await createClient()
   const adminClient = createAdminClient()
 
@@ -257,7 +254,6 @@ export async function softDeleteUser(id: string): Promise<SimpleResult> {
  */
 export async function blockUser(id: string): Promise<SimpleResult> {
   const session = await verifySession()
-  await requirePermission('users', 2)
   const supabase = await createClient()
   const adminClient = createAdminClient()
 
@@ -316,7 +312,6 @@ export async function blockUser(id: string): Promise<SimpleResult> {
  */
 export async function unblockUser(id: string): Promise<SimpleResult> {
   const session = await verifySession()
-  await requirePermission('users', 2)
   const supabase = await createClient()
   const adminClient = createAdminClient()
 
@@ -383,7 +378,6 @@ export async function assignTemplate(
   templateId: string
 ): Promise<SimpleResult> {
   const session = await verifySession()
-  await requirePermission('users', 2)
   return assignTemplateInternal(userId, templateId, session.userId)
 }
 
@@ -469,7 +463,6 @@ export async function saveUserPermissions(
   formData: FormData
 ): Promise<SimpleResult> {
   const session = await verifySession()
-  await requirePermission('users', 2)
   const supabase = await createClient()
 
   const MODULE_KEYS = [
