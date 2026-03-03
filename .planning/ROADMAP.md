@@ -125,10 +125,13 @@ Plans:
   7. Admin can edit and soft-delete projects; list filterable by 3-state status with active count
   8. Admin can export any admin table to Excel/CSV
 
-**Plans:** TBD (re-planning required — previous plans reverted due to requirement changes)
+**Plans:** 4 plans
 
 Plans:
-- [ ] TBD — Re-plan with `/gsd:plan-phase 4`
+- [ ] 04-01-PLAN.md — DB migration 00014 (projects rebuild + attendance_clocks + triggers + RLS + soft-delete RPC) + TypeScript types + ProjectSchema + Server Actions + CSP update + leaflet install
+- [ ] 04-02-PLAN.md — ProjectForm dialog: EmployeeCombobox, ProjectLocationPicker (react-leaflet), all 7 form sections (basic, managers, CVC, client, supervision, clocks, map)
+- [ ] 04-03-PLAN.md — ProjectsTable with 3-state status filter + active count + projects page + universal Excel/CSV export Route Handler + SidebarNav update
+- [ ] 04-04-PLAN.md — Checkpoint: apply migration 00014 + full Phase 4 human verification (53-step checklist)
 
 ---
 
@@ -166,7 +169,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 03.1 -> 4 -> 5
 | 2. Employees | 2/2 | Complete | 2026-03-01 |
 | 3. Access Control | 3/3 | Complete | 2026-03-03 |
 | 03.1. Security Hardening | 3/3 | Complete | 2026-03-03 |
-| 4. Projects | 0/TBD | Re-planning | - |
+| 4. Projects | 0/4 | Planned | - |
 | 5. Settings and Observability | 0/3 | Not started | - |
 
 ---
@@ -180,14 +183,14 @@ All 59 v1 requirements mapped to exactly one phase.
 | 1. Foundation | FOUND-01, FOUND-02, FOUND-03, FOUND-04, FOUND-05, AUTH-01, AUTH-02, AUTH-03, AUTH-04, COMP-01, COMP-02, COMP-03, COMP-04, DEPT-01, DEPT-02, DEPT-03, DEPT-04, RTAG-01, RTAG-02, RTAG-03, AUDT-01 |
 | 2. Employees | EMPL-01, EMPL-02, EMPL-03, EMPL-04, EMPL-05, EMPL-06, EMPL-07, EMPL-08, EMPL-09, EMPL-10 |
 | 3. Access Control | USER-01, USER-02, USER-03, USER-04, USER-05, USER-06, USER-07, TMPL-01, TMPL-02, TMPL-03, TMPL-04, TMPL-05, NAVP-01, NAVP-02, NAVP-03 |
-| 4. Projects | PROJ-01, PROJ-02, PROJ-03, PROJ-04, PROJ-05, PROJ-06 |
+| 4. Projects | PROJ-01, PROJ-02, PROJ-03, PROJ-04, PROJ-05, PROJ-06, PROJ-07, PROJ-08, PROJ-09, PROJ-10, PROJ-11, EXPORT-01 |
 | 5. Settings and Observability | SETT-01, SETT-02, SETT-03, SETT-04, AUDT-02, DASH-01, DASH-02 |
 
-**Total mapped: 59/59**
+**Total mapped: 65/65**
 
-Note: REQUIREMENTS.md stated "46 total" but the file contains 59 v1 requirements. All 59 are mapped above. The stated count was set before requirements were finalized and has been corrected in the traceability table.
+Note: Phase 4 requirements expanded from 6 to 12 (PROJ-07 through PROJ-11 + EXPORT-01 added 2026-03-03).
 
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-03 — Phase 4 requirements expanded (12 reqs), previous plans reverted, awaiting re-plan*
+*Last updated: 2026-03-03 — Phase 4 planned: 4 plans in 3 waves*
