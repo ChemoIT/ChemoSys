@@ -92,6 +92,21 @@ Plans:
 
 ---
 
+### Phase 03.1: Security Hardening (INSERTED)
+
+**Goal:** Apply security hardening across the full Next.js 16 + Supabase admin system before deployment: upgrade patched Next.js version (CVE fix), add security headers + CSP, add rate limiting on login, tighten RLS on user_permissions, and fix minor security gaps (server-only guard, PII logs, encryption key).
+
+**Depends on:** Phase 3
+
+**Plans:** 3 plans
+
+Plans:
+- [ ] 03.1-01-PLAN.md — Next.js CVE patch + security headers + CSP in next.config.ts + server-only guard on dal.ts
+- [ ] 03.1-02-PLAN.md — Rate limiting on login Server Action + PII log fix in employee import + encryption key env var
+- [ ] 03.1-03-PLAN.md — RLS migration 00013: tighten user_permissions write policies to admin-only
+
+---
+
 ### Phase 4: Projects
 
 **Goal:** The admin can manage the full project registry — each project has a unique auto-generated number, is linked to employee managers, and the list is filterable by status.
@@ -140,13 +155,14 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
+Phases execute in numeric order: 1 -> 2 -> 3 -> 03.1 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 4/4 | Complete | 2026-03-01 |
 | 2. Employees | 2/2 | Complete | 2026-03-01 |
 | 3. Access Control | 3/3 | Complete | 2026-03-03 |
+| 03.1. Security Hardening | 0/3 | Planned | - |
 | 4. Projects | 0/2 | Not started | - |
 | 5. Settings and Observability | 0/3 | Not started | - |
 
@@ -171,4 +187,4 @@ Note: REQUIREMENTS.md stated "46 total" but the file contains 59 v1 requirements
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-03 after Phase 3 complete + architectural clarification (admin interface is Sharon-only; permissions infrastructure for future ChemoSys)*
+*Last updated: 2026-03-03 — Phase 03.1 Security Hardening planned (3 plans, 1 wave)*
