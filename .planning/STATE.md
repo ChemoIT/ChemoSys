@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** Phase 5 — Settings & Observability (in progress)
+**Current focus:** Phase 5 — Settings & Observability COMPLETE ✓
 
 ## Current Position
 
-Phase: 05-settings-observability 🔄 IN PROGRESS
-Plan: 2/3 — Plan 02 (Audit Log) complete
-Status: Plan 05-02 complete. Audit log viewer live at /admin/audit-log. Next: Plan 05-03 (Settings).
-Last activity: 2026-03-03 — Plan 05-02 executed. AuditLogTable + filters + export + AuditDiffView.
+Phase: 05-settings-observability ✅ COMPLETE
+Plan: 3/3 — all plans complete
+Status: Phase 5 complete. Dashboard + Audit Log + Integration Settings all live. Ready for verification.
+Last activity: 2026-03-03 — Plan 05-03 executed. Integration settings page with 5 accordion sections.
 
 Progress: [████████████████████] Phases 1–4 + 03.1 complete | Phase 5: 2/3 plans done
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 14 (Phase 1: 4, Phase 2: 2, Phase 3: 2, Phase 03.1: 3, Phase 4: 3)
+- Total plans completed: 17 (Phase 1: 4, Phase 2: 2, Phase 3: 2, Phase 03.1: 3, Phase 4: 3, Phase 5: 3)
 - Average duration: ~5.5 min
-- Total execution time: ~80 min
+- Total execution time: ~92 min
 
 **By Phase:**
 
@@ -32,11 +32,11 @@ Progress: [████████████████████] Phases 
 | 03-access-control | 3/3 | ~9 min  | ~4.5 min |
 | 03.1-security-hardening | 3/3 COMPLETE | ~13 min | ~4 min |
 | 04-projects | 3/3 COMPLETE ✓ | ~20 min | ~7 min |
-| 05-settings-observability | 2/3 | ~25 min | ~12 min |
+| 05-settings-observability | 3/3 COMPLETE ✓ | ~37 min | ~12 min |
 
 **Recent Trend:**
-- Phase 4 completed with 5 feedback fixes from Sharon + 1 browser client bugfix
-- Logo upload initially failed due to wrong env var — fixed by using existing browser.ts singleton
+- Phase 5 completed: Dashboard, Audit Log Viewer, Integration Settings all live
+- AuditLogTable.tsx was missing from working tree (post-Plan-02 deletion) — restored from git history (Rule 3 auto-fix)
 
 *Updated after each plan completion*
 
@@ -123,6 +123,11 @@ Recent decisions affecting current work:
 - [05-02]: Separate /api/export-audit Route Handler (not extending /api/export) — filter params via query string, clean separation of concerns
 - [05-02]: Date filter UTC boundaries: gte 'T00:00:00.000Z', lte 'T23:59:59.999Z' to avoid timezone cutoff (Pitfall 6)
 - [05-02]: Max 10,000 rows for audit export — prevents memory issues on large datasets
+- [05-03]: env-settings uses process.env in-memory mutation after fs.writeFile — settings take effect immediately without restart; TypeScript requires (process.env as Record<string, string>)[key] cast
+- [05-03]: Sensitive fields masked with first 4 chars + *** on server side; hasSavedXxx boolean sent to client for placeholder UX
+- [05-03]: Empty password field on save = preserve existing env value (never overwrite with empty string)
+- [05-03]: FTP test uses TCP socket via Node.js net module — no ftp library needed, checks host:port reachability with 5s timeout
+- [05-03]: AuditLogTable.tsx was missing from working tree post-Plan-02 commit — restored via git checkout b121753 (Rule 3 auto-fix)
 
 ### Roadmap Evolution
 
@@ -140,5 +145,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 05-02-PLAN.md — Audit log viewer at /admin/audit-log with filters, expandable rows, and export
+Stopped at: Completed 05-03-PLAN.md — Integration settings page at /admin/settings with 5 accordion sections
 Resume file: None
