@@ -3,15 +3,19 @@
  * Fetches all active role tags and renders the RoleTagsTable client component.
  */
 
-import { verifySession } from '@/lib/dal'
+import { verifySession, checkPagePermission } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
 import { RoleTagsTable } from '@/components/admin/role-tags/RoleTagsTable'
 import { RefreshButton } from '@/components/shared/RefreshButton'
 import { Badge } from '@/components/ui/badge'
+import { AccessDenied } from '@/components/shared/AccessDenied'
 
 export default async function RoleTagsPage() {
   // Auth guard — redirects to /login if no valid session
   await verifySession()
+
+  const hasAccess = await checkPagePermission('role_tags', 1)
+  if (!hasAccess) return <AccessDenied />
 
   const supabase = await createClient()
 

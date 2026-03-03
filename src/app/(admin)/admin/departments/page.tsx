@@ -3,15 +3,19 @@
  * Fetches active departments for table display.
  */
 
-import { verifySession } from '@/lib/dal'
+import { verifySession, checkPagePermission } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
 import { DepartmentsTable } from '@/components/admin/departments/DepartmentsTable'
 import { RefreshButton } from '@/components/shared/RefreshButton'
 import { Badge } from '@/components/ui/badge'
 import type { Department } from '@/types/entities'
+import { AccessDenied } from '@/components/shared/AccessDenied'
 
 export default async function DepartmentsPage() {
   await verifySession()
+
+  const hasAccess = await checkPagePermission('departments', 1)
+  if (!hasAccess) return <AccessDenied />
 
   const supabase = await createClient()
 
