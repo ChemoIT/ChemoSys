@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** Phase 3 — COMPLETE ✓ (Templates CRUD, User management, permission infrastructure — admin shell enforcement corrected and removed)
+**Current focus:** Phase 03.1 — Security Hardening (in progress — Plan 01 complete)
 
 ## Current Position
 
-Phase: 3 of 5 (Access Control) — COMPLETE
-Plan: 3/3 complete
-Status: Phase 3 done — architectural correction applied: permission enforcement removed from admin shell (admin is Sharon-only); infrastructure intact for ChemoSys
-Last activity: 2026-03-03 — Phase 3 complete, admin shell permission guards removed (Groups A/B/C)
+Phase: 03.1-security-hardening (security hardening between Phase 3 and Phase 4)
+Plan: 1/2 complete (03.1-01 done, 03.1-02 rate limiting next)
+Status: 03.1-01 complete — security headers + CSP + server-only guard on dal.ts
+Last activity: 2026-03-03 — 03.1-01 complete: next.config.ts security headers, CSP, dal.ts server-only
 
-Progress: [██████████] 60% (3 of 5 phases complete)
+Progress: [██████████] 60% (Phase 3 of 5 complete — Phase 03.1 in progress)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7 (Phase 1: 4, Phase 2: 2 full, Phase 3: 2)
-- Average duration: ~6 min
-- Total execution time: ~47 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min, 02-01: ~7 min, 02-02: ~10 min, 03-01: ~4 min, 03-02: ~5 min)
+- Total plans completed: 8 (Phase 1: 4, Phase 2: 2 full, Phase 3: 2, Phase 03.1: 1)
+- Average duration: ~5.5 min
+- Total execution time: ~50 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min, 02-01: ~7 min, 02-02: ~10 min, 03-01: ~4 min, 03-02: ~5 min, 03.1-01: ~3 min)
 
 **By Phase:**
 
@@ -30,10 +30,11 @@ Progress: [██████████] 60% (3 of 5 phases complete)
 | 01-foundation    | 4/4 | ~21 min | ~5 min |
 | 02-employees     | 2/2 | ~17 min | ~8 min |
 | 03-access-control | 3/3 | ~9 min  | ~4.5 min |
+| 03.1-security-hardening | 1/2 | ~3 min | ~3 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-02 (Excel import wizard + RPC), 03-01 (Role Templates + permission matrix), 03-02 (User CRUD + auth admin API + permission matrix)
-- Trend: On track, Phase 3 averaging ~4.5 min/plan due to established patterns
+- Last 5 plans: 03-01 (Role Templates + permission matrix), 03-02 (User CRUD + auth admin API), 03-03 (correction), 03.1-01 (security headers + CSP + server-only)
+- Trend: On track, security hardening fast due to configuration-only work
 
 *Updated after each plan completion*
 
@@ -85,6 +86,15 @@ Recent decisions affecting current work:
 - [03-03]: Bootstrap admin (no public.users row) bypasses all permission checks — safe fallback for initial setup
 - [03-03 CORRECTION 2026-03-03]: Admin interface is Sharon-only — permission enforcement removed from admin shell (layout, sidebar, Server Actions, pages). All functions preserved in dal.ts for future ChemoSys use.
 - [ARCHITECTURE]: Admin interface (ChemoSystem) ≠ ChemoSys application. ChemoSys is a future separate system. Users and permissions managed here are for ChemoSys modules (fleet, equipment, etc.), not for this admin shell.
+- [03.1-01]: next@16.1.6 is already latest stable — CVE-2025-55183/67779 fix confirmed included (16.0.10 was the fix for 16.0.x line; 16.1.x carries the fix forward)
+- [03.1-01]: Static CSP chosen over nonce-based — nonces force all pages to dynamic rendering; admin panel has no third-party scripts so static + unsafe-inline is correct
+- [03.1-01]: HSTS only in production via isDev guard — prevents localhost HTTPS lockout in development
+- [03.1-01]: No Google Fonts CDN in CSP — Heebo served locally via next/font/google; fonts.googleapis.com and fonts.gstatic.com are never hit at runtime
+- [03.1-01]: server-only as first import in dal.ts — prevents accidental client bundle inclusion of session verification logic
+
+### Roadmap Evolution
+
+- Phase 03.1 inserted after Phase 3: Security Hardening (URGENT) — security baseline required before deployment: security headers, password policy, rate limiting on login, session timeout, migration 00012
 
 ### Pending Todos
 
@@ -99,5 +109,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Phase 3 complete — architectural correction done, ready for Phase 4 planning
+Stopped at: Phase 03.1 Plan 01 complete — security headers + CSP + server-only. Next: 03.1-02 (rate limiting on login)
 Resume file: None
