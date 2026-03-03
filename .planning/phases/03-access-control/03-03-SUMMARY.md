@@ -16,8 +16,8 @@ provides:
   - checkPagePermission() — page-level access denied rendering
   - Migration 00012: UPDATE policy for user_permissions, is_admin column, is_current_user_blocked()
   - AccessDenied component — Hebrew access denied page
-  - Sidebar/SidebarNav/MobileSidebar permission-based nav filtering
-  - is_blocked check in AdminLayout — blocked users redirected to /login?blocked=1
+  - Permission infrastructure in dal.ts — ready for future ChemoSys module pages (NOT applied to admin shell)
+  - [CORRECTED 2026-03-03]: Admin shell enforcement removed — admin interface is Sharon-only
 affects: ["04-projects", "05-settings"]
 
 # Tech tracking
@@ -81,21 +81,21 @@ completed: 2026-03-03
 - **Duration:** ~6 min
 - **Started:** 2026-03-03T11:25:22Z
 - **Completed:** 2026-03-03T11:31:xx Z
-- **Tasks:** 2 complete (Task 3 = checkpoint awaiting human verification)
-- **Files modified:** 19
+- **Tasks:** 3 complete (Tasks 1+2 built, architectural correction applied)
+- **Files modified:** 19 (built) + 16 (corrected)
 
 ## Accomplishments
-- 22+ mutation Server Actions across 6 files guarded by requirePermission() — unauthorized mutations rejected server-side
-- Sidebar nav items filtered by getNavPermissions() — users only see modules they have access to
-- All 6 admin pages render AccessDenied for unauthorized direct URL access
-- AdminLayout detects is_blocked flag and redirects to /login?blocked=1 with signOut
-- Migration 00012 adds UPDATE policy, is_admin column, is_current_user_blocked() function, enhanced get_user_permissions()
+- Migration 00012: is_admin column, UPDATE policy, is_current_user_blocked(), enhanced get_user_permissions()
+- requirePermission(), getNavPermissions(), checkPagePermission() in dal.ts — SECURITY DEFINER RPC-backed
+- AccessDenied component: Hebrew "אין גישה" ready for ChemoSys module pages
+- Architectural correction: admin shell enforcement removed (admin is Sharon-only)
+- Permission infrastructure fully intact and ready for future ChemoSys module integration
 
 ## Task Commits
 
 1. **Task 1: Migration 00012, requirePermission/getNavPermissions in DAL, AccessDenied component** - `f3283a5` (feat)
-2. **Task 2: Sidebar filtering, page guards, Server Action guards, is_blocked check** - `8ee2537` (feat)
-3. **Task 3: Human verification checkpoint** - awaiting
+2. **Task 2 (original): Sidebar filtering, page guards, Server Action guards** - `8ee2537` (feat — later corrected)
+3. **Correction: Remove admin shell enforcement** - `a51e4bb`, `662559b`, `447482c` (refactor)
 
 ## Files Created/Modified
 
@@ -159,7 +159,14 @@ After running migration, set `is_admin = true` on your user row in the `users` t
 
 ## Self-Check: PASSED
 
-All required files exist, all commits verified, all exports confirmed, requirePermission() in all 6 action files, checkPagePermission() in all 6 admin pages, allowedModules in SidebarNav, is_blocked in AdminLayout.
+Migration 00012 infrastructure correct. dal.ts functions exist and correct. Admin shell runs without permission guards (auth only). requirePermission/checkPagePermission preserved in dal.ts for ChemoSys use.
+
+## Architecture Decision
+
+Admin interface (ChemoSystem admin shell) ≠ ChemoSys application.
+- Admin shell: Sharon-only, no module permissions, only verifySession() guard
+- ChemoSys (future): employee-facing application with module permissions enforced
+- Permission infrastructure built here applies to ChemoSys module Server Actions and pages — NOT to this admin shell
 
 ---
 *Phase: 03-access-control*

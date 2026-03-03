@@ -70,7 +70,7 @@ Plans:
 
 ### Phase 3: Access Control
 
-**Goal:** The admin can create user accounts, assign permissions via templates or manually, and the system enforces access control on every route and mutation — users only see and can do what they are authorized for.
+**Goal:** The admin can create user accounts and assign permissions via templates or manually — building the full permission management infrastructure for future ChemoSys modules. Note: this admin interface is Sharon-only; permission enforcement will apply to future ChemoSys module pages, not to this admin shell.
 
 **Depends on:** Phase 2 (users are linked to employees; employee list must be populated)
 
@@ -80,15 +80,15 @@ Plans:
   1. Admin can create a new user by searching for an active employee and linking a Supabase Auth account to them
   2. Admin can create a role template with a named permission set, assign it to a user, and the user's permissions populate automatically
   3. Admin can override specific module permissions for a user after assigning a template — the override persists independently of the template
-  4. A logged-in user only sees the sidebar tabs for modules they have access to; attempting to navigate directly to a tab they cannot access shows an "אין גישה" message
-  5. Every permission check for mutations is enforced server-side (Server Actions), not only in the UI
+  4. Admin can manage the full user lifecycle: create, edit, block, unblock, soft-delete
+  5. Permission enforcement infrastructure is in place (requirePermission, getNavPermissions, user_permissions table, get_user_permissions RPC) — ready for ChemoSys module integration when those modules are built
 
 **Plans:** 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Role templates CRUD: TemplateSchema, Server Actions (create/update/softDelete), PermissionMatrixEditor (9 modules x 3 levels), TemplateForm dialog, TemplatesTable, templates page
-- [ ] 03-02-PLAN.md — User management: createAdminClient (service role), user lifecycle (create/edit/delete/block/unblock), EmployeeSearchDialog, template assignment, per-user permission overrides, UsersTable, users page
-- [ ] 03-03-PLAN.md — Permission enforcement: migration 00012 (UPDATE policy + is_admin + is_current_user_blocked), requirePermission() + getNavPermissions() + checkPagePermission() in DAL, sidebar nav filtering by allowedModules, AccessDenied component, is_blocked check in AdminLayout, permission guards on all Server Actions and pages
+- [x] 03-01-PLAN.md — Role templates CRUD: TemplateSchema, Server Actions (create/update/softDelete), PermissionMatrixEditor (9 modules x 3 levels), TemplateForm dialog, TemplatesTable, templates page
+- [x] 03-02-PLAN.md — User management: createAdminClient (service role), user lifecycle (create/edit/delete/block/unblock), EmployeeSearchDialog, template assignment, per-user permission overrides, UsersTable, users page
+- [x] 03-03-PLAN.md — Permission infrastructure: migration 00012 (UPDATE policy + is_admin + is_current_user_blocked), requirePermission() + getNavPermissions() + checkPagePermission() + AccessDenied in DAL/components — enforcement on admin shell removed (admin is Sharon-only); infrastructure preserved for ChemoSys
 
 ---
 
@@ -145,8 +145,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 4/4 | Complete | 2026-03-01 |
-| 2. Employees | 0/2 | Planned | - |
-| 3. Access Control | 0/3 | Not started | - |
+| 2. Employees | 2/2 | Complete | 2026-03-01 |
+| 3. Access Control | 3/3 | Complete | 2026-03-03 |
 | 4. Projects | 0/2 | Not started | - |
 | 5. Settings and Observability | 0/3 | Not started | - |
 
@@ -171,4 +171,4 @@ Note: REQUIREMENTS.md stated "46 total" but the file contains 59 v1 requirements
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-01 after Phase 2 planning*
+*Last updated: 2026-03-03 after Phase 3 complete + architectural clarification (admin interface is Sharon-only; permissions infrastructure for future ChemoSys)*
