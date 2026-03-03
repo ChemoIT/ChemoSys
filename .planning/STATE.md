@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** Phase 4 — Projects (Plan 01 complete — data layer ready)
+**Current focus:** Phase 4 — Projects (Plans 01 + 03 complete — data layer + ProjectsTable + export ready)
 
 ## Current Position
 
 Phase: 04-projects
-Plan: 1/4 (04-01 complete — migration + Server Actions + leaflet)
-Status: Active execution — Phase 4 Plan 01 complete. Next: Plan 02 (ProjectForm).
-Last activity: 2026-03-03 — 04-01 executed: migration 00014, ProjectSchema, createProject/updateProject/softDeleteProject, leaflet installed, OpenStreetMap CSP
+Plan: 3/4 (04-01, 04-03 complete — data layer + ProjectsTable + export; 04-02 ProjectForm full build pending)
+Status: Active execution — Phase 4 Plan 03 complete. Next: Plan 02 (ProjectForm full build — full 7-section form).
+Last activity: 2026-03-03 — 04-03 executed: ProjectsTable, projects page, ProjectForm placeholder, /api/export Route Handler
 
-Progress: [█████████████] 72% (Phase 3 + 03.1 complete — Phase 4 Plan 1/4 done)
+Progress: [███████████████] 80% (Phase 3 + 03.1 complete — Phase 4 Plans 01+03/4 done)
 
 ## Performance Metrics
 
@@ -31,11 +31,11 @@ Progress: [█████████████] 72% (Phase 3 + 03.1 complete
 | 02-employees     | 2/2 | ~17 min | ~8 min |
 | 03-access-control | 3/3 | ~9 min  | ~4.5 min |
 | 03.1-security-hardening | 3/3 COMPLETE | ~13 min | ~4 min |
-| 04-projects | 1/4 | ~5 min | ~5 min |
+| 04-projects | 3/4 | ~9 min | ~4.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 03.1-01 (security headers + CSP + server-only), 03.1-02 (rate limiting + PII fix + encryption key), 03.1-03 (admin-only RLS on user_permissions), 04-01 (projects data layer + migration + leaflet)
-- Trend: Phase 4 started. Data layer complete — migration 00014, ProjectSchema, Server Actions.
+- Last 5 plans: 03.1-03 (admin-only RLS on user_permissions), 04-01 (projects data layer + migration + leaflet), 04-03 (ProjectsTable + projects page + /api/export)
+- Trend: Phase 4 active. Plans 01+03 complete — data layer + admin UI table + universal export route.
 
 *Updated after each plan completion*
 
@@ -120,9 +120,12 @@ Recent decisions affecting current work:
 - [Phase 2 checkpoint]: Migration 00004 must be applied manually in Supabase SQL editor — upsert_employee() RPC will not exist until then
 - [Phase 5]: Research cPanel API capabilities for config.ini read/write before Phase 5 planning
 - [Phase 4]: Map integration decision needed — react-leaflet (free) vs Google Maps (paid API key) vs interactive map skill
+- [04-03]: SidebarNav already uses usePathname() — no CURRENT_PHASE gate, projects tab active automatically
+- [04-03]: ProjectForm placeholder created to unblock Plan 03 TypeScript (full 7-section form is Plan 02 scope)
+- [04-03]: Universal export Route Handler pattern: ALLOWED_TABLES whitelist + verifySession + ExcelJS RTL + Buffer (as any) cast
 
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 04-projects-01-PLAN.md — data layer ready (migration + types + schemas + actions + leaflet + CSP)
+Stopped at: Completed 04-projects-03-PLAN.md — ProjectsTable + projects page + /api/export Route Handler
 Resume file: None
