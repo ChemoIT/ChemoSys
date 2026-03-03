@@ -17,6 +17,7 @@ import {
   UserCog,
   Shield,
   FolderKanban,
+  ScrollText,
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/users",       label: "ניהול יוזרים",     icon: UserCog,         moduleKey: "users" },
   { href: "/admin/templates",   label: "תבניות הרשאות",    icon: Shield,          moduleKey: "templates" },
   { href: "/admin/projects",    label: "ניהול פרויקטים",   icon: FolderKanban,    moduleKey: "projects" },
+  { href: "/admin/audit-log",   label: "יומן פעולות",      icon: ScrollText,      moduleKey: "audit_log" },
   { href: "/admin/settings",    label: "הגדרות מערכת",     icon: Settings,        moduleKey: "settings" },
 ];
 
