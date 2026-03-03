@@ -152,9 +152,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Dashboard: 6 summary stat cards + 20 recent activity entries from audit_log with user name resolution
-- [ ] 05-02-PLAN.md — Audit log viewer: server-side filtered table (entity, action, search, date range), 50 rows/page, expandable rows with old/new data diff, Excel/CSV export via dedicated Route Handler, sidebar nav entry
-- [ ] 05-03-PLAN.md — Integration settings: .env.local read/write library, 5 integration accordion sections (SMS, WhatsApp, FTP, Telegram, LLM) with save, enable/disable toggle, and test connection
+- [x] 05-01-PLAN.md — Dashboard: 6 summary stat cards + 20 recent activity entries from audit_log with user name resolution
+- [x] 05-02-PLAN.md — Audit log viewer: server-side filtered table (entity, action, search, date range), 50 rows/page, expandable rows with old/new data diff, Excel/CSV export via dedicated Route Handler, sidebar nav entry
+- [x] 05-03-PLAN.md — Integration settings: .env.local read/write library, 5 integration accordion sections (SMS, WhatsApp, FTP, Telegram, LLM) with save, enable/disable toggle, and test connection
 
 ---
 
@@ -169,8 +169,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 03.1 -> 4 -> 5
 | 2. Employees | 2/2 | Complete | 2026-03-01 |
 | 3. Access Control | 3/3 | Complete | 2026-03-03 |
 | 03.1. Security Hardening | 3/3 | Complete | 2026-03-03 |
-| 4. Projects | 0/4 | Planned | - |
-| 5. Settings and Observability | 0/3 | Planned | - |
+| 4. Projects | 4/4 | Complete | 2026-03-03 |
+| 5. Settings and Observability | 3/3 | Complete | 2026-03-03 |
 
 ---
 
@@ -193,4 +193,4 @@ Note: Phase 4 requirements expanded from 6 to 12 (PROJ-07 through PROJ-11 + EXPO
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-03 — Phase 5 planned: 3 plans in 1 wave (all parallel)*
+*Last updated: 2026-03-03 — Phase 5 complete: all 3 plans executed and verified (13/13)*
