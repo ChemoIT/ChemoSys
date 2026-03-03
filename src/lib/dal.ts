@@ -1,3 +1,5 @@
+import 'server-only'
+
 // Data Access Layer — session verification and permission enforcement.
 // verifySession() is the single source of truth for "is the user logged in?"
 // requirePermission() guards every mutation Server Action.
