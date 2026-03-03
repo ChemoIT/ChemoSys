@@ -83,12 +83,12 @@ Plans:
   4. A logged-in user only sees the sidebar tabs for modules they have access to; attempting to navigate directly to a tab they cannot access shows an "אין גישה" message
   5. Every permission check for mutations is enforced server-side (Server Actions), not only in the UI
 
-**Plans:** TBD (estimated 3 plans)
+**Plans:** 3 plans
 
 Plans:
-- [ ] 03-01: Role templates CRUD — permission matrix UI, template create/edit/delete
-- [ ] 03-02: User management — create user linked to employee, assign/block/delete user, assign template
-- [ ] 03-03: Permission enforcement — server-side requirePermission() on all Server Actions, sidebar nav filtering, access-denied page
+- [ ] 03-01-PLAN.md — Role templates CRUD: TemplateSchema, Server Actions (create/update/softDelete), PermissionMatrixEditor (9 modules x 3 levels), TemplateForm dialog, TemplatesTable, templates page
+- [ ] 03-02-PLAN.md — User management: createAdminClient (service role), user lifecycle (create/edit/delete/block/unblock), EmployeeSearchDialog, template assignment, per-user permission overrides, UsersTable, users page
+- [ ] 03-03-PLAN.md — Permission enforcement: migration 00012 (UPDATE policy + is_admin + is_current_user_blocked), requirePermission() + getNavPermissions() + checkPagePermission() in DAL, sidebar nav filtering by allowedModules, AccessDenied component, is_blocked check in AdminLayout, permission guards on all Server Actions and pages
 
 ---
 
