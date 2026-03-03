@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** Phase 03.1 — Security Hardening (in progress — Plan 01 complete)
+**Current focus:** Phase 4 — Projects, Map, Dashboard (Phase 03.1 Security Hardening complete)
 
 ## Current Position
 
-Phase: 03.1-security-hardening (security hardening between Phase 3 and Phase 4)
-Plan: 1/2 complete (03.1-01 done, 03.1-02 rate limiting next)
-Status: 03.1-01 complete — security headers + CSP + server-only guard on dal.ts
-Last activity: 2026-03-03 — 03.1-01 complete: next.config.ts security headers, CSP, dal.ts server-only
+Phase: 03.1-security-hardening (COMPLETE)
+Plan: 2/2 complete (03.1-01 done, 03.1-02 done)
+Status: Phase 03.1 complete — security headers + CSP + server-only + rate limiting + PII log fix + encryption key
+Last activity: 2026-03-03 — 03.1-02 complete: login rate limiting, employee PII log fix, NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
 
-Progress: [██████████] 60% (Phase 3 of 5 complete — Phase 03.1 in progress)
+Progress: [████████████] 65% (Phase 3 + 03.1 complete — Phase 4 next)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8 (Phase 1: 4, Phase 2: 2 full, Phase 3: 2, Phase 03.1: 1)
+- Total plans completed: 9 (Phase 1: 4, Phase 2: 2 full, Phase 3: 2, Phase 03.1: 2 — COMPLETE)
 - Average duration: ~5.5 min
-- Total execution time: ~50 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min, 02-01: ~7 min, 02-02: ~10 min, 03-01: ~4 min, 03-02: ~5 min, 03.1-01: ~3 min)
+- Total execution time: ~55 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min, 02-01: ~7 min, 02-02: ~10 min, 03-01: ~4 min, 03-02: ~5 min, 03.1-01: ~3 min, 03.1-02: ~5 min)
 
 **By Phase:**
 
@@ -30,11 +30,11 @@ Progress: [██████████] 60% (Phase 3 of 5 complete — Phase 
 | 01-foundation    | 4/4 | ~21 min | ~5 min |
 | 02-employees     | 2/2 | ~17 min | ~8 min |
 | 03-access-control | 3/3 | ~9 min  | ~4.5 min |
-| 03.1-security-hardening | 1/2 | ~3 min | ~3 min |
+| 03.1-security-hardening | 2/2 COMPLETE | ~8 min | ~4 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-01 (Role Templates + permission matrix), 03-02 (User CRUD + auth admin API), 03-03 (correction), 03.1-01 (security headers + CSP + server-only)
-- Trend: On track, security hardening fast due to configuration-only work
+- Last 5 plans: 03-02 (User CRUD + auth admin API), 03-03 (correction), 03.1-01 (security headers + CSP + server-only), 03.1-02 (rate limiting + PII fix + encryption key)
+- Trend: Security hardening complete. Ready for Phase 4.
 
 *Updated after each plan completion*
 
@@ -91,6 +91,11 @@ Recent decisions affecting current work:
 - [03.1-01]: HSTS only in production via isDev guard — prevents localhost HTTPS lockout in development
 - [03.1-01]: No Google Fonts CDN in CSP — Heebo served locally via next/font/google; fonts.googleapis.com and fonts.gstatic.com are never hit at runtime
 - [03.1-01]: server-only as first import in dal.ts — prevents accidental client bundle inclusion of session verification logic
+- [03.1-02]: Rate limiting in auth.ts (Node.js runtime), NOT proxy.ts (Edge Runtime) — Edge resets module-level Map on every request
+- [03.1-02]: Rate limit check BEFORE signInWithPassword — blocks Supabase Auth hits from brute-force
+- [03.1-02]: logout() excluded from rate limiting — requires active session, cannot be brute-forced
+- [03.1-02]: PII-safe logging pattern: err instanceof Error ? err.message : 'Unknown error' — never dump raw error objects
+- [03.1-02]: NEXT_SERVER_ACTIONS_ENCRYPTION_KEY generated with crypto.randomBytes(32).toString(base64) — consistent across deploys
 
 ### Roadmap Evolution
 
@@ -109,5 +114,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Phase 03.1 Plan 01 complete — security headers + CSP + server-only. Next: 03.1-02 (rate limiting on login)
+Stopped at: Phase 03.1 COMPLETE — all 2 plans done. Next: Phase 4 (Projects, Map, Dashboard)
 Resume file: None
