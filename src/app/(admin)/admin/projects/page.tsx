@@ -35,7 +35,7 @@ export default async function ProjectsPage() {
     // Active employees — for ProjectForm PM/SM/CVC selectors
     supabase
       .from('employees')
-      .select('id, first_name, last_name, email, mobile_phone')
+      .select('id, first_name, last_name, employee_number, email, mobile_phone')
       .is('deleted_at', null)
       .eq('status', 'active')
       .order('first_name'),

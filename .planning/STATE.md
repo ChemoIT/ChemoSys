@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** Phase 4 — Projects (Plans 01 + 02 + 03 complete — full CRUD stack ready)
+**Current focus:** Phase 4 — Projects COMPLETE ✓
 
 ## Current Position
 
-Phase: 04-projects
-Plan: 3/4 (04-01, 04-02, 04-03 complete — data layer + ProjectForm 7-section + ProjectsTable + export)
-Status: Active execution — Phase 4 Plans 01–03 complete. Next: Plan 04 (final phase plan).
-Last activity: 2026-03-03 — 04-02 executed: EmployeeCombobox, ProjectLocationPicker, ProjectForm (full 7-section dialog, 962 lines)
+Phase: 04-projects ✅ COMPLETE
+Plan: 4/4 — all plans complete + verification passed (12/12 requirements)
+Status: Phase 4 complete. Next: Phase 5 (Reports/ERP integration).
+Last activity: 2026-03-03 — Phase 4 verified. All feedback items addressed.
 
-Progress: [████████████████] 85% (Phase 3 + 03.1 complete — Phase 4 Plans 01+02+03/4 done)
+Progress: [████████████████████] 100% (Phases 1–4 + 03.1 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11 (Phase 1: 4, Phase 2: 2, Phase 3: 2, Phase 03.1: 3, Phase 4: 1 — 04-01)
+- Total plans completed: 14 (Phase 1: 4, Phase 2: 2, Phase 3: 2, Phase 03.1: 3, Phase 4: 3)
 - Average duration: ~5.5 min
-- Total execution time: ~65 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min, 02-01: ~7 min, 02-02: ~10 min, 03-01: ~4 min, 03-02: ~5 min, 03.1-01: ~3 min, 03.1-02: ~5 min, 03.1-03: ~5 min, 04-01: ~5 min)
+- Total execution time: ~80 min
 
 **By Phase:**
 
@@ -31,11 +31,11 @@ Progress: [████████████████] 85% (Phase 3 + 03.1
 | 02-employees     | 2/2 | ~17 min | ~8 min |
 | 03-access-control | 3/3 | ~9 min  | ~4.5 min |
 | 03.1-security-hardening | 3/3 COMPLETE | ~13 min | ~4 min |
-| 04-projects | 3/4 | ~9 min | ~4.5 min |
+| 04-projects | 3/3 COMPLETE ✓ | ~20 min | ~7 min |
 
 **Recent Trend:**
-- Last 5 plans: 03.1-03 (admin-only RLS on user_permissions), 04-01 (projects data layer + migration + leaflet), 04-03 (ProjectsTable + projects page + /api/export)
-- Trend: Phase 4 active. Plans 01+03 complete — data layer + admin UI table + universal export route.
+- Phase 4 completed with 5 feedback fixes from Sharon + 1 browser client bugfix
+- Logo upload initially failed due to wrong env var — fixed by using existing browser.ts singleton
 
 *Updated after each plan completion*
 
@@ -103,12 +103,17 @@ Recent decisions affecting current work:
 - [03.1-03]: Bootstrap admin (no public.users row) unaffected — createAdminClient() service role key bypasses RLS entirely
 - [Phase 4 REVERT 2026-03-03]: Phase 4 code reverted — Sharon provided updated requirements with significant field changes (attendance clocks table, client logo upload, supervision contact, conditional CVC entry, map with radius, CSV export)
 - [Phase 04-projects]: react-leaflet v5 chosen — latest stable, React 19 compatible
-- [Phase 04-projects]: project_number sent as empty string on INSERT — DB trigger fills in PR26XXXXXX format
+- [Phase 04-projects]: project_number editable — auto-gen PR26XXXXXX only if field left empty
 - [Phase 04-projects]: attendance_clocks managed via replace-all in updateProject (same pattern as employee_role_tags)
 - [04-02]: EmployeeCombobox uses custom filter function on Command — cmdk default filters on value prop (UUID) not label; custom filter matches first_name+last_name+employee_number
 - [04-02]: ProjectLocationPicker loaded via dynamic(ssr:false) — Leaflet accesses window at import time, crashes SSR if imported directly
 - [04-02]: Duplicate clock ID client-side check in handleSubmit before Server Action — prevents raw DB unique constraint error
 - [04-02]: ProjectForm replaces Plan 03 placeholder with full 7-section implementation (962 lines) — ProjectsTable props interface unchanged
+- [04-FIX]: cvc_name column added (migration 00015) — CVC free-text mode requires both name and phone
+- [04-FIX]: Phone format 05x-xxxxxxx via formatIsraeliPhone helper — normalizes employee phone on auto-fill
+- [04-FIX]: Logo upload uses existing browser.ts singleton — NOT inline createBrowserClient with wrong env var
+- [04-FIX]: Logo drag-and-drop with visual feedback on dragover
+- [04-FIX]: Logo upload failure does not block form submission — project saved without logo
 
 ### Roadmap Evolution
 
@@ -121,15 +126,10 @@ Recent decisions affecting current work:
 
 ### Blockers/Concerns
 
-- [Phase 2 checkpoint]: Migration 00004 must be applied manually in Supabase SQL editor — upsert_employee() RPC will not exist until then
 - [Phase 5]: Research cPanel API capabilities for config.ini read/write before Phase 5 planning
-- [Phase 4]: Map integration decision needed — react-leaflet (free) vs Google Maps (paid API key) vs interactive map skill
-- [04-03]: SidebarNav already uses usePathname() — no CURRENT_PHASE gate, projects tab active automatically
-- [04-03]: ProjectForm placeholder created to unblock Plan 03 TypeScript (full 7-section form is Plan 02 scope)
-- [04-03]: Universal export Route Handler pattern: ALLOWED_TABLES whitelist + verifySession + ExcelJS RTL + Buffer (as any) cast
 
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 04-projects-02-PLAN.md — ProjectForm 7-section dialog + EmployeeCombobox + ProjectLocationPicker
+Stopped at: Phase 4 complete — all 12 requirements verified ✓
 Resume file: None
