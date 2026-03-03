@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** Phase 3 — Access Control (Templates CRUD complete, starting user management)
+**Current focus:** Phase 3 — Access Control (Templates CRUD done, User management done, starting /admin/users nav link)
 
 ## Current Position
 
 Phase: 3 of 5 (Access Control)
-Plan: 1 of 3 complete (03-01 Templates CRUD done)
-Status: 03-01 complete — role templates + permission matrix UI fully working
-Last activity: 2026-03-03 — Phase 3 Plan 01 executed (Role Template CRUD + permission matrix)
+Plan: 2 of 3 complete (03-01 Templates CRUD done, 03-02 User management done)
+Status: 03-02 complete — full user lifecycle: create/block/unblock/delete + permission matrix with template assignment
+Last activity: 2026-03-03 — Phase 3 Plan 02 executed (User CRUD + auth admin integration + permission matrix)
 
-Progress: [█████░░░░░] 45% (Phase 2 done, Phase 3 Plan 01 done)
+Progress: [██████░░░░] 55% (Phase 2 done, Phase 3 Plans 01+02 done)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6 (Phase 1: 4, Phase 2: 2 full, Phase 3: 1)
+- Total plans completed: 7 (Phase 1: 4, Phase 2: 2 full, Phase 3: 2)
 - Average duration: ~6 min
-- Total execution time: ~42 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min, 02-01: ~7 min, 02-02: ~10 min, 03-01: ~4 min)
+- Total execution time: ~47 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min, 02-01: ~7 min, 02-02: ~10 min, 03-01: ~4 min, 03-02: ~5 min)
 
 **By Phase:**
 
@@ -29,11 +29,11 @@ Progress: [█████░░░░░] 45% (Phase 2 done, Phase 3 Plan 01 do
 |-------|-------|-------|----------|
 | 01-foundation    | 4/4 | ~21 min | ~5 min |
 | 02-employees     | 2/2 | ~17 min | ~8 min |
-| 03-access-control | 1/3 | ~4 min  | ~4 min |
+| 03-access-control | 2/3 | ~9 min  | ~4.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-04 (Companies/Departments/RoleTags CRUD), 02-01 (Employee CRUD — 22 fields), 02-02 (Excel import wizard + RPC), 03-01 (Role Templates + permission matrix)
-- Trend: On track, feature plans averaging ~7 min; 03-01 was faster (~4 min) due to established patterns
+- Last 5 plans: 02-02 (Excel import wizard + RPC), 03-01 (Role Templates + permission matrix), 03-02 (User CRUD + auth admin API + permission matrix)
+- Trend: On track, Phase 3 averaging ~4.5 min/plan due to established patterns
 
 *Updated after each plan completion*
 
@@ -74,6 +74,12 @@ Recent decisions affecting current work:
 - [03-01]: Native <input type="radio"> used instead of shadcn RadioGroup — radios must write to FormData natively for Server Actions
 - [03-01]: Delete-all + insert pattern for template_permissions on every save — only levels > 0 stored; absence = no access
 - [03-01]: proxy.ts export renamed from middleware() to proxy() for Next.js 16.1.6 API requirement (auto-fixed, blocking build)
+- [03-02]: Two-phase atomic createUser with rollback — auth.admin.createUser first, if DB insert fails hard-delete auth user to prevent orphaned accounts
+- [03-02]: softDeleteUser: soft-delete public.users + hard-delete auth.users (frees email for reuse); auth delete failure is logged but does not fail the operation
+- [03-02]: blockUser uses ban_duration=87600h (10 years) — Supabase has no permanent ban concept
+- [03-02]: assignTemplate preserves is_override=true user_permissions — manual overrides survive template re-assignment
+- [03-02]: Lucide icon title prop removed (LucideProps type constraint) → aria-label used instead (auto-fix Rule 1)
+- [03-02]: Supabase join returns array type; double cast via unknown for foreign key relation in page.tsx (auto-fix Rule 1)
 
 ### Pending Todos
 
@@ -88,5 +94,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: 03-01 complete — awaiting continuation to 03-02 (user management)
+Stopped at: 03-02 complete — awaiting continuation to 03-03 (sidebar nav link for /admin/users + access control finalization)
 Resume file: None
