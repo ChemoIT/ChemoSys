@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** Phase 4 — Projects (Plans 01 + 03 complete — data layer + ProjectsTable + export ready)
+**Current focus:** Phase 4 — Projects (Plans 01 + 02 + 03 complete — full CRUD stack ready)
 
 ## Current Position
 
 Phase: 04-projects
-Plan: 3/4 (04-01, 04-03 complete — data layer + ProjectsTable + export; 04-02 ProjectForm full build pending)
-Status: Active execution — Phase 4 Plan 03 complete. Next: Plan 02 (ProjectForm full build — full 7-section form).
-Last activity: 2026-03-03 — 04-03 executed: ProjectsTable, projects page, ProjectForm placeholder, /api/export Route Handler
+Plan: 3/4 (04-01, 04-02, 04-03 complete — data layer + ProjectForm 7-section + ProjectsTable + export)
+Status: Active execution — Phase 4 Plans 01–03 complete. Next: Plan 04 (final phase plan).
+Last activity: 2026-03-03 — 04-02 executed: EmployeeCombobox, ProjectLocationPicker, ProjectForm (full 7-section dialog, 962 lines)
 
-Progress: [███████████████] 80% (Phase 3 + 03.1 complete — Phase 4 Plans 01+03/4 done)
+Progress: [████████████████] 85% (Phase 3 + 03.1 complete — Phase 4 Plans 01+02+03/4 done)
 
 ## Performance Metrics
 
@@ -105,6 +105,10 @@ Recent decisions affecting current work:
 - [Phase 04-projects]: react-leaflet v5 chosen — latest stable, React 19 compatible
 - [Phase 04-projects]: project_number sent as empty string on INSERT — DB trigger fills in PR26XXXXXX format
 - [Phase 04-projects]: attendance_clocks managed via replace-all in updateProject (same pattern as employee_role_tags)
+- [04-02]: EmployeeCombobox uses custom filter function on Command — cmdk default filters on value prop (UUID) not label; custom filter matches first_name+last_name+employee_number
+- [04-02]: ProjectLocationPicker loaded via dynamic(ssr:false) — Leaflet accesses window at import time, crashes SSR if imported directly
+- [04-02]: Duplicate clock ID client-side check in handleSubmit before Server Action — prevents raw DB unique constraint error
+- [04-02]: ProjectForm replaces Plan 03 placeholder with full 7-section implementation (962 lines) — ProjectsTable props interface unchanged
 
 ### Roadmap Evolution
 
@@ -127,5 +131,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 04-projects-03-PLAN.md — ProjectsTable + projects page + /api/export Route Handler
+Stopped at: Completed 04-projects-02-PLAN.md — ProjectForm 7-section dialog + EmployeeCombobox + ProjectLocationPicker
 Resume file: None
