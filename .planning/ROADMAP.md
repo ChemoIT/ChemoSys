@@ -121,11 +121,11 @@ Plans:
   3. Admin can edit and soft-delete projects
   4. The project list is filterable by status (active / inactive) and shows the correct active count
 
-**Plans:** TBD (estimated 2 plans)
+**Plans:** 2 plans
 
 Plans:
-- [ ] 04-01: Project CRUD — all fields, auto-number generation, soft delete, employee FK selectors for manager roles
-- [ ] 04-02: Project list — status filter, display of active/inactive counts
+- [ ] 04-01-PLAN.md — Migration 00014 (sequence + soft delete RPC), ProjectSchema, Server Actions (create/update/softDelete), ProjectForm dialog with all fields and 3 employee selectors
+- [ ] 04-02-PLAN.md — Projects list page with status filter, search, active count badge, and full CRUD integration via ProjectForm + DeleteConfirmDialog
 
 ---
 
@@ -187,4 +187,4 @@ Note: REQUIREMENTS.md stated "46 total" but the file contains 59 v1 requirements
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-03 — Phase 03.1 Security Hardening complete (3/3 plans)*
+*Last updated: 2026-03-03 — Phase 4 plans finalized (2 plans)*
