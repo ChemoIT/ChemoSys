@@ -56,6 +56,7 @@ type AuditRow = {
   old_data: Record<string, unknown> | null
   new_data: Record<string, unknown> | null
   userName: string
+  entityName: string // resolved server-side per entity_type lookup
 }
 
 type Filters = {
@@ -197,19 +198,20 @@ function buildColumns(): ColumnDef<AuditRow>[] {
         )
       },
     },
-    // Entity ID (truncated UUID with full as tooltip)
+    // Entity name (human-readable, raw UUID as tooltip for debugging)
     {
       id: 'entity_id',
-      header: 'מזהה ישות',
-      accessorKey: 'entity_id',
-      cell: ({ getValue }) => {
-        const id = getValue() as string
+      header: 'ישות',
+      accessorKey: 'entityName',
+      cell: ({ row }) => {
+        const name = row.original.entityName
+        const id = row.original.entity_id
         return (
           <span
-            className="text-sm text-muted-foreground font-mono"
-            title={id}
+            className="text-sm"
+            title={id}  // full UUID as tooltip for debugging
           >
-            {id?.substring(0, 8) ?? '—'}...
+            {name || `${id?.substring(0, 8) ?? '—'}…`}
           </span>
         )
       },

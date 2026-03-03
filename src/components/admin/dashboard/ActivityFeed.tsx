@@ -22,7 +22,8 @@ export type ActivityEntry = {
   entity_type: string
   entity_id: string
   user_id: string
-  userName: string // resolved server-side from public.users
+  userName: string   // resolved server-side via users → employees join
+  entityName: string // resolved server-side per entity_type lookup
 }
 
 // ----------------------------------------------------------------
@@ -118,9 +119,14 @@ export function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
                     <span className="text-muted-foreground">פעל על</span>
                     {' '}
                     <span className="font-medium">{formatEntityType(entry.entity_type)}</span>
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate" dir="ltr">
-                    {entry.entity_id}
+                    {entry.entityName && entry.entityName !== entry.entity_id?.substring(0, 8) && (
+                      <>
+                        {' '}
+                        <span className="text-muted-foreground">—</span>
+                        {' '}
+                        <span className="font-medium">{entry.entityName}</span>
+                      </>
+                    )}
                   </p>
                 </div>
 
