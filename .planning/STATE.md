@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** Phase 3 — Access Control (Templates CRUD done, User management done, starting /admin/users nav link)
+**Current focus:** Phase 3 — Access Control (Templates CRUD done, User management done, permission enforcement done — awaiting verification of 03-03)
 
 ## Current Position
 
 Phase: 3 of 5 (Access Control)
-Plan: 2 of 3 complete (03-01 Templates CRUD done, 03-02 User management done)
-Status: 03-02 complete — full user lifecycle: create/block/unblock/delete + permission matrix with template assignment
-Last activity: 2026-03-03 — Phase 3 Plan 02 executed (User CRUD + auth admin integration + permission matrix)
+Plan: 2.5 of 3 (03-01 done, 03-02 done, 03-03 Tasks 1+2 done — at human-verify checkpoint)
+Status: 03-03 checkpoint — permission enforcement built, awaiting human verification before Phase 3 finalized
+Last activity: 2026-03-03 — Phase 3 Plan 03 Tasks 1+2 executed (migration 00012, requirePermission, sidebar filtering, page guards)
 
-Progress: [██████░░░░] 55% (Phase 2 done, Phase 3 Plans 01+02 done)
+Progress: [███████░░░] 60% (Phase 2 done, Phase 3 Plans 01+02+03 Tasks 1+2 done)
 
 ## Performance Metrics
 
@@ -80,6 +80,11 @@ Recent decisions affecting current work:
 - [03-02]: assignTemplate preserves is_override=true user_permissions — manual overrides survive template re-assignment
 - [03-02]: Lucide icon title prop removed (LucideProps type constraint) → aria-label used instead (auto-fix Rule 1)
 - [03-02]: Supabase join returns array type; double cast via unknown for foreign key relation in page.tsx (auto-fix Rule 1)
+- [03-03]: requirePermission() throws Error — caught by Server Action error boundary; no return value needed
+- [03-03]: getNavPermissions() called in AdminLayout (not per-page) — single DB call serves sidebar for whole request
+- [03-03]: Bootstrap admin (no public.users row) sees all nav items and bypasses all permission checks
+- [03-03]: SidebarNav CURRENT_PHASE mechanism removed entirely — replaced by permission-based allowedModules filtering
+- [03-03]: reactivateEmployee and bulkSoftDeleteEmployees also guarded (Rule 2 — security completeness)
 
 ### Pending Todos
 
@@ -94,5 +99,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: 03-02 complete — awaiting continuation to 03-03 (sidebar nav link for /admin/users + access control finalization)
+Stopped at: 03-03 Tasks 1+2 complete — at checkpoint Task 3 (human-verify Phase 3 complete)
 Resume file: None
