@@ -744,7 +744,7 @@ export async function importEmployeesAction(
     rows        = result.rows
     skippedRows = result.skippedRows
   } catch (err) {
-    console.error('[importEmployeesAction] Excel parse error:', err)
+    console.error('[importEmployeesAction] Excel parse error:', err instanceof Error ? err.message : 'Unknown error')
     return { success: false, error: 'שגיאה בקריאת קובץ ה-Excel. ודא שהקובץ תקין ובפורמט .xlsx' }
   }
 
