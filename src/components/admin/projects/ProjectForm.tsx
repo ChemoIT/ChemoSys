@@ -29,7 +29,7 @@ import dynamic from 'next/dynamic'
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Plus, X } from 'lucide-react'
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient as createBrowserSupabase } from '@/lib/supabase/browser'
 import type { Database } from '@/types/database'
 import { createProject, updateProject } from '@/actions/projects'
 import { EmployeeCombobox, type EmployeeOption } from './EmployeeCombobox'
@@ -298,10 +298,7 @@ export function ProjectForm({
     // Logo upload failure does NOT block form submission — project is saved without logo
     if (logoFile) {
       try {
-        const supabase = createBrowserClient<Database>(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        )
+        const supabase = createBrowserSupabase()
         const ext      = logoFile.name.split('.').pop() || 'png'
         const fileName = `${crypto.randomUUID()}.${ext}`
 
