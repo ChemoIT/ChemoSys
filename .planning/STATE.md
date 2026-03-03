@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** Phase 4 — Projects (RE-PLANNING: requirements updated by Sharon)
+**Current focus:** Phase 4 — Projects (Plan 01 complete — data layer ready)
 
 ## Current Position
 
-Phase: 04-projects (RE-PLANNING)
-Plan: 0/? (previous plans reverted — requirements changed significantly)
-Status: Phase 4 code reverted. Sharon provided updated field requirements. Awaiting re-plan.
-Last activity: 2026-03-03 — Phase 4 execution reverted, requirements updated
+Phase: 04-projects
+Plan: 1/4 (04-01 complete — migration + Server Actions + leaflet)
+Status: Active execution — Phase 4 Plan 01 complete. Next: Plan 02 (ProjectForm).
+Last activity: 2026-03-03 — 04-01 executed: migration 00014, ProjectSchema, createProject/updateProject/softDeleteProject, leaflet installed, OpenStreetMap CSP
 
-Progress: [████████████] 68% (Phase 3 + 03.1 complete — Phase 4 re-planning)
+Progress: [█████████████] 72% (Phase 3 + 03.1 complete — Phase 4 Plan 1/4 done)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10 (Phase 1: 4, Phase 2: 2 full, Phase 3: 2, Phase 03.1: 3 — COMPLETE)
+- Total plans completed: 11 (Phase 1: 4, Phase 2: 2, Phase 3: 2, Phase 03.1: 3, Phase 4: 1 — 04-01)
 - Average duration: ~5.5 min
-- Total execution time: ~60 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min, 02-01: ~7 min, 02-02: ~10 min, 03-01: ~4 min, 03-02: ~5 min, 03.1-01: ~3 min, 03.1-02: ~5 min, 03.1-03: ~5 min)
+- Total execution time: ~65 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min, 02-01: ~7 min, 02-02: ~10 min, 03-01: ~4 min, 03-02: ~5 min, 03.1-01: ~3 min, 03.1-02: ~5 min, 03.1-03: ~5 min, 04-01: ~5 min)
 
 **By Phase:**
 
@@ -31,10 +31,11 @@ Progress: [████████████] 68% (Phase 3 + 03.1 complete �
 | 02-employees     | 2/2 | ~17 min | ~8 min |
 | 03-access-control | 3/3 | ~9 min  | ~4.5 min |
 | 03.1-security-hardening | 3/3 COMPLETE | ~13 min | ~4 min |
+| 04-projects | 1/4 | ~5 min | ~5 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-03 (correction), 03.1-01 (security headers + CSP + server-only), 03.1-02 (rate limiting + PII fix + encryption key), 03.1-03 (admin-only RLS on user_permissions)
-- Trend: Security hardening complete. Phase 4 re-planning with updated requirements.
+- Last 5 plans: 03.1-01 (security headers + CSP + server-only), 03.1-02 (rate limiting + PII fix + encryption key), 03.1-03 (admin-only RLS on user_permissions), 04-01 (projects data layer + migration + leaflet)
+- Trend: Phase 4 started. Data layer complete — migration 00014, ProjectSchema, Server Actions.
 
 *Updated after each plan completion*
 
@@ -101,6 +102,9 @@ Recent decisions affecting current work:
 - [03.1-03]: RLS admin gate pattern: EXISTS (SELECT 1 FROM users WHERE auth_user_id = auth.uid() AND is_admin = true AND deleted_at IS NULL)
 - [03.1-03]: Bootstrap admin (no public.users row) unaffected — createAdminClient() service role key bypasses RLS entirely
 - [Phase 4 REVERT 2026-03-03]: Phase 4 code reverted — Sharon provided updated requirements with significant field changes (attendance clocks table, client logo upload, supervision contact, conditional CVC entry, map with radius, CSV export)
+- [Phase 04-projects]: react-leaflet v5 chosen — latest stable, React 19 compatible
+- [Phase 04-projects]: project_number sent as empty string on INSERT — DB trigger fills in PR26XXXXXX format
+- [Phase 04-projects]: attendance_clocks managed via replace-all in updateProject (same pattern as employee_role_tags)
 
 ### Roadmap Evolution
 
@@ -120,5 +124,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Phase 4 code reverted. Requirements updated by Sharon. Next: /gsd:plan-phase 4 with new requirements.
+Stopped at: Completed 04-projects-01-PLAN.md — data layer ready (migration + types + schemas + actions + leaflet + CSP)
 Resume file: None
