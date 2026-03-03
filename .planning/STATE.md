@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** Phase 4 — Projects COMPLETE ✓
+**Current focus:** Phase 5 — Settings & Observability (in progress)
 
 ## Current Position
 
-Phase: 04-projects ✅ COMPLETE
-Plan: 4/4 — all plans complete + verification passed (12/12 requirements)
-Status: Phase 4 complete. Next: Phase 5 (Reports/ERP integration).
-Last activity: 2026-03-03 — Phase 4 verified. All feedback items addressed.
+Phase: 05-settings-observability 🔄 IN PROGRESS
+Plan: 1/3 — Plan 01 (Dashboard) complete
+Status: Plan 05-01 complete. Dashboard live at /admin/dashboard. Next: Plan 05-02 (Audit Log).
+Last activity: 2026-03-03 — Plan 05-01 executed. Dashboard with StatsCards + ActivityFeed.
 
-Progress: [████████████████████] 100% (Phases 1–4 + 03.1 complete)
+Progress: [████████████████████] Phases 1–4 + 03.1 complete | Phase 5: 1/3 plans done
 
 ## Performance Metrics
 
@@ -32,6 +32,7 @@ Progress: [████████████████████] 100% (P
 | 03-access-control | 3/3 | ~9 min  | ~4.5 min |
 | 03.1-security-hardening | 3/3 COMPLETE | ~13 min | ~4 min |
 | 04-projects | 3/3 COMPLETE ✓ | ~20 min | ~7 min |
+| 05-settings-observability | 1/3 | ~3 min | ~3 min |
 
 **Recent Trend:**
 - Phase 4 completed with 5 feedback fixes from Sharon + 1 browser client bugfix
@@ -114,6 +115,9 @@ Recent decisions affecting current work:
 - [04-FIX]: Logo upload uses existing browser.ts singleton — NOT inline createBrowserClient with wrong env var
 - [04-FIX]: Logo drag-and-drop with visual feedback on dragover
 - [04-FIX]: Logo upload failure does not block form submission — project saved without logo
+- [05-01]: Two-step user name resolution for audit_log: audit_log.user_id → auth.users(id), NOT public.users; must query public.users WHERE auth_user_id IN (distinct_user_ids) and merge via Map
+- [05-01]: 7 parallel queries in DashboardPage via Promise.all — 6 entity counts + 1 audit_log fetch, fresh load on every visit with no caching
+- [05-01]: ActivityFeed uses formatDistanceToNow with date-fns/locale/he for Hebrew relative timestamps
 
 ### Roadmap Evolution
 
@@ -131,5 +135,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Phase 4 complete — all 12 requirements verified ✓
+Stopped at: Completed 05-01-PLAN.md — Dashboard page at /admin/dashboard with StatsCards and ActivityFeed
 Resume file: None
