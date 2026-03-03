@@ -8,36 +8,43 @@
  * dropdowns — DataTable only supports a single text filter.
  *
  * Features:
+ *   - Click any data row to open employee edit form
  *   - Sorting on all data columns
- *   - Text search filter on employee name
+ *   - Text search filter on name, employee number, ID, phone
  *   - Company, department, and status dropdown filters
- *   - Status Badge: active=green, suspended=yellow, inactive=gray
+ *   - Status Badge: active=green, suspended(notice period)=yellow, inactive=red
  *   - Role tag Badges in each row
  *   - Edit opens EmployeeForm in edit mode
- *   - Suspend via suspendEmployee action with inline confirmation
  *   - Delete via DeleteConfirmDialog + softDeleteEmployee
+ *   - Bulk delete with progress bar
+ *   - Israeli ID padded to 9 digits in display
  *   - RTL-safe Tailwind (text-start, pe-*, ms-*)
  */
 
 import * as React from 'react'
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   type ColumnDef,
   type SortingState,
   type ColumnFiltersState,
+  type RowSelectionState,
+  type PaginationState,
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { Pencil, Trash2, Ban, Plus, ArrowUpDown } from 'lucide-react'
+import { Pencil, Trash2, Plus, ArrowUpDown, CheckCircle2, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft } from 'lucide-react'
 import type { Company, Department, Employee, RoleTag } from '@/types/entities'
-import { softDeleteEmployee, suspendEmployee } from '@/actions/employees'
+import { softDeleteEmployee, bulkSoftDeleteEmployees } from '@/actions/employees'
 import { EmployeeForm } from './EmployeeForm'
 import { DeleteConfirmDialog } from '@/components/shared/DeleteConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -54,6 +61,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Progress } from '@/components/ui/progress'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -76,6 +92,7 @@ interface EmployeesTableProps {
 
 // ---------------------------------------------------------------------------
 // Status badge helper
+// active=green, suspended=yellow (הודעה מוקדמת), inactive=red
 // ---------------------------------------------------------------------------
 
 function StatusBadge({ status }: { status: string }) {
@@ -83,9 +100,19 @@ function StatusBadge({ status }: { status: string }) {
     return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">פעיל</Badge>
   }
   if (status === 'suspended') {
-    return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">מושהה</Badge>
+    return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">הודעה מוקדמת</Badge>
   }
-  return <Badge variant="secondary">לא פעיל</Badge>
+  return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">לא פעיל</Badge>
+}
+
+/**
+ * formatIdNumber — pad Israeli ID to 9 digits for display.
+ * Only pads purely numeric IDs shorter than 9 digits.
+ */
+function formatIdNumber(id: string | null | undefined): string {
+  if (!id) return '—'
+  if (/^\d+$/.test(id) && id.length < 9) return id.padStart(9, '0')
+  return id
 }
 
 // ---------------------------------------------------------------------------
@@ -101,10 +128,20 @@ export function EmployeesTable({
   // ---------------------------------------------------------------------------
   // Dialog state
   // ---------------------------------------------------------------------------
-  const [formOpen,       setFormOpen]       = useState(false)
+  const [formOpen,        setFormOpen]       = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<EmployeeWithJoins | undefined>()
-  const [deleteTarget,   setDeleteTarget]   = useState<EmployeeWithJoins | undefined>()
-  const [deleting,       setDeleting]       = useState(false)
+  const [deleteTarget,    setDeleteTarget]   = useState<EmployeeWithJoins | undefined>()
+  const [deleting,        setDeleting]       = useState(false)
+
+  // Row selection for bulk operations
+  const [rowSelection,   setRowSelection]   = useState<RowSelectionState>({})
+  const [bulkDeleting,   setBulkDeleting]   = useState(false)
+  const [showBulkDelete, setShowBulkDelete] = useState(false)
+  const [bulkProgress,   setBulkProgress]   = useState(0)
+  const [bulkPhase,      setBulkPhase]      = useState<'confirm' | 'deleting' | 'done'>('confirm')
+  const [bulkResult,     setBulkResult]     = useState(0)
+  const bulkCancelledRef = React.useRef(false)
+  const bulkProgressRef  = React.useRef<ReturnType<typeof setInterval> | null>(null)
 
   // ---------------------------------------------------------------------------
   // Filter state (multi-filter toolbar)
@@ -114,14 +151,19 @@ export function EmployeesTable({
   const [departmentFilter, setDepartmentFilter] = useState('all')
   const [statusFilter,     setStatusFilter]     = useState('all')
 
-  // Suspend
-  const [, startSuspendTransition] = useTransition()
+  // Router for refreshing data after mutations
+  const router = useRouter()
 
   // ---------------------------------------------------------------------------
   // TanStack Table state
   // ---------------------------------------------------------------------------
   const [sorting,       setSorting]       = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [pagination,    setPagination]    = React.useState<PaginationState>({ pageIndex: 0, pageSize: 50 })
+
+  // Unused transition kept for API compatibility
+  const [, startTransition] = useTransition()
+  void startTransition
 
   // ---------------------------------------------------------------------------
   // Actions
@@ -140,47 +182,130 @@ export function EmployeesTable({
   async function handleDelete() {
     if (!deleteTarget) return
     setDeleting(true)
-    await softDeleteEmployee(deleteTarget.id)
+    const result = await softDeleteEmployee(deleteTarget.id)
+    if (!result.success) {
+      console.error('[handleDelete] Failed:', result.error)
+      alert(`שגיאה במחיקה: ${result.error}`)
+    }
     setDeleting(false)
     setDeleteTarget(undefined)
+    router.refresh()
   }
 
-  function handleSuspend(emp: EmployeeWithJoins) {
-    startSuspendTransition(async () => {
-      await suspendEmployee(emp.id)
-    })
+  // Open bulk delete dialog — reset state
+  function openBulkDelete() {
+    setBulkPhase('confirm')
+    setBulkProgress(0)
+    setBulkResult(0)
+    bulkCancelledRef.current = false
+    setShowBulkDelete(true)
   }
 
-  // ---------------------------------------------------------------------------
-  // Filtered data (applied before TanStack table)
-  // ---------------------------------------------------------------------------
-  const filteredData = employees.filter((emp) => {
-    // Name filter
-    if (nameFilter) {
-      const fullName = `${emp.first_name} ${emp.last_name}`.toLowerCase()
-      if (!fullName.includes(nameFilter.toLowerCase())) return false
+  // Bulk delete — single batch query via server action
+  async function handleBulkDelete() {
+    const selectedRows = table.getSelectedRowModel().rows
+    if (selectedRows.length === 0) return
+
+    setBulkPhase('deleting')
+    setBulkDeleting(true)
+    setBulkProgress(0)
+
+    const estimatedMs = Math.max(selectedRows.length * 3, 500)
+    const steps = 30
+    const intervalMs = estimatedMs / steps
+    let current = 0
+    bulkProgressRef.current = setInterval(() => {
+      current += 90 / steps
+      if (current >= 90) {
+        current = 90
+        if (bulkProgressRef.current) clearInterval(bulkProgressRef.current)
+      }
+      setBulkProgress(Math.round(current))
+    }, intervalMs)
+
+    const ids = selectedRows.map((r) => r.original.id)
+    const result = await bulkSoftDeleteEmployees(ids)
+
+    if (bulkProgressRef.current) clearInterval(bulkProgressRef.current)
+    setBulkProgress(100)
+    setBulkDeleting(false)
+
+    if (bulkCancelledRef.current) return
+
+    if (!result.success) {
+      console.error('[handleBulkDelete] Failed:', result.error)
+      setBulkDeleting(false)
+      setShowBulkDelete(false)
+      alert(`שגיאה במחיקה: ${result.error}`)
+      router.refresh()
+      return
     }
-    // Company filter
+
+    setBulkResult(result.deleted)
+    setBulkPhase('done')
+    setRowSelection({})
+
+    setTimeout(() => {
+      setShowBulkDelete(false)
+      router.refresh()
+    }, 1500)
+  }
+
+  function handleBulkCancel() {
+    bulkCancelledRef.current = true
+    if (bulkProgressRef.current) clearInterval(bulkProgressRef.current)
+    setBulkDeleting(false)
+    setShowBulkDelete(false)
+  }
+
+  const selectedCount = Object.keys(rowSelection).length
+
+  // ---------------------------------------------------------------------------
+  // Filtered data — MUST be memoized to prevent useReactTable re-render loop
+  // ---------------------------------------------------------------------------
+  const filteredData = useMemo(() => employees.filter((emp) => {
+    if (nameFilter) {
+      const q = nameFilter.toLowerCase()
+      const fullName = `${emp.first_name} ${emp.last_name}`.toLowerCase()
+      const empNum = (emp.employee_number ?? '').toLowerCase()
+      const idNum = (emp.id_number ?? '').toLowerCase()
+      const phone = (emp.mobile_phone ?? '').toLowerCase()
+      if (!fullName.includes(q) && !empNum.includes(q) && !idNum.includes(q) && !phone.includes(q)) return false
+    }
     if (companyFilter !== 'all' && emp.company_id !== companyFilter) return false
-    // Department filter
     if (departmentFilter !== 'all' && emp.department_id !== departmentFilter) return false
-    // Status filter
     if (statusFilter !== 'all' && emp.status !== statusFilter) return false
     return true
-  })
+  }), [employees, nameFilter, companyFilter, departmentFilter, statusFilter])
 
   // ---------------------------------------------------------------------------
-  // Department options scoped to company filter
+  // Department options — departments are global (not per-company), show all
   // ---------------------------------------------------------------------------
-  const departmentOptions =
-    companyFilter === 'all'
-      ? departments
-      : departments.filter((d) => d.company_id === companyFilter)
+  const departmentOptions = departments
 
   // ---------------------------------------------------------------------------
   // Column definitions
   // ---------------------------------------------------------------------------
   const columns: ColumnDef<EmployeeWithJoins>[] = [
+    {
+      id: 'select',
+      header: ({ table: t }) => (
+        <Checkbox
+          checked={t.getIsAllPageRowsSelected() || (t.getIsSomePageRowsSelected() && 'indeterminate')}
+          onCheckedChange={(value) => t.toggleAllPageRowsSelected(!!value)}
+          aria-label="בחר הכל"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="בחר שורה"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       id: 'employee_number',
       accessorKey: 'employee_number',
@@ -209,6 +334,16 @@ export function EmployeesTable({
           שם מלא
           <ArrowUpDown className="ms-2 h-4 w-4" />
         </Button>
+      ),
+    },
+    {
+      id: 'id_number',
+      accessorKey: 'id_number',
+      header: 'ת.ז.',
+      cell: ({ row }) => (
+        <span dir="ltr" className="font-mono text-sm">
+          {formatIdNumber(row.original.id_number)}
+        </span>
       ),
     },
     {
@@ -265,23 +400,10 @@ export function EmployeesTable({
               size="icon"
               className="h-8 w-8"
               title="עריכה"
-              onClick={() => openEdit(emp)}
+              onClick={(e) => { e.stopPropagation(); openEdit(emp) }}
             >
               <Pencil className="h-4 w-4" />
             </Button>
-
-            {/* Suspend — only if not already suspended */}
-            {emp.status !== 'suspended' && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-yellow-600 hover:text-yellow-700"
-                title="השהיה"
-                onClick={() => handleSuspend(emp)}
-              >
-                <Ban className="h-4 w-4" />
-              </Button>
-            )}
 
             {/* Delete */}
             <Button
@@ -289,7 +411,7 @@ export function EmployeesTable({
               size="icon"
               className="h-8 w-8 text-destructive hover:text-destructive"
               title="מחיקה"
-              onClick={() => setDeleteTarget(emp)}
+              onClick={(e) => { e.stopPropagation(); setDeleteTarget(emp) }}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -302,15 +424,24 @@ export function EmployeesTable({
   // ---------------------------------------------------------------------------
   // Table instance
   // ---------------------------------------------------------------------------
+  const coreRowModel       = useMemo(() => getCoreRowModel(), [])
+  const sortedRowModel     = useMemo(() => getSortedRowModel(), [])
+  const filteredRowModel   = useMemo(() => getFilteredRowModel(), [])
+  const paginationRowModel = useMemo(() => getPaginationRowModel(), [])
+
   const table = useReactTable({
     data: filteredData,
     columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    getCoreRowModel: coreRowModel,
+    getSortedRowModel: sortedRowModel,
+    getFilteredRowModel: filteredRowModel,
+    getPaginationRowModel: paginationRowModel,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
-    state: { sorting, columnFilters },
+    onRowSelectionChange: setRowSelection,
+    onPaginationChange: setPagination,
+    enableRowSelection: true,
+    state: { sorting, columnFilters, rowSelection, pagination },
   })
 
   // ---------------------------------------------------------------------------
@@ -318,26 +449,47 @@ export function EmployeesTable({
   // ---------------------------------------------------------------------------
   return (
     <div className="space-y-4">
-      {/* Top bar — add button + filters */}
+      {/* Top bar — add button + bulk actions */}
       <div className="flex flex-wrap items-center gap-3">
-        {/* Add employee button */}
         <Button onClick={openCreate} size="sm">
           <Plus className="me-2 h-4 w-4" />
           הוספת עובד
         </Button>
+
+        {selectedCount > 0 && (
+          <>
+            <div className="h-6 w-px bg-border" />
+            <span className="text-sm font-medium text-brand-dark">
+              {selectedCount} נבחרו
+            </span>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={openBulkDelete}
+            >
+              <Trash2 className="me-2 h-4 w-4" />
+              מחק נבחרים
+            </Button>
+            <button
+              type="button"
+              className="text-xs text-muted-foreground hover:underline cursor-pointer"
+              onClick={() => setRowSelection({})}
+            >
+              בטל בחירה
+            </button>
+          </>
+        )}
       </div>
 
       {/* Filter toolbar */}
       <div className="flex flex-wrap items-center gap-3">
-        {/* Text search */}
         <Input
-          placeholder="חיפוש לפי שם..."
+          placeholder="חיפוש לפי שם, מס' עובד, ת.ז., טלפון..."
           value={nameFilter}
           onChange={(e) => setNameFilter(e.target.value)}
           className="max-w-xs"
         />
 
-        {/* Company filter */}
         <Select value={companyFilter} onValueChange={(v) => { setCompanyFilter(v); setDepartmentFilter('all') }}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="כל החברות" />
@@ -350,7 +502,6 @@ export function EmployeesTable({
           </SelectContent>
         </Select>
 
-        {/* Department filter — scoped to company */}
         <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="כל המחלקות" />
@@ -363,15 +514,14 @@ export function EmployeesTable({
           </SelectContent>
         </Select>
 
-        {/* Status filter */}
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-44">
             <SelectValue placeholder="כל הסטטוסים" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">כל הסטטוסים</SelectItem>
             <SelectItem value="active">פעיל</SelectItem>
-            <SelectItem value="suspended">מושהה</SelectItem>
+            <SelectItem value="suspended">הודעה מוקדמת</SelectItem>
             <SelectItem value="inactive">לא פעיל</SelectItem>
           </SelectContent>
         </Select>
@@ -396,9 +546,21 @@ export function EmployeesTable({
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow
+                  key={row.id}
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => openEdit(row.original)}
+                >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      // Prevent row click when interacting with checkbox or action buttons
+                      onClick={
+                        cell.column.id === 'select' || cell.column.id === 'actions'
+                          ? (e: React.MouseEvent) => e.stopPropagation()
+                          : undefined
+                      }
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -418,11 +580,53 @@ export function EmployeesTable({
         </Table>
       </div>
 
-      {/* EmployeeForm dialog — only mount when open to avoid heavy init cost */}
+      {/* Pagination controls */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">
+            עמוד {table.getState().pagination.pageIndex + 1} מתוך{' '}
+            {table.getPageCount()} ({filteredData.length} רשומות)
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">שורות בעמוד:</span>
+            <Select
+              value={String(pagination.pageSize)}
+              onValueChange={(v) => { setPagination({ pageIndex: 0, pageSize: Number(v) }) }}
+            >
+              <SelectTrigger className="h-8 w-[80px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+                <SelectItem value="500">500</SelectItem>
+                <SelectItem value="1000">1000</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => table.firstPage()} disabled={!table.getCanPreviousPage()} title="עמוד ראשון">
+            <ChevronsRight className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} title="הקודם">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()} title="הבא">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => table.lastPage()} disabled={!table.getCanNextPage()} title="עמוד אחרון">
+            <ChevronsLeft className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* EmployeeForm dialog — only mount when open */}
       {formOpen && (
         <EmployeeForm
           open={formOpen}
           onOpenChange={setFormOpen}
+          onSaved={() => router.refresh()}
           employee={editingEmployee}
           companies={companies}
           departments={departments}
@@ -430,7 +634,7 @@ export function EmployeesTable({
         />
       )}
 
-      {/* Delete confirmation dialog */}
+      {/* Delete confirmation dialog — single */}
       <DeleteConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => { if (!open) setDeleteTarget(undefined) }}
@@ -443,6 +647,47 @@ export function EmployeesTable({
             : undefined
         }
       />
+
+      {/* Bulk delete dialog with progress bar */}
+      <Dialog open={showBulkDelete} onOpenChange={(open) => { if (!open && !bulkDeleting) setShowBulkDelete(false) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>מחיקת עובדים</DialogTitle>
+            <DialogDescription>
+              {bulkPhase === 'confirm'  && `האם למחוק ${selectedCount} עובדים? פעולה זו ניתנת לשחזור.`}
+              {bulkPhase === 'deleting' && `מוחק ${selectedCount} עובדים...`}
+              {bulkPhase === 'done'     && `${bulkResult} עובדים נמחקו בהצלחה.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {(bulkPhase === 'deleting' || bulkPhase === 'done') && (
+            <div className="space-y-2">
+              <Progress value={bulkProgress} className="h-3" />
+              <p className="text-sm text-muted-foreground text-center">
+                {bulkPhase === 'deleting' && `${bulkProgress}%`}
+                {bulkPhase === 'done' && (
+                  <span className="flex items-center justify-center gap-1 text-green-600">
+                    <CheckCircle2 className="h-4 w-4" />
+                    הושלם
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
+
+          <DialogFooter className="flex gap-2 justify-end">
+            {bulkPhase === 'confirm' && (
+              <>
+                <Button variant="outline" onClick={() => setShowBulkDelete(false)}>ביטול</Button>
+                <Button variant="destructive" onClick={handleBulkDelete}>מחק</Button>
+              </>
+            )}
+            {bulkPhase === 'deleting' && (
+              <Button variant="outline" onClick={handleBulkCancel}>ביטול מחיקה</Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

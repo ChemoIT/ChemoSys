@@ -122,6 +122,7 @@ export function CompaniesTable({ companies }: CompaniesTableProps) {
         data={companies}
         searchKey="name"
         searchPlaceholder="חיפוש לפי שם חברה..."
+        onRowClick={openEdit}
       />
 
       {/* Create / Edit form dialog */}

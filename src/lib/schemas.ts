@@ -77,6 +77,8 @@ export const EmployeeSchema = z.object({
   correspondence_language: z.enum(['hebrew', 'english', 'arabic', 'thai']).default('hebrew'),
   profession:              z.string().optional().or(z.literal('')),
   notes:                   z.string().optional().or(z.literal('')),
+  photo_url:               z.string().optional().or(z.literal('')),
+  salary_system_license:   z.string().optional().or(z.literal('')),
 })
 
 export type EmployeeInput = z.infer<typeof EmployeeSchema>

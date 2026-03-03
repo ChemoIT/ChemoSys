@@ -108,6 +108,7 @@ export function RoleTagsTable({ roleTags }: RoleTagsTableProps) {
         data={roleTags}
         searchKey="name"
         searchPlaceholder="חיפוש לפי שם תגית..."
+        onRowClick={openEdit}
       />
 
       {/* Create / Edit form dialog */}

@@ -7,6 +7,7 @@
 import { verifySession } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
 import { CompaniesTable } from '@/components/admin/companies/CompaniesTable'
+import { RefreshButton } from '@/components/shared/RefreshButton'
 import { Badge } from '@/components/ui/badge'
 
 export default async function CompaniesPage() {
@@ -34,6 +35,7 @@ export default async function CompaniesPage() {
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold text-foreground">ניהול חברות</h1>
         <Badge variant="secondary">{companiesList.length}</Badge>
+        <RefreshButton />
       </div>
 
       {/* Companies data table with create/edit/delete */}

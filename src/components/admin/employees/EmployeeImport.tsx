@@ -8,32 +8,36 @@
  *   Submits with action='preview' — no DB writes, just count analysis.
  *
  * Step 2 — Preview summary:
- *   Shows total rows found, new vs update breakdown, and any skipped-row warnings.
+ *   Shows total rows found, new vs update breakdown, and detailed skipped-row info.
  *   Admin clicks "אישור ייבוא" to confirm — re-submits the same file with action='confirm'.
  *   "ביטול" resets back to Step 1.
+ *
+ * Step 2.5 — Importing:
+ *   Shows animated progress bar while the server processes rows.
  *
  * Step 3 — Import complete:
  *   Shows final counts and any per-row errors. Link back to employees list.
  *
  * State management:
- *   - phase: 'upload' | 'preview' | 'complete' — drives which step renders
+ *   - phase: 'upload' | 'preview' | 'importing' | 'complete'
  *   - selectedFile: kept in React state so Step 2 can re-submit the same file
  *   - selectedCompanyId: kept in state alongside the hidden input for the confirm form
  *
  * Server Action: importEmployeesAction (employees.ts)
- *   Phase 1: action='preview' → returns counts, no writes
+ *   Phase 1: action='preview' → returns counts + skippedRows details, no writes
  *   Phase 2: action='confirm' → upserts via RPC, returns results
  */
 
 import * as React from 'react'
-import { useActionState, useRef, useState, useTransition } from 'react'
+import { useActionState, useRef, useState, useTransition, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Upload, Loader2, CheckCircle, AlertCircle, ArrowRight } from 'lucide-react'
+import { Upload, Loader2, CheckCircle, AlertCircle, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react'
 import { importEmployeesAction, type ImportActionState } from '@/actions/employees'
 import type { Company } from '@/types/entities'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import {
   Select,
   SelectContent,
@@ -56,13 +60,23 @@ interface EmployeeImportProps {
 
 export function EmployeeImport({ companies }: EmployeeImportProps) {
   // ── Local state ──────────────────────────────────────────────────────────
-  const [phase, setPhase]                   = useState<'upload' | 'preview' | 'complete'>('upload')
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
-  const [selectedFile, setSelectedFile]     = useState<File | null>(null)
-  const [isPending, startTransition]        = useTransition()
+  const [phase, setPhase]                         = useState<'upload' | 'preview' | 'importing' | 'complete'>('upload')
+  const [selectedCompanyId, setSelectedCompanyId]  = useState<string>('')
+  const [selectedFile, setSelectedFile]            = useState<File | null>(null)
+  const [isPending, startTransition]               = useTransition()
+  const [isPreviewLoading, setIsPreviewLoading]    = useState(false)
+  const cancelledRef = useRef(false)
 
-  // Ref for the hidden company_id input in the confirm form
+  // Progress bar state
+  const [progress, setProgress] = useState(0)
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const totalRowsRef = useRef(0)
+
+  // Ref for the file input reset
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Skipped rows expand/collapse
+  const [showSkippedDetails, setShowSkippedDetails] = useState(false)
 
   // ── Server Action state ──────────────────────────────────────────────────
   const [actionState, dispatch] = useActionState<ImportActionState, FormData>(
@@ -70,36 +84,89 @@ export function EmployeeImport({ companies }: EmployeeImportProps) {
     null
   )
 
+  // ── Stop progress animation ────────────────────────────────────────────
+  const stopProgress = useCallback(() => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current)
+      progressIntervalRef.current = null
+    }
+  }, [])
+
   // ── Derived state from action response ───────────────────────────────────
-  // Move to preview step after a successful preview response
-  React.useEffect(() => {
+  useEffect(() => {
     if (!actionState) return
+    // Ignore responses if user cancelled
+    if (cancelledRef.current) return
     if (actionState.success && actionState.phase === 'preview') {
       setPhase('preview')
+      setIsPreviewLoading(false)
+      if (actionState.preview) {
+        totalRowsRef.current = actionState.preview.total
+      }
+    }
+    if (!actionState.success) {
+      setIsPreviewLoading(false)
     }
     if (actionState.success && actionState.phase === 'complete') {
-      setPhase('complete')
+      stopProgress()
+      setProgress(100)
+      // Small delay to show 100% before switching phase
+      setTimeout(() => setPhase('complete'), 600)
     }
-  }, [actionState])
+  }, [actionState, stopProgress])
+
+  // ── Cleanup on unmount ──────────────────────────────────────────────────
+  useEffect(() => {
+    return () => stopProgress()
+  }, [stopProgress])
 
   // ── Reset handler ─────────────────────────────────────────────────────────
   function handleReset() {
+    cancelledRef.current = true
     setPhase('upload')
     setSelectedFile(null)
     setSelectedCompanyId('')
+    setProgress(0)
+    setIsPreviewLoading(false)
+    stopProgress()
+    setShowSkippedDetails(false)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
   }
 
+  // ── Start progress animation ──────────────────────────────────────────
+  function startProgressAnimation() {
+    setProgress(0)
+    setPhase('importing')
+    // Estimate: ~150ms per row, animate toward 90%
+    const totalRows = totalRowsRef.current || 10
+    const estimatedMs = totalRows * 150
+    const steps = 50
+    const intervalMs = estimatedMs / steps
+    let current = 0
+
+    progressIntervalRef.current = setInterval(() => {
+      current += 90 / steps
+      if (current >= 90) {
+        current = 90
+        stopProgress()
+      }
+      setProgress(Math.round(current))
+    }, intervalMs)
+  }
+
   // ── Confirm handler — re-submits the same file with action='confirm' ─────
   function handleConfirm() {
     if (!selectedFile || !selectedCompanyId) return
+    cancelledRef.current = false
 
     const formData = new FormData()
     formData.append('company_id', selectedCompanyId)
     formData.append('action', 'confirm')
     formData.append('excel_file', selectedFile)
+
+    startProgressAnimation()
 
     startTransition(() => {
       dispatch(formData)
@@ -109,9 +176,10 @@ export function EmployeeImport({ companies }: EmployeeImportProps) {
   // ── Preview form submission handler ─────────────────────────────────────
   function handlePreviewSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    cancelledRef.current = false
+    setIsPreviewLoading(true)
     const form = e.currentTarget
     const formData = new FormData(form)
-    // Capture the file for re-use in confirm step
     const file = formData.get('excel_file')
     if (file instanceof File && file.size > 0) {
       setSelectedFile(file)
@@ -126,9 +194,10 @@ export function EmployeeImport({ companies }: EmployeeImportProps) {
     <Card className="max-w-2xl">
       <CardHeader>
         <CardTitle className="text-lg">
-          {phase === 'upload'   && 'בחירת חברה וקובץ'}
-          {phase === 'preview'  && 'תצוגה מקדימה לפני ייבוא'}
-          {phase === 'complete' && 'הייבוא הושלם'}
+          {phase === 'upload'    && 'בחירת חברה וקובץ'}
+          {phase === 'preview'   && 'תצוגה מקדימה לפני ייבוא'}
+          {phase === 'importing' && 'מייבא עובדים...'}
+          {phase === 'complete'  && 'הייבוא הושלם'}
         </CardTitle>
       </CardHeader>
 
@@ -158,7 +227,6 @@ export function EmployeeImport({ companies }: EmployeeImportProps) {
                   ))}
                 </SelectContent>
               </Select>
-              {/* Hidden input so the server action can read company_id from FormData */}
               <input type="hidden" name="company_id" value={selectedCompanyId} />
             </div>
 
@@ -194,7 +262,6 @@ export function EmployeeImport({ companies }: EmployeeImportProps) {
               )}
             </div>
 
-            {/* Phase action hidden input */}
             <input type="hidden" name="action" value="preview" />
 
             {/* Error from server */}
@@ -207,10 +274,10 @@ export function EmployeeImport({ companies }: EmployeeImportProps) {
 
             <Button
               type="submit"
-              disabled={isPending || !selectedCompanyId || !selectedFile}
+              disabled={isPreviewLoading || !selectedCompanyId || !selectedFile}
               className="w-full"
             >
-              {isPending ? (
+              {isPreviewLoading ? (
                 <>
                   <Loader2 className="me-2 h-4 w-4 animate-spin" />
                   מעבד קובץ...
@@ -247,15 +314,36 @@ export function EmployeeImport({ companies }: EmployeeImportProps) {
                 </Badge>
               </div>
 
-              {/* Warnings (skipped rows, etc.) */}
-              {actionState.preview.errors.length > 0 && (
-                <div className="space-y-1 pt-1">
-                  {actionState.preview.errors.map((err, i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                      <span>{err}</span>
+              {/* ── Detailed skipped rows ─────────────────────────────── */}
+              {actionState.preview.skippedRows.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowSkippedDetails(!showSkippedDetails)}
+                    className="flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-400 hover:underline"
+                  >
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{actionState.preview.skippedRows.length} שורות דולגו (חסרים שדות חובה)</span>
+                    {showSkippedDetails
+                      ? <ChevronUp className="h-3.5 w-3.5" />
+                      : <ChevronDown className="h-3.5 w-3.5" />
+                    }
+                  </button>
+
+                  {showSkippedDetails && (
+                    <div className="max-h-48 overflow-y-auto rounded border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-2 space-y-1">
+                      <div className="grid grid-cols-[60px_1fr] gap-1 text-xs font-semibold text-amber-800 dark:text-amber-300 border-b border-amber-200 dark:border-amber-800 pb-1 mb-1">
+                        <span>שורה</span>
+                        <span>שדות חסרים</span>
+                      </div>
+                      {actionState.preview.skippedRows.map((sr, i) => (
+                        <div key={i} className="grid grid-cols-[60px_1fr] gap-1 text-xs text-amber-700 dark:text-amber-400">
+                          <span className="font-mono">{sr.row}</span>
+                          <span>{sr.missing.join(', ')}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
             </div>
@@ -274,14 +362,7 @@ export function EmployeeImport({ companies }: EmployeeImportProps) {
                 disabled={isPending}
                 className="flex-1"
               >
-                {isPending ? (
-                  <>
-                    <Loader2 className="me-2 h-4 w-4 animate-spin" />
-                    מייבא...
-                  </>
-                ) : (
-                  'אישור ייבוא'
-                )}
+                אישור ייבוא
               </Button>
               <Button
                 type="button"
@@ -292,6 +373,37 @@ export function EmployeeImport({ companies }: EmployeeImportProps) {
                 ביטול
               </Button>
             </div>
+          </div>
+        )}
+
+        {/* ── STEP 2.5: Importing — Progress Bar ──────────────────────── */}
+        {phase === 'importing' && (
+          <div className="space-y-5">
+            <div className="rounded-lg border bg-muted/30 p-6 space-y-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium text-foreground">
+                  מייבא {totalRowsRef.current} עובדים...
+                </span>
+                <span className="font-mono text-muted-foreground">
+                  {progress}%
+                </span>
+              </div>
+
+              <Progress value={progress} className="h-3" />
+
+              <p className="text-xs text-muted-foreground text-center">
+                נא לא לסגור את הדף. הייבוא בתהליך ביצוע...
+              </p>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleReset}
+            >
+              ביטול ייבוא
+            </Button>
           </div>
         )}
 

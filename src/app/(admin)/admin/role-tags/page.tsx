@@ -6,6 +6,7 @@
 import { verifySession } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
 import { RoleTagsTable } from '@/components/admin/role-tags/RoleTagsTable'
+import { RefreshButton } from '@/components/shared/RefreshButton'
 import { Badge } from '@/components/ui/badge'
 
 export default async function RoleTagsPage() {
@@ -33,6 +34,7 @@ export default async function RoleTagsPage() {
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold text-foreground">תגיות תפקיד</h1>
         <Badge variant="secondary">{roleTagsList.length}</Badge>
+        <RefreshButton />
       </div>
 
       {/* Role tags data table with create/edit/delete */}

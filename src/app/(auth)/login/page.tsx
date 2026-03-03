@@ -3,7 +3,8 @@
 // Login page — client component for useActionState (React 19).
 // Displays full Chemo Aharon Hebrew logo, email/password form,
 // submits via login Server Action, shows Hebrew error messages.
-// "Remember me" saves email to localStorage for next visit.
+// "Remember me" saves email + password (base64) to localStorage.
+// Note: localStorage is not encrypted — acceptable for internal admin tool.
 
 import { useActionState, useEffect, useState } from "react";
 import Image from "next/image";
@@ -13,27 +14,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
-const REMEMBER_KEY = "chemosys_remember_email";
+const REMEMBER_KEY = "chemosys_remember";
 
 export default function LoginPage() {
   const [state, formAction, isPending] = useActionState(login, null);
   const [savedEmail, setSavedEmail] = useState("");
+  const [savedPassword, setSavedPassword] = useState("");
   const [remember, setRemember] = useState(false);
 
-  // Load saved email on mount
+  // Load saved credentials on mount
   useEffect(() => {
-    const stored = localStorage.getItem(REMEMBER_KEY);
-    if (stored) {
-      setSavedEmail(stored);
-      setRemember(true);
+    try {
+      const stored = localStorage.getItem(REMEMBER_KEY);
+      if (stored) {
+        const { e, p } = JSON.parse(atob(stored));
+        if (e) setSavedEmail(e);
+        if (p) setSavedPassword(p);
+        setRemember(true);
+      }
+    } catch {
+      // Corrupted data or old format — clear it
+      localStorage.removeItem(REMEMBER_KEY);
     }
+    // Also clean up old key from previous version
+    localStorage.removeItem("chemosys_remember_email");
   }, []);
 
-  // Save or clear email on form submit
+  // Save or clear credentials on form submit
   function handleSubmit(formData: FormData) {
     const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
     if (remember && email) {
-      localStorage.setItem(REMEMBER_KEY, email);
+      localStorage.setItem(REMEMBER_KEY, btoa(JSON.stringify({ e: email, p: password })));
     } else {
       localStorage.removeItem(REMEMBER_KEY);
     }
@@ -81,6 +93,7 @@ export default function LoginPage() {
             required
             autoComplete="current-password"
             disabled={isPending}
+            defaultValue={savedPassword}
           />
         </div>
 

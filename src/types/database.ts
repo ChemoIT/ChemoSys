@@ -61,7 +61,7 @@ export interface Database {
           id: string
           name: string
           dept_number: string
-          company_id: string
+          company_id: string | null   // nullable — departments are global across companies
           parent_dept_id: string | null
           notes: string | null
           created_at: string
@@ -74,7 +74,7 @@ export interface Database {
           id?: string
           name: string
           dept_number: string
-          company_id: string
+          company_id?: string | null  // optional — global departments have no company
           parent_dept_id?: string | null
           notes?: string | null
           created_at?: string
@@ -200,6 +200,8 @@ export interface Database {
           correspondence_language: 'hebrew' | 'english' | 'arabic' | 'thai' | null
           profession: string | null
           notes: string | null
+          photo_url: string | null
+          salary_system_license: string | null
           created_at: string
           updated_at: string
           created_by: string | null
@@ -231,6 +233,8 @@ export interface Database {
           correspondence_language?: 'hebrew' | 'english' | 'arabic' | 'thai' | null
           profession?: string | null
           notes?: string | null
+          photo_url?: string | null
+          salary_system_license?: string | null
           created_at?: string
           updated_at?: string
           created_by?: string | null
