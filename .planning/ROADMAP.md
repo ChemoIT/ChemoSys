@@ -162,7 +162,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 03.1 -> 4 -> 5
 | 1. Foundation | 4/4 | Complete | 2026-03-01 |
 | 2. Employees | 2/2 | Complete | 2026-03-01 |
 | 3. Access Control | 3/3 | Complete | 2026-03-03 |
-| 03.1. Security Hardening | 0/3 | Planned | - |
+| 03.1. Security Hardening | 3/3 | Complete | 2026-03-03 |
 | 4. Projects | 0/2 | Not started | - |
 | 5. Settings and Observability | 0/3 | Not started | - |
 
@@ -187,4 +187,4 @@ Note: REQUIREMENTS.md stated "46 total" but the file contains 59 v1 requirements
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-03 — Phase 03.1 Security Hardening planned (3 plans, 1 wave)*
+*Last updated: 2026-03-03 — Phase 03.1 Security Hardening complete (3/3 plans)*
