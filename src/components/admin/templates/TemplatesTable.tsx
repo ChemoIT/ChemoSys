@@ -172,8 +172,9 @@ export function TemplatesTable({ templates }: TemplatesTableProps) {
         onRowClick={openEdit}
       />
 
-      {/* Create / Edit form dialog */}
+      {/* Create / Edit form dialog — key forces remount on each open to reset useActionState */}
       <TemplateForm
+        key={editingTemplate?.id ?? 'new'}
         open={formOpen}
         onOpenChange={setFormOpen}
         template={editingTemplate}
