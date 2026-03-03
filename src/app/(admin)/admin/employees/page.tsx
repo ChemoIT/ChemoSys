@@ -11,13 +11,12 @@
 
 import Link from 'next/link'
 import { Upload } from 'lucide-react'
-import { verifySession, checkPagePermission } from '@/lib/dal'
+import { verifySession } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
 import { EmployeesTable } from '@/components/admin/employees/EmployeesTable'
 import { RefreshButton } from '@/components/shared/RefreshButton'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { AccessDenied } from '@/components/shared/AccessDenied'
 
 const EMPLOYEES_SELECT = '*, companies(name), departments!department_id(name), sub_departments:departments!sub_department_id(name), employee_role_tags(role_tags(name))'
 const PAGE_SIZE = 1000
@@ -26,8 +25,6 @@ export default async function EmployeesPage() {
   // Auth guard — redirects to /login if no valid session
   await verifySession()
 
-  const hasAccess = await checkPagePermission('employees', 1)
-  if (!hasAccess) return <AccessDenied />
 
   const supabase = await createClient()
 

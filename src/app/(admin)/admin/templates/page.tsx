@@ -6,18 +6,15 @@
  * First line: verifySession() — redirects to /login if unauthenticated.
  */
 
-import { verifySession, checkPagePermission } from '@/lib/dal'
+import { verifySession } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
 import { TemplatesTable } from '@/components/admin/templates/TemplatesTable'
 import { Badge } from '@/components/ui/badge'
-import { AccessDenied } from '@/components/shared/AccessDenied'
 
 export default async function TemplatesPage() {
   // Auth guard — redirects to /login if no valid session
   await verifySession()
 
-  const hasAccess = await checkPagePermission('templates', 1)
-  if (!hasAccess) return <AccessDenied />
 
   const supabase = await createClient()
 

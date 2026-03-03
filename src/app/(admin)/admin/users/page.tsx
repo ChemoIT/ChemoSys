@@ -10,17 +10,14 @@
  * Passes all data down to UsersTable (client component).
  */
 
-import { verifySession, checkPagePermission } from '@/lib/dal'
+import { verifySession } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
 import { UsersTable } from '@/components/admin/users/UsersTable'
 import { Badge } from '@/components/ui/badge'
-import { AccessDenied } from '@/components/shared/AccessDenied'
 
 export default async function UsersPage() {
   await verifySession()
 
-  const hasAccess = await checkPagePermission('users', 1)
-  if (!hasAccess) return <AccessDenied />
   const supabase = await createClient()
 
   const [usersRes, employeesRes, templatesRes] = await Promise.all([

@@ -4,20 +4,17 @@
  * First line: verifySession() — redirects to /login if unauthenticated.
  */
 
-import { verifySession, checkPagePermission } from '@/lib/dal'
+import { verifySession } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
 import { CompaniesTable } from '@/components/admin/companies/CompaniesTable'
 import { RefreshButton } from '@/components/shared/RefreshButton'
 import { Badge } from '@/components/ui/badge'
-import { AccessDenied } from '@/components/shared/AccessDenied'
 
 export default async function CompaniesPage() {
   // Auth guard — redirects to /login if no valid session
   await verifySession()
 
   // Permission guard — render access denied if user lacks read access
-  const hasAccess = await checkPagePermission('companies', 1)
-  if (!hasAccess) return <AccessDenied />
 
   const supabase = await createClient()
 
