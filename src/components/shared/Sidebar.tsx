@@ -12,10 +12,9 @@ import type { SessionUser } from "@/lib/dal";
 
 type SidebarProps = {
   user: SessionUser;
-  allowedModules: string[];
 };
 
-export function Sidebar({ user, allowedModules }: SidebarProps) {
+export function Sidebar({ user }: SidebarProps) {
   return (
     // sidebar-bg class uses --color-sidebar-bg from globals.css
     <div className="flex h-full w-64 flex-col bg-sidebar-bg text-sidebar-text">
@@ -33,9 +32,8 @@ export function Sidebar({ user, allowedModules }: SidebarProps) {
         </span>
       </div>
 
-      {/* Navigation — client component for usePathname() active state.
-          allowedModules passed from server (AdminLayout → getNavPermissions()) */}
-      <SidebarNav allowedModules={allowedModules} />
+      {/* Navigation — client component for usePathname() active state */}
+      <SidebarNav />
 
       {/* User footer: email + logout */}
       <div className="border-t border-white/10 px-4 py-4 space-y-2">

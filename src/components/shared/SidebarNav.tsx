@@ -3,10 +3,8 @@
 // SidebarNav — client component for active link detection.
 // Lives inside the server Sidebar component.
 // Uses usePathname() to highlight the current active route.
-//
-// Nav items are filtered by allowedModules prop (passed from AdminLayout
-// via getNavPermissions()). Items not in allowedModules are hidden entirely
-// — no greyed-out placeholders. Permission enforcement is server-side.
+// All nav items are always shown — admin interface is Sharon-only.
+// moduleKey on each item maps to modules.key in DB (useful for future ChemoSys use).
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -44,18 +42,12 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/settings",    label: "הגדרות מערכת",     icon: Settings,        moduleKey: "settings" },
 ];
 
-type SidebarNavProps = {
-  /** Module keys the user has at least READ access to (from getNavPermissions()) */
-  allowedModules: string[];
-};
-
-export function SidebarNav({ allowedModules }: SidebarNavProps) {
+export function SidebarNav() {
   const pathname = usePathname();
 
   return (
     <nav className="flex-1 overflow-y-auto py-4 space-y-1">
       {NAV_ITEMS
-        .filter((item) => allowedModules.includes(item.moduleKey))
         .map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;

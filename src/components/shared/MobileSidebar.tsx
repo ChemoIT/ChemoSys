@@ -14,10 +14,9 @@ import type { SessionUser } from "@/lib/dal";
 
 type MobileSidebarProps = {
   user: SessionUser;
-  allowedModules: string[];
 };
 
-export function MobileSidebar({ user, allowedModules }: MobileSidebarProps) {
+export function MobileSidebar({ user }: MobileSidebarProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -54,7 +53,7 @@ export function MobileSidebar({ user, allowedModules }: MobileSidebarProps) {
 
         {/* Close drawer on nav click by wrapping in a div with onClick */}
         <div onClick={() => setOpen(false)} className="flex-1">
-          <SidebarNav allowedModules={allowedModules} />
+          <SidebarNav />
         </div>
 
         {/* User footer */}
