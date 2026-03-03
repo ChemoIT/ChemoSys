@@ -5,34 +5,35 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** Phase 2 — Employee CRUD + Excel Import built, awaiting human verification checkpoint
+**Current focus:** Phase 3 — Access Control (Templates CRUD complete, starting user management)
 
 ## Current Position
 
-Phase: 2 of 5 (Employees) — CHECKPOINT PENDING
-Plan: 2 of 2 automated tasks complete — awaiting Task 3 human-verify checkpoint
-Status: 02-02 automated tasks done — RPC migration must be applied in Supabase SQL editor before testing import
-Last activity: 2026-03-01 — Phase 2 Plan 02 executed (Excel import: migration, wizard, route)
+Phase: 3 of 5 (Access Control)
+Plan: 1 of 3 complete (03-01 Templates CRUD done)
+Status: 03-01 complete — role templates + permission matrix UI fully working
+Last activity: 2026-03-03 — Phase 3 Plan 01 executed (Role Template CRUD + permission matrix)
 
-Progress: [████░░░░░░] 30% (automated tasks done; checkpoint pending)
+Progress: [█████░░░░░] 45% (Phase 2 done, Phase 3 Plan 01 done)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5 (+ 02-02 automated tasks, checkpoint pending)
-- Average duration: ~7 min
-- Total execution time: ~38 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min, 02-01: ~7 min, 02-02: ~10 min)
+- Total plans completed: 6 (Phase 1: 4, Phase 2: 2 full, Phase 3: 1)
+- Average duration: ~6 min
+- Total execution time: ~42 min (01-01: 6 min, 01-02: ~6 min, 01-03: ~3 min, 01-04: ~6 min, 02-01: ~7 min, 02-02: ~10 min, 03-01: ~4 min)
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-foundation | 4/4 | ~21 min | ~5 min |
-| 02-employees  | 1/2 full + 1 checkpoint | ~17 min  | ~8 min  |
+| 01-foundation    | 4/4 | ~21 min | ~5 min |
+| 02-employees     | 2/2 | ~17 min | ~8 min |
+| 03-access-control | 1/3 | ~4 min  | ~4 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-03 (auth + admin shell), 01-04 (Companies/Departments/RoleTags CRUD), 02-01 (Employee CRUD — 22 fields), 02-02 (Excel import wizard + RPC)
-- Trend: On track, feature plans averaging ~7-10 min
+- Last 5 plans: 01-04 (Companies/Departments/RoleTags CRUD), 02-01 (Employee CRUD — 22 fields), 02-02 (Excel import wizard + RPC), 03-01 (Role Templates + permission matrix)
+- Trend: On track, feature plans averaging ~7 min; 03-01 was faster (~4 min) due to established patterns
 
 *Updated after each plan completion*
 
@@ -70,6 +71,9 @@ Recent decisions affecting current work:
 - [02-02]: experimental.serverActions.bodySizeLimit in next.config.ts — Next.js 16 places serverActions under experimental, not top-level in NextConfig type
 - [02-02]: Buffer.from() + (as any) cast for ExcelJS — @types/node v22 Buffer<ArrayBuffer> vs exceljs types Buffer (non-generic) version mismatch; runtime-safe
 - [02-02]: audit log uses INSERT + entity_type='employee_import' — IMPORT is not a valid action enum value; distinct entity_type preserves audit trail query-ability
+- [03-01]: Native <input type="radio"> used instead of shadcn RadioGroup — radios must write to FormData natively for Server Actions
+- [03-01]: Delete-all + insert pattern for template_permissions on every save — only levels > 0 stored; absence = no access
+- [03-01]: proxy.ts export renamed from middleware() to proxy() for Next.js 16.1.6 API requirement (auto-fixed, blocking build)
 
 ### Pending Todos
 
@@ -83,6 +87,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-01
-Stopped at: 02-02 Task 3 checkpoint (human-verify) — automated tasks 1+2 complete, awaiting Sharon's verification of Phase 2 employee module
+Last session: 2026-03-03
+Stopped at: 03-01 complete — awaiting continuation to 03-02 (user management)
 Resume file: None
