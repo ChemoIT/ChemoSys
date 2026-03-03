@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-01)
 
 ## Current Position
 
-Phase: 05-settings-observability ✅ COMPLETE + VERIFIED (13/13)
-Plan: 3/3 — all plans complete + verification passed
-Status: All 5 phases + 03.1 complete. Milestone v1.0 ready for `/gsd:complete-milestone`.
-Last activity: 2026-03-03 — Phase 5 executed and verified. All 7 requirements met (SETT-01–04, AUDT-02, DASH-01–02).
+Phase: 05-settings-observability ✅ COMPLETE + VERIFIED (13/13) + GAP CLOSURE (05-04)
+Plan: 4/4 — all plans complete + verification passed + UAT gaps closed
+Status: All 5 phases + 03.1 complete + UAT gap closure complete. Milestone v1.0 ready for `/gsd:complete-milestone`.
+Last activity: 2026-03-04 — UAT gap closure: user names + entity names now show as real names in activity feed, audit log, and export.
 
 Progress: [████████████████████] 100% — ALL PHASES COMPLETE
 
@@ -32,7 +32,7 @@ Progress: [████████████████████] 100% �
 | 03-access-control | 3/3 | ~9 min  | ~4.5 min |
 | 03.1-security-hardening | 3/3 COMPLETE | ~13 min | ~4 min |
 | 04-projects | 3/3 COMPLETE ✓ | ~20 min | ~7 min |
-| 05-settings-observability | 3/3 COMPLETE ✓ | ~37 min | ~12 min |
+| 05-settings-observability | 4/4 COMPLETE ✓ | ~52 min | ~13 min |
 
 **Recent Trend:**
 - Phase 5 completed: Dashboard, Audit Log Viewer, Integration Settings all live
@@ -128,6 +128,10 @@ Recent decisions affecting current work:
 - [05-03]: Empty password field on save = preserve existing env value (never overwrite with empty string)
 - [05-03]: FTP test uses TCP socket via Node.js net module — no ftp library needed, checks host:port reachability with 5s timeout
 - [05-03]: AuditLogTable.tsx was missing from working tree post-Plan-02 commit — restored via git checkout b121753 (Rule 3 auto-fix)
+- [05-04]: Supabase FK join cast pattern: `u.employees as unknown as { first_name, last_name } | null` — Supabase types declare FK join as array; runtime returns single object for single FK; double cast via unknown is the safe pattern
+- [05-04]: No deleted_at filter on entity/user name resolution lookups — historical audit entries must resolve names even after soft-delete
+- [05-04]: async addLookup pattern: inner async function returns Promise<void> directly — avoids PromiseLike<void> type mismatch from .then() chaining in Promise<void>[] array
+- [05-04]: Excel export includes both 'ישות' (human name) + 'UUID ישות' (raw UUID) columns — name for readability, UUID for debugging
 
 ### Roadmap Evolution
 
@@ -144,6 +148,6 @@ None — all phases complete.
 
 ## Session Continuity
 
-Last session: 2026-03-03
-Stopped at: Phase 5 execution + verification complete. All milestone phases done.
+Last session: 2026-03-04
+Stopped at: Phase 5 UAT gap closure complete (05-04-PLAN.md). All milestone phases + gap closure done.
 Resume file: None
