@@ -109,23 +109,26 @@ Plans:
 
 ### Phase 4: Projects
 
-**Goal:** The admin can manage the full project registry — each project has a unique auto-generated number, is linked to employee managers, and the list is filterable by status.
+**Goal:** The admin can manage the full project registry — each project has all required fields (basic info, client with logo, supervision contact, attendance clocks, employee-linked managers, conditional CVC, map location with radius), with export capability across all admin tables.
 
 **Depends on:** Phase 2 (project managers are selected from the employee list)
 
-**Requirements:** PROJ-01, PROJ-02, PROJ-03, PROJ-04, PROJ-05, PROJ-06
+**Requirements:** PROJ-01, PROJ-02, PROJ-03, PROJ-04, PROJ-05, PROJ-06, PROJ-07, PROJ-08, PROJ-09, PROJ-10, PROJ-11, EXPORT-01
 
 **Success Criteria** (what must be TRUE):
-  1. Admin can create a project with all fields (name, display name, description, codes, type, supervision, client, status, coordinates) and the project number is auto-generated in PR25XXXXXX format
-  2. Admin can assign project manager, site manager, and camp vehicle coordinator by searching the employee list
-  3. Admin can edit and soft-delete projects
-  4. The project list is filterable by status (active / inactive) and shows the correct active count
+  1. Admin can create a project with all fields and the project number is auto-generated in PR26XXXXXX format
+  2. Admin can assign PM and SM from employee list (email/phone auto-pulled) with notification flags
+  3. Admin can assign CVC from employees OR enter manually with Israeli mobile validation
+  4. Admin can manage attendance clocks (multiple per project, each with unique ID)
+  5. Admin can upload client logo (Supabase Storage) and fill supervision contact details
+  6. Admin can set project location on map (coordinates + radius) — displayed visually
+  7. Admin can edit and soft-delete projects; list filterable by 3-state status with active count
+  8. Admin can export any admin table to Excel/CSV
 
-**Plans:** 2 plans
+**Plans:** TBD (re-planning required — previous plans reverted due to requirement changes)
 
 Plans:
-- [ ] 04-01-PLAN.md — Migration 00014 (sequence + soft delete RPC), ProjectSchema, Server Actions (create/update/softDelete), ProjectForm dialog with all fields and 3 employee selectors
-- [ ] 04-02-PLAN.md — Projects list page with status filter, search, active count badge, and full CRUD integration via ProjectForm + DeleteConfirmDialog
+- [ ] TBD — Re-plan with `/gsd:plan-phase 4`
 
 ---
 
@@ -163,7 +166,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 03.1 -> 4 -> 5
 | 2. Employees | 2/2 | Complete | 2026-03-01 |
 | 3. Access Control | 3/3 | Complete | 2026-03-03 |
 | 03.1. Security Hardening | 3/3 | Complete | 2026-03-03 |
-| 4. Projects | 0/2 | Not started | - |
+| 4. Projects | 0/TBD | Re-planning | - |
 | 5. Settings and Observability | 0/3 | Not started | - |
 
 ---
@@ -187,4 +190,4 @@ Note: REQUIREMENTS.md stated "46 total" but the file contains 59 v1 requirements
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-03 — Phase 4 plans finalized (2 plans)*
+*Last updated: 2026-03-03 — Phase 4 requirements expanded (12 reqs), previous plans reverted, awaiting re-plan*

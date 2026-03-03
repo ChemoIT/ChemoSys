@@ -81,12 +81,24 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Projects (ניהול פרויקטים)
 
-- [ ] **PROJ-01**: אדמין יכול להוסיף פרויקט חדש עם כל השדות (שם, שם תצוגה, מספר אוטומטי, תיאור, קודים, סוג, פיקוח, מזמין, סטטוס, קואורדינטות)
+- [ ] **PROJ-01**: אדמין יכול להוסיף פרויקט חדש עם כל השדות הבאים:
+  - שם פרויקט (חובה), מספר פרויקט (אוטומטי), תאריך פתיחה, מספר הוצאה, תיאור
+  - סיווג (פרויקט / שטח התארגנות / שטח אחסנה)
+  - סטטוס (פעיל / לצפייה בלבד / לא פעיל)
 - [ ] **PROJ-02**: אדמין יכול לערוך פרויקט קיים
 - [ ] **PROJ-03**: אדמין יכול למחוק פרויקט (soft delete)
-- [ ] **PROJ-04**: מנהל פרויקט / מנהל עבודה / אחראי רכבי מחנה נבחרים מרשימת עובדים
-- [ ] **PROJ-05**: מספר פרויקט נוצר אוטומטית (פורמט PR25XXXXXX)
-- [ ] **PROJ-06**: רשימת פרויקטים עם סינון לפי סטטוס (פעיל/לא פעיל)
+- [ ] **PROJ-04**: מנהל פרויקט ומנהל עבודה נבחרים מרשימת עובדים — מייל וטלפון נשאבים אוטומטית, עם אפשרות סימון לשליחת הודעות לכל אחד
+- [ ] **PROJ-05**: מספר פרויקט נוצר אוטומטית (פורמט PR26XXXXXX)
+- [ ] **PROJ-06**: רשימת פרויקטים עם סינון לפי סטטוס (פעיל / לצפייה בלבד / לא פעיל) ותצוגת מספר פעילים
+- [ ] **PROJ-07**: מספרי שעוני נוכחות — ריבוי שעונים לכל פרויקט, לכל שעון מספר ID ייחודי
+- [ ] **PROJ-08**: שם מזמין + מקום להעלאת לוגו מזמין (לצירוף לדוחות בעתיד)
+- [ ] **PROJ-09**: חברת פיקוח — שם חברה, שם איש קשר, מייל, טלפון, סימון לאישור משלוח הודעות וצירוף לדוחות
+- [ ] **PROJ-10**: אחראי רכב מחנה — בחירה מרשימת עובדים (טלפון נשאב) או רישום חופשי (טלפון נייד ישראלי חובה עם ולידציה)
+- [ ] **PROJ-11**: מיקום פרויקט — קואורדינטות (X/Y) + רדיוס כיסוי + הצגה על מפה
+
+### Data Export (ייצוא נתונים)
+
+- [ ] **EXPORT-01**: ייצוא ל-Excel או CSV מכל טבלה בממשק האדמין (חברות, מחלקות, עובדים, פרויקטים, יוזרים, תבניות)
 
 ### System Settings (הגדרות מערכת)
 
@@ -123,7 +135,7 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ### Projects Enhancements
 
-- **PROJ-V2-01**: תצוגת מפה עם react-leaflet (קואורדינטות כבר ב-DB)
+- **PROJ-V2-01**: ~~תצוגת מפה עם react-leaflet~~ — moved to v1 as PROJ-11
 
 ### Audit Log Enhancements
 
@@ -144,7 +156,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | צ'אט / הודעות בזמן אמת | WhatsApp/n8n מטפלים בתקשורת שטח |
 | מנוע שכר / חישובי שכר | ChemoSys downstream של מערכת השכר |
 | דיווחי נוכחות / שעון | מערכת נפרדת |
-| אחסון מסמכים / קבצים מצורפים | מורכבות S3/CDN — לא ב-v1 |
+| אחסון מסמכים / קבצים מצורפים | מורכבות S3/CDN — לא ב-v1 (חריגה: לוגו מזמין בלבד ב-Supabase Storage) |
 | התראות מייל | תשתית בפני עצמה — v2+ |
 | אפליקציה מובייל native | רספונסיבי מספיק |
 | דוחות AI | לא צורך מאומת — מודל נתונים קודם |
@@ -211,6 +223,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROJ-04 | Phase 4 | Pending |
 | PROJ-05 | Phase 4 | Pending |
 | PROJ-06 | Phase 4 | Pending |
+| PROJ-07 | Phase 4 | Pending |
+| PROJ-08 | Phase 4 | Pending |
+| PROJ-09 | Phase 4 | Pending |
+| PROJ-10 | Phase 4 | Pending |
+| PROJ-11 | Phase 4 | Pending |
+| EXPORT-01 | Phase 4 | Pending |
 | SETT-01 | Phase 5 | Pending |
 | SETT-02 | Phase 5 | Pending |
 | SETT-03 | Phase 5 | Pending |
@@ -220,10 +238,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-02 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 59 total (note: original stated 46, actual count is 59 — corrected at roadmap creation)
-- Mapped to phases: 59
+- v1 requirements: 65 total (was 59 — added PROJ-07..11 + EXPORT-01 per Sharon's updated Phase 4 requirements)
+- Mapped to phases: 65
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-01*
-*Last updated: 2026-03-01 after roadmap creation — traceability complete*
+*Last updated: 2026-03-03 — Phase 4 requirements expanded (PROJ-07..11 + EXPORT-01) per Sharon's field specifications*

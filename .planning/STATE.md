@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** Phase 4 — Projects, Map, Dashboard (Phase 03.1 Security Hardening complete)
+**Current focus:** Phase 4 — Projects (RE-PLANNING: requirements updated by Sharon)
 
 ## Current Position
 
-Phase: 03.1-security-hardening (COMPLETE)
-Plan: 3/3 complete (03.1-01 done, 03.1-02 done, 03.1-03 done)
-Status: Phase 03.1 complete — security headers + CSP + server-only + rate limiting + PII log fix + encryption key + admin-only RLS on user_permissions
-Last activity: 2026-03-03 — 03.1-03 complete: migration 00013 tightens user_permissions RLS to admin-only writes
+Phase: 04-projects (RE-PLANNING)
+Plan: 0/? (previous plans reverted — requirements changed significantly)
+Status: Phase 4 code reverted. Sharon provided updated field requirements. Awaiting re-plan.
+Last activity: 2026-03-03 — Phase 4 execution reverted, requirements updated
 
-Progress: [████████████] 68% (Phase 3 + 03.1 complete — Phase 4 next)
+Progress: [████████████] 68% (Phase 3 + 03.1 complete — Phase 4 re-planning)
 
 ## Performance Metrics
 
@@ -34,7 +34,7 @@ Progress: [████████████] 68% (Phase 3 + 03.1 complete �
 
 **Recent Trend:**
 - Last 5 plans: 03-03 (correction), 03.1-01 (security headers + CSP + server-only), 03.1-02 (rate limiting + PII fix + encryption key), 03.1-03 (admin-only RLS on user_permissions)
-- Trend: Security hardening complete. Ready for Phase 4.
+- Trend: Security hardening complete. Phase 4 re-planning with updated requirements.
 
 *Updated after each plan completion*
 
@@ -100,10 +100,12 @@ Recent decisions affecting current work:
 - [03.1-03]: user_permissions SELECT policy left permissive — reads are harmless; get_user_permissions() SECURITY DEFINER is the real guard
 - [03.1-03]: RLS admin gate pattern: EXISTS (SELECT 1 FROM users WHERE auth_user_id = auth.uid() AND is_admin = true AND deleted_at IS NULL)
 - [03.1-03]: Bootstrap admin (no public.users row) unaffected — createAdminClient() service role key bypasses RLS entirely
+- [Phase 4 REVERT 2026-03-03]: Phase 4 code reverted — Sharon provided updated requirements with significant field changes (attendance clocks table, client logo upload, supervision contact, conditional CVC entry, map with radius, CSV export)
 
 ### Roadmap Evolution
 
 - Phase 03.1 inserted after Phase 3: Security Hardening (URGENT) — security baseline required before deployment: security headers, password policy, rate limiting on login, session timeout, migration 00012
+- Phase 4 re-planning: Sharon's updated requirements add attendance clocks (child table), client logo upload, supervision contact details, conditional CVC (employee or free text), map+radius for location, CSV/Excel export from all tables
 
 ### Pending Todos
 
@@ -113,10 +115,10 @@ Recent decisions affecting current work:
 
 - [Phase 2 checkpoint]: Migration 00004 must be applied manually in Supabase SQL editor — upsert_employee() RPC will not exist until then
 - [Phase 5]: Research cPanel API capabilities for config.ini read/write before Phase 5 planning
-- [Phase 4]: Decide react-leaflet vs Google Maps for project coordinates at Phase 4 planning time
+- [Phase 4]: Map integration decision needed — react-leaflet (free) vs Google Maps (paid API key) vs interactive map skill
 
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Phase 03.1 COMPLETE — all 3 plans done (including 03.1-03 RLS hardening). Next: Phase 4 (Projects, Map, Dashboard)
+Stopped at: Phase 4 code reverted. Requirements updated by Sharon. Next: /gsd:plan-phase 4 with new requirements.
 Resume file: None
