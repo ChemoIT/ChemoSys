@@ -372,37 +372,48 @@ export interface Database {
       }
 
       // -----------------------------------------------------------------------
-      // projects (Phase 4 — stub created for FK readiness)
+      // projects (Phase 4 — rebuilt with full field set)
       // -----------------------------------------------------------------------
       projects: {
         Row: {
           id: string
+          // Basic info
           name: string
-          display_name: string | null
           project_number: string
+          open_date: string | null
           expense_number: string | null
-          general_number: string | null
           description: string | null
-          project_code: string | null
-          attendance_code: string | null
-          has_attendance_code: boolean
           project_type: 'project' | 'staging_area' | 'storage_area' | null
-          ignore_auto_equipment: boolean
-          supervision: string | null
-          client: string | null
-          status: 'active' | 'inactive'
+          status: 'active' | 'view_only' | 'inactive'
+          // Project Manager
           project_manager_id: string | null
           pm_email: string | null
           pm_phone: string | null
           pm_notifications: boolean
+          // Site Manager
           site_manager_id: string | null
           sm_email: string | null
           sm_phone: string | null
           sm_notifications: boolean
+          // Camp/Vehicle Coordinator
           camp_vehicle_coordinator_id: string | null
+          cvc_is_employee: boolean
           cvc_phone: string | null
+          // Client
+          client_name: string | null
+          client_logo_url: string | null
+          // Supervision
+          supervision_company: string | null
+          supervision_contact: string | null
+          supervision_email: string | null
+          supervision_phone: string | null
+          supervision_notifications: boolean
+          supervision_attach_reports: boolean
+          // Location
           latitude: number | null
           longitude: number | null
+          radius: number
+          // Universal audit columns
           created_at: string
           updated_at: string
           created_by: string | null
@@ -411,32 +422,43 @@ export interface Database {
         }
         Insert: {
           id?: string
+          // Basic info
           name: string
-          display_name?: string | null
-          project_number: string
+          project_number?: string        // Defaults to '' — trigger fills in PR26XXXXXX
+          open_date?: string | null
           expense_number?: string | null
-          general_number?: string | null
           description?: string | null
-          project_code?: string | null
-          attendance_code?: string | null
-          has_attendance_code?: boolean
           project_type?: 'project' | 'staging_area' | 'storage_area' | null
-          ignore_auto_equipment?: boolean
-          supervision?: string | null
-          client?: string | null
-          status?: 'active' | 'inactive'
+          status?: 'active' | 'view_only' | 'inactive'
+          // Project Manager
           project_manager_id?: string | null
           pm_email?: string | null
           pm_phone?: string | null
           pm_notifications?: boolean
+          // Site Manager
           site_manager_id?: string | null
           sm_email?: string | null
           sm_phone?: string | null
           sm_notifications?: boolean
+          // Camp/Vehicle Coordinator
           camp_vehicle_coordinator_id?: string | null
+          cvc_is_employee?: boolean
           cvc_phone?: string | null
+          // Client
+          client_name?: string | null
+          client_logo_url?: string | null
+          // Supervision
+          supervision_company?: string | null
+          supervision_contact?: string | null
+          supervision_email?: string | null
+          supervision_phone?: string | null
+          supervision_notifications?: boolean
+          supervision_attach_reports?: boolean
+          // Location
           latitude?: number | null
           longitude?: number | null
+          radius?: number
+          // Universal audit columns
           created_at?: string
           updated_at?: string
           created_by?: string | null
@@ -444,6 +466,27 @@ export interface Database {
           deleted_at?: string | null
         }
         Update: Partial<Database['public']['Tables']['projects']['Insert']>
+      }
+
+      // -----------------------------------------------------------------------
+      // attendance_clocks (Phase 4 — clock devices assigned to a project)
+      // -----------------------------------------------------------------------
+      attendance_clocks: {
+        Row: {
+          id: string
+          project_id: string
+          clock_id: string
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          clock_id: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['attendance_clocks']['Insert']>
       }
     }
   }
