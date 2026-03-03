@@ -1,48 +1,119 @@
 'use client'
 
 /**
- * ProjectForm — placeholder dialog component for create/edit project.
+ * ProjectForm — full project create/edit dialog.
  *
- * NOTE: This is a minimal placeholder created to unblock Plan 03 (ProjectsTable).
- * The full implementation (all 7 sections: basic info, PM/SM, CVC, client, supervision,
- * clocks, location picker) will be built in Plan 02.
+ * Organized into 7 visual sections matching the PROJ requirements:
+ *   1. פרטים בסיסיים    — name, project_number, dates, type, status, description
+ *   2. מנהלים           — PM + SM employee selectors with auto-pulled email/phone
+ *   3. אחראי רכב מחנה  — CVC employee selector or manual phone entry
+ *   4. מזמין            — client name + logo upload to Supabase Storage
+ *   5. חברת פיקוח       — supervision contact details + notification toggles
+ *   6. שעוני נוכחות    — dynamic list of attendance clock IDs
+ *   7. מיקום פרויקט    — react-leaflet map (click-to-place) + radius input
  *
- * Currently supports:
- *  - Displaying the dialog shell (open/close)
- *  - Showing project name in edit mode title
- *  - Placeholder message directing user to full form (coming soon)
+ * Pattern: native HTML form + useActionState + handleSubmit override
+ *   (logo upload before submit, same pattern as EmployeeForm photo upload)
+ *
+ * Map import: ProjectLocationPicker is loaded via dynamic() with ssr: false
+ *   to prevent Leaflet's window/document access crashing the SSR render.
+ *
+ * Boolean fields: sent as hidden inputs with 'true'/'false' values.
+ *   Server Action normalises them via formDataToBoolean().
+ *
+ * Attendance clocks: serialised as JSON string in one hidden input.
+ *   Server Action parses via JSON.parse().
  */
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import type { Project } from '@/types/entities'
-import type { Employee } from '@/types/entities'
+import dynamic from 'next/dynamic'
+import { useActionState, useEffect, useRef, useState, useTransition } from 'react'
+import { toast } from 'sonner'
+import { Loader2, Plus, X } from 'lucide-react'
+import { createBrowserClient } from '@supabase/ssr'
+import type { Database } from '@/types/database'
+import { createProject, updateProject } from '@/actions/projects'
+import { EmployeeCombobox, type EmployeeOption } from './EmployeeCombobox'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { createProject, updateProject } from '@/actions/projects'
-import { useActionState } from 'react'
-import { useEffect } from 'react'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+
+// ---------------------------------------------------------------------------
+// Dynamic import for react-leaflet map (MUST be ssr:false — Leaflet uses window)
+// ---------------------------------------------------------------------------
+
+const DynamicLocationPicker = dynamic(
+  () => import('./ProjectLocationPicker').then((m) => ({ default: m.ProjectLocationPicker })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[300px] w-full rounded-lg border bg-muted animate-pulse" />
+    ),
+  }
+)
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
+type ProjectRow = Database['public']['Tables']['projects']['Row']
+
 interface ProjectFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  project?: Project | null
-  employees: Pick<Employee, 'id' | 'first_name' | 'last_name' | 'email' | 'mobile_phone'>[]
+  /** Active employees list for PM/SM/CVC selectors */
+  employees: EmployeeOption[]
+  /** null = create mode, defined = edit mode */
+  project?: ProjectRow | null
+  /** Existing attendance clocks in edit mode */
   clocks?: Array<{ clock_id: string }>
 }
+
+type ActionState = {
+  success: boolean
+  error?: Record<string, string[]>
+} | null
+
+// ---------------------------------------------------------------------------
+// Shared helpers (same style as EmployeeForm)
+// ---------------------------------------------------------------------------
+
+/** Shared Tailwind classes for native <select> — matches Input style */
+const selectClass =
+  'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer'
+
+function SectionHeading({ title }: { title: string }) {
+  return (
+    <div className="pt-3 pb-2">
+      <h3 className="text-sm font-semibold text-brand-dark border-r-4 border-brand-primary pr-3 py-1">
+        {title}
+      </h3>
+    </div>
+  )
+}
+
+function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <label className="text-xs font-medium leading-none text-muted-foreground">
+      {children}
+      {required && <span className="text-brand-primary"> *</span>}
+    </label>
+  )
+}
+
+function FieldError({ errors, field }: { errors?: Record<string, string[]>; field: string }) {
+  const messages = errors?.[field]
+  if (!messages?.length) return null
+  return <p className="text-xs text-destructive">{messages[0]}</p>
+}
+
+const ACCEPTED_LOGO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml']
 
 // ---------------------------------------------------------------------------
 // ProjectForm
@@ -51,120 +122,839 @@ interface ProjectFormProps {
 export function ProjectForm({
   open,
   onOpenChange,
+  employees,
   project,
-  employees: _employees,
-  clocks: _clocks,
+  clocks: initialClocks = [],
 }: ProjectFormProps) {
-  const router = useRouter()
   const isEdit = !!project
 
-  const action = isEdit ? updateProject : createProject
+  // Build bound action: edit mode adds project id into FormData before calling updateProject
+  const boundAction = isEdit
+    ? async (prevState: ActionState, formData: FormData) => {
+        formData.set('id', project.id)
+        return updateProject(prevState, formData)
+      }
+    : createProject
 
-  const [state, formAction, pending] = useActionState(action, null)
+  const [, startTransition] = useTransition()
+  const [state, formAction, isPending] = useActionState<ActionState, FormData>(
+    boundAction as (prevState: ActionState, formData: FormData) => Promise<ActionState>,
+    null
+  )
 
-  // Close dialog on success
+  const errors = state?.error
+
+  // ── Section 1: Basic Info state ──
+  const [projectType, setProjectType] = useState(project?.project_type ?? '')
+  const [status, setStatus]           = useState<string>(project?.status ?? 'active')
+
+  // ── Section 2: PM state ──
+  const [pmId, setPmId]       = useState(project?.project_manager_id ?? '')
+  const [pmEmail, setPmEmail] = useState(project?.pm_email ?? '')
+  const [pmPhone, setPmPhone] = useState(project?.pm_phone ?? '')
+  const [pmNotif, setPmNotif] = useState(project?.pm_notifications ?? true)
+
+  // ── Section 2: SM state ──
+  const [smId, setSmId]       = useState(project?.site_manager_id ?? '')
+  const [smEmail, setSmEmail] = useState(project?.sm_email ?? '')
+  const [smPhone, setSmPhone] = useState(project?.sm_phone ?? '')
+  const [smNotif, setSmNotif] = useState(project?.sm_notifications ?? true)
+
+  // ── Section 3: CVC state ──
+  const [cvcIsEmployee, setCvcIsEmployee] = useState(project?.cvc_is_employee ?? true)
+  const [cvcId, setCvcId]                 = useState(project?.camp_vehicle_coordinator_id ?? '')
+  const [cvcPhone, setCvcPhone]           = useState(project?.cvc_phone ?? '')
+
+  // ── Section 4: Client logo state ──
+  const [logoFile, setLogoFile]       = useState<File | null>(null)
+  const [logoUrl, setLogoUrl]         = useState(project?.client_logo_url ?? '')
+  const [logoPreview, setLogoPreview] = useState<string | null>(project?.client_logo_url ?? null)
+  const logoInputRef = useRef<HTMLInputElement>(null)
+
+  // ── Section 5: Supervision notification states ──
+  const [supervNotif, setSupervNotif]   = useState(project?.supervision_notifications ?? false)
+  const [supervAttach, setSupervAttach] = useState(project?.supervision_attach_reports ?? false)
+
+  // ── Section 6: Attendance clocks state ──
+  const [clocks, setClocks] = useState<string[]>(
+    initialClocks.map((c) => c.clock_id)
+  )
+
+  // ── Section 7: Location state ──
+  const [latitude, setLatitude]   = useState<number | null>(project?.latitude ?? null)
+  const [longitude, setLongitude] = useState<number | null>(project?.longitude ?? null)
+  const [radius, setRadius]       = useState<number>(project?.radius ?? 100)
+
+  // ── Reset all state when project prop changes (new dialog open) ──
+  useEffect(() => {
+    setProjectType(project?.project_type ?? '')
+    setStatus(project?.status ?? 'active')
+
+    setPmId(project?.project_manager_id ?? '')
+    setPmEmail(project?.pm_email ?? '')
+    setPmPhone(project?.pm_phone ?? '')
+    setPmNotif(project?.pm_notifications ?? true)
+
+    setSmId(project?.site_manager_id ?? '')
+    setSmEmail(project?.sm_email ?? '')
+    setSmPhone(project?.sm_phone ?? '')
+    setSmNotif(project?.sm_notifications ?? true)
+
+    setCvcIsEmployee(project?.cvc_is_employee ?? true)
+    setCvcId(project?.camp_vehicle_coordinator_id ?? '')
+    setCvcPhone(project?.cvc_phone ?? '')
+
+    setLogoFile(null)
+    setLogoUrl(project?.client_logo_url ?? '')
+    setLogoPreview(project?.client_logo_url ?? null)
+
+    setSupervNotif(project?.supervision_notifications ?? false)
+    setSupervAttach(project?.supervision_attach_reports ?? false)
+
+    setClocks(initialClocks.map((c) => c.clock_id))
+
+    setLatitude(project?.latitude ?? null)
+    setLongitude(project?.longitude ?? null)
+    setRadius(project?.radius ?? 100)
+  }, [project]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Close dialog + toast on success ──
   useEffect(() => {
     if (state?.success) {
+      toast.success(isEdit ? 'הפרויקט עודכן בהצלחה' : 'הפרויקט נוצר בהצלחה')
       onOpenChange(false)
-      router.refresh()
     }
-  }, [state, onOpenChange, router])
+  }, [state, isEdit, onOpenChange])
 
-  const [name, setName] = useState(project?.name ?? '')
-  const [status, setStatus] = useState(project?.status ?? 'active')
-
-  // Reset on open/project change
-  useEffect(() => {
-    if (open) {
-      setName(project?.name ?? '')
-      setStatus(project?.status ?? 'active')
+  // ── Logo file handler ──
+  function handleLogoFile(file: File) {
+    if (!ACCEPTED_LOGO_TYPES.includes(file.type)) {
+      toast.error('סוג הקובץ אינו נתמך — יש להשתמש ב-JPG, PNG, WebP, או SVG')
+      return
     }
-  }, [open, project])
+    const preview = URL.createObjectURL(file)
+    setLogoFile(file)
+    setLogoPreview(preview)
+  }
 
-  const errorMsg =
-    state && !state.success
-      ? typeof state.error === 'string'
-        ? state.error
-        : state.error?._form?.[0] ?? 'שגיאה בשמירת הפרויקט'
-      : null
+  // ── Attendance clocks handlers ──
+  function addClock() {
+    setClocks((prev) => [...prev, ''])
+  }
+
+  function removeClock(index: number) {
+    setClocks((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function updateClock(index: number, value: string) {
+    setClocks((prev) => {
+      const next = [...prev]
+      next[index] = value
+      return next
+    })
+  }
+
+  // ── Form submit — upload logo first, then submit to Server Action ──
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const form = e.currentTarget
+    const formData = new FormData(form)
+
+    // Client-side duplicate clock ID validation
+    const nonEmpty = clocks.filter((c) => c.trim() !== '')
+    const uniqueSet = new Set(nonEmpty)
+    if (uniqueSet.size !== nonEmpty.length) {
+      toast.error('קיימים מזהי שעון כפולים — יש להסיר כפילויות לפני השמירה')
+      return
+    }
+
+    // Upload logo to Supabase Storage if a new file was selected
+    if (logoFile) {
+      try {
+        const supabase = createBrowserClient<Database>(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        )
+        const ext      = logoFile.name.split('.').pop() || 'png'
+        const fileName = `${crypto.randomUUID()}.${ext}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('client-logos')
+          .upload(fileName, logoFile, { upsert: true })
+
+        if (uploadError) {
+          toast.error(`שגיאה בהעלאת לוגו: ${uploadError.message}`)
+        } else {
+          const { data: urlData } = supabase.storage
+            .from('client-logos')
+            .getPublicUrl(fileName)
+          const newUrl = urlData.publicUrl
+          setLogoUrl(newUrl)
+          formData.set('client_logo_url', newUrl)
+        }
+      } catch (err) {
+        // PII-safe logging — never dump raw error objects
+        console.error('[ProjectForm] Logo upload failed:', err instanceof Error ? err.message : 'Unknown error')
+        toast.error('שגיאה בהעלאת הלוגו — ודא שה-bucket "client-logos" קיים ב-Supabase Storage')
+      }
+    }
+
+    startTransition(() => {
+      formAction(formData)
+    })
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
-            {isEdit ? `עריכת פרויקט: ${project?.name}` : 'פרויקט חדש'}
-          </DialogTitle>
-          <DialogDescription>
-            {isEdit ? 'עדכן את פרטי הפרויקט' : 'הוסף פרויקט חדש למערכת'}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col overflow-hidden p-0">
+        <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
 
-        <form action={formAction} className="space-y-4">
-          {/* Hidden project id for edit mode */}
-          {isEdit && <input type="hidden" name="id" value={project.id} />}
-
-          {/* Name */}
-          <div className="space-y-1">
-            <Label htmlFor="name">שם פרויקט *</Label>
-            <Input
-              id="name"
-              name="name"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="הזן שם פרויקט"
-            />
+          {/* ── Sticky header with save/cancel buttons ── */}
+          <div className="border-b bg-background px-6 py-4 flex items-center justify-between shrink-0">
+            <DialogHeader className="p-0 space-y-0">
+              <DialogTitle className="text-lg text-brand-dark">
+                {isEdit ? 'עריכת פרויקט' : 'הוספת פרויקט חדש'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={isPending}
+              >
+                ביטול
+              </Button>
+              <Button
+                type="submit"
+                disabled={isPending}
+                className="bg-brand-primary hover:bg-brand-primary/90 active:scale-95 transition-transform text-white"
+              >
+                {isPending ? (
+                  <>
+                    <Loader2 className="ms-2 h-4 w-4 animate-spin" />
+                    שומר...
+                  </>
+                ) : isEdit ? 'שמור שינויים' : 'צור פרויקט'}
+              </Button>
+            </div>
           </div>
 
-          {/* Project number — disabled, auto-generated */}
-          <div className="space-y-1">
-            <Label htmlFor="project_number">מספר פרויקט</Label>
-            <Input
-              id="project_number"
-              name="project_number"
-              disabled
-              value={project?.project_number ?? ''}
-              placeholder="ייווצר אוטומטית"
-            />
-          </div>
+          {/* ── Scrollable form body ── */}
+          <div className="overflow-y-auto flex-1 px-6 py-4 space-y-3">
 
-          {/* Status */}
-          <div className="space-y-1">
-            <Label htmlFor="status">סטטוס</Label>
-            <select
-              id="status"
-              name="status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value as 'active' | 'view_only' | 'inactive')}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+            {/* ══════════════════════════════════════════════════════════════
+                Section 1: פרטים בסיסיים
+            ══════════════════════════════════════════════════════════════ */}
+            <SectionHeading title="פרטים בסיסיים" />
+            <div className="bg-muted/10 rounded-lg p-4 space-y-3">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Project name — required */}
+                <div className="space-y-1">
+                  <FieldLabel required>שם פרויקט</FieldLabel>
+                  <Input
+                    name="name"
+                    placeholder="שם הפרויקט"
+                    defaultValue={project?.name ?? ''}
+                    required
+                  />
+                  <FieldError errors={errors} field="name" />
+                </div>
+
+                {/* Project number — auto-generated by DB trigger, read-only */}
+                <div className="space-y-1">
+                  <FieldLabel>מספר פרויקט</FieldLabel>
+                  <Input
+                    name="project_number"
+                    value={isEdit ? (project?.project_number ?? '') : ''}
+                    placeholder="ייווצר אוטומטית"
+                    disabled
+                    dir="ltr"
+                    className="bg-muted/30"
+                    readOnly
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Open date */}
+                <div className="space-y-1">
+                  <FieldLabel>תאריך פתיחה</FieldLabel>
+                  <Input
+                    name="open_date"
+                    type="date"
+                    defaultValue={project?.open_date ?? ''}
+                    dir="ltr"
+                  />
+                </div>
+
+                {/* Expense number */}
+                <div className="space-y-1">
+                  <FieldLabel>מספר הוצאה</FieldLabel>
+                  <Input
+                    name="expense_number"
+                    placeholder="מספר הוצאה"
+                    defaultValue={project?.expense_number ?? ''}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Project type — shadcn Select does not write to FormData; use native select + hidden input */}
+                <div className="space-y-1">
+                  <FieldLabel>סיווג</FieldLabel>
+                  <select
+                    value={projectType}
+                    onChange={(e) => setProjectType(e.target.value)}
+                    className={selectClass}
+                  >
+                    <option value="">בחר סיווג</option>
+                    <option value="project">פרויקט</option>
+                    <option value="staging_area">שטח התארגנות</option>
+                    <option value="storage_area">שטח אחסנה</option>
+                  </select>
+                  <input type="hidden" name="project_type" value={projectType} />
+                </div>
+
+                {/* Status */}
+                <div className="space-y-1">
+                  <FieldLabel>סטטוס</FieldLabel>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className={selectClass}
+                  >
+                    <option value="active">פעיל</option>
+                    <option value="view_only">לצפייה בלבד</option>
+                    <option value="inactive">לא פעיל</option>
+                  </select>
+                  <input type="hidden" name="status" value={status} />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1">
+                <FieldLabel>תיאור</FieldLabel>
+                <textarea
+                  name="description"
+                  className="flex min-h-[70px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  placeholder="תיאור הפרויקט..."
+                  defaultValue={project?.description ?? ''}
+                />
+              </div>
+            </div>
+
+            {/* ══════════════════════════════════════════════════════════════
+                Section 2: מנהלים (PM + SM) — PROJ-04
+            ══════════════════════════════════════════════════════════════ */}
+            <SectionHeading title="מנהלים" />
+            <div className="bg-muted/10 rounded-lg p-4 space-y-4">
+
+              {/* ── Project Manager ── */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-2">מנהל פרויקט</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <FieldLabel>בחירת עובד</FieldLabel>
+                    <EmployeeCombobox
+                      employees={employees}
+                      value={pmId}
+                      onChange={(id, emp) => {
+                        setPmId(id)
+                        // Auto-pull email and phone from employee record
+                        setPmEmail(emp.email ?? '')
+                        setPmPhone(emp.mobile_phone ?? '')
+                      }}
+                      placeholder="בחר מנהל פרויקט"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <FieldLabel>מייל</FieldLabel>
+                      <Input
+                        value={pmEmail}
+                        onChange={(e) => setPmEmail(e.target.value)}
+                        type="email"
+                        placeholder="מייל מנהל"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <FieldLabel>טלפון</FieldLabel>
+                      <Input
+                        value={pmPhone}
+                        onChange={(e) => setPmPhone(e.target.value)}
+                        placeholder="טלפון מנהל"
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <input
+                    type="checkbox"
+                    id="pm_notifications_check"
+                    checked={pmNotif}
+                    onChange={(e) => setPmNotif(e.target.checked)}
+                    className="h-4 w-4 cursor-pointer"
+                  />
+                  <label htmlFor="pm_notifications_check" className="text-xs text-muted-foreground cursor-pointer">
+                    שלח הודעות למנהל פרויקט
+                  </label>
+                </div>
+              </div>
+
+              {/* Hidden inputs for PM — Server Action reads these (not the combobox display) */}
+              <input type="hidden" name="project_manager_id" value={pmId} />
+              <input type="hidden" name="pm_email" value={pmEmail} />
+              <input type="hidden" name="pm_phone" value={pmPhone} />
+              <input type="hidden" name="pm_notifications" value={pmNotif ? 'true' : 'false'} />
+
+              <Separator />
+
+              {/* ── Site Manager ── */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-2">מנהל עבודה</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <FieldLabel>בחירת עובד</FieldLabel>
+                    <EmployeeCombobox
+                      employees={employees}
+                      value={smId}
+                      onChange={(id, emp) => {
+                        setSmId(id)
+                        setSmEmail(emp.email ?? '')
+                        setSmPhone(emp.mobile_phone ?? '')
+                      }}
+                      placeholder="בחר מנהל עבודה"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <FieldLabel>מייל</FieldLabel>
+                      <Input
+                        value={smEmail}
+                        onChange={(e) => setSmEmail(e.target.value)}
+                        type="email"
+                        placeholder="מייל מנהל"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <FieldLabel>טלפון</FieldLabel>
+                      <Input
+                        value={smPhone}
+                        onChange={(e) => setSmPhone(e.target.value)}
+                        placeholder="טלפון מנהל"
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <input
+                    type="checkbox"
+                    id="sm_notifications_check"
+                    checked={smNotif}
+                    onChange={(e) => setSmNotif(e.target.checked)}
+                    className="h-4 w-4 cursor-pointer"
+                  />
+                  <label htmlFor="sm_notifications_check" className="text-xs text-muted-foreground cursor-pointer">
+                    שלח הודעות למנהל עבודה
+                  </label>
+                </div>
+              </div>
+
+              {/* Hidden inputs for SM */}
+              <input type="hidden" name="site_manager_id" value={smId} />
+              <input type="hidden" name="sm_email" value={smEmail} />
+              <input type="hidden" name="sm_phone" value={smPhone} />
+              <input type="hidden" name="sm_notifications" value={smNotif ? 'true' : 'false'} />
+            </div>
+
+            {/* ══════════════════════════════════════════════════════════════
+                Section 3: אחראי רכב מחנה (CVC) — PROJ-10
+            ══════════════════════════════════════════════════════════════ */}
+            <SectionHeading title="אחראי רכב מחנה (CVC)" />
+            <div className="bg-muted/10 rounded-lg p-4 space-y-3">
+
+              {/* CVC mode toggle — employee selector vs manual phone entry */}
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-medium text-muted-foreground">אופן בחירה:</span>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="_cvc_mode_radio"
+                    value="employee"
+                    checked={cvcIsEmployee}
+                    onChange={() => {
+                      setCvcIsEmployee(true)
+                      setCvcPhone('')
+                    }}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-xs">בחירה מרשימת עובדים</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="_cvc_mode_radio"
+                    value="manual"
+                    checked={!cvcIsEmployee}
+                    onChange={() => {
+                      setCvcIsEmployee(false)
+                      setCvcId('')
+                    }}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-xs">רישום חופשי</span>
+                </label>
+              </div>
+
+              {cvcIsEmployee ? (
+                /* Employee mode — select from list, phone auto-pulled */
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <FieldLabel>אחראי רכב מחנה</FieldLabel>
+                    <EmployeeCombobox
+                      employees={employees}
+                      value={cvcId}
+                      onChange={(id, emp) => {
+                        setCvcId(id)
+                        setCvcPhone(emp.mobile_phone ?? '')
+                      }}
+                      placeholder="בחר אחראי רכב מחנה"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <FieldLabel>טלפון (מתוך רישום העובד)</FieldLabel>
+                    <Input
+                      value={cvcPhone}
+                      disabled
+                      placeholder="יתמלא אוטומטית"
+                      dir="ltr"
+                      className="bg-muted/30"
+                    />
+                  </div>
+                </div>
+              ) : (
+                /* Manual mode — free-text phone with Israeli mobile validation */
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <FieldLabel required>טלפון נייד ישראלי</FieldLabel>
+                    <Input
+                      value={cvcPhone}
+                      onChange={(e) => setCvcPhone(e.target.value)}
+                      placeholder="0521234567"
+                      dir="ltr"
+                      maxLength={10}
+                    />
+                    <FieldError errors={errors} field="cvc_phone" />
+                    <p className="text-xs text-muted-foreground">
+                      נדרש בעת רישום חופשי — 10 ספרות מתחיל ב-05X
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Hidden inputs for CVC — Server Action reads these */}
+              <input type="hidden" name="camp_vehicle_coordinator_id" value={cvcId} />
+              <input type="hidden" name="cvc_is_employee" value={cvcIsEmployee ? 'true' : 'false'} />
+              <input type="hidden" name="cvc_phone" value={cvcPhone} />
+            </div>
+
+            {/* ══════════════════════════════════════════════════════════════
+                Section 4: מזמין (Client) — PROJ-08
+            ══════════════════════════════════════════════════════════════ */}
+            <SectionHeading title="מזמין" />
+            <div className="bg-muted/10 rounded-lg p-4 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Client name */}
+                <div className="space-y-1">
+                  <FieldLabel>שם מזמין</FieldLabel>
+                  <Input
+                    name="client_name"
+                    placeholder="שם החברה / המזמין"
+                    defaultValue={project?.client_name ?? ''}
+                  />
+                </div>
+
+                {/* Client logo — uploaded to Supabase Storage before form submit */}
+                <div className="space-y-1">
+                  <FieldLabel>לוגו מזמין</FieldLabel>
+                  <div className="flex items-center gap-3">
+                    {logoPreview && (
+                      <img
+                        src={logoPreview}
+                        alt="לוגו מזמין"
+                        className="h-10 w-10 object-contain rounded border bg-white p-0.5"
+                      />
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => logoInputRef.current?.click()}
+                    >
+                      {logoPreview ? 'שנה לוגו' : 'העלה לוגו'}
+                    </Button>
+                    {logoPreview && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          setLogoFile(null)
+                          setLogoPreview(null)
+                          setLogoUrl('')
+                        }}
+                      >
+                        הסר
+                      </Button>
+                    )}
+                  </div>
+                  {/* Hidden file input — triggered by button above */}
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) handleLogoFile(file)
+                    }}
+                  />
+                  {/* URL set after successful upload in handleSubmit */}
+                  <input type="hidden" name="client_logo_url" value={logoUrl} />
+                </div>
+              </div>
+            </div>
+
+            {/* ══════════════════════════════════════════════════════════════
+                Section 5: חברת פיקוח (Supervision) — PROJ-09
+            ══════════════════════════════════════════════════════════════ */}
+            <SectionHeading title="חברת פיקוח" />
+            <div className="bg-muted/10 rounded-lg p-4 space-y-3">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <FieldLabel>שם חברת פיקוח</FieldLabel>
+                  <Input
+                    name="supervision_company"
+                    placeholder="שם החברה"
+                    defaultValue={project?.supervision_company ?? ''}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <FieldLabel>שם איש קשר</FieldLabel>
+                  <Input
+                    name="supervision_contact"
+                    placeholder="שם מלא"
+                    defaultValue={project?.supervision_contact ?? ''}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <FieldLabel>מייל פיקוח</FieldLabel>
+                  <Input
+                    name="supervision_email"
+                    type="email"
+                    placeholder="email@company.com"
+                    defaultValue={project?.supervision_email ?? ''}
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <FieldLabel>טלפון פיקוח</FieldLabel>
+                  <Input
+                    name="supervision_phone"
+                    placeholder="03-XXXXXXX"
+                    defaultValue={project?.supervision_phone ?? ''}
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-6 pt-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={supervNotif}
+                    onChange={(e) => setSupervNotif(e.target.checked)}
+                    className="h-4 w-4 cursor-pointer"
+                  />
+                  <span className="text-xs text-muted-foreground">אישור שליחת הודעות לחברת פיקוח</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={supervAttach}
+                    onChange={(e) => setSupervAttach(e.target.checked)}
+                    className="h-4 w-4 cursor-pointer"
+                  />
+                  <span className="text-xs text-muted-foreground">צירוף לדוחות</span>
+                </label>
+              </div>
+
+              {/* Hidden inputs for supervision booleans */}
+              <input type="hidden" name="supervision_notifications" value={supervNotif ? 'true' : 'false'} />
+              <input type="hidden" name="supervision_attach_reports" value={supervAttach ? 'true' : 'false'} />
+            </div>
+
+            {/* ══════════════════════════════════════════════════════════════
+                Section 6: שעוני נוכחות (Attendance Clocks) — PROJ-07
+            ══════════════════════════════════════════════════════════════ */}
+            <SectionHeading title="שעוני נוכחות" />
+            <div className="bg-muted/10 rounded-lg p-4 space-y-3">
+
+              {clocks.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  אין שעוני נוכחות מוגדרים לפרויקט זה.
+                </p>
+              )}
+
+              {clocks.map((clockId, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-6 shrink-0 text-end">{index + 1}.</span>
+                  <Input
+                    value={clockId}
+                    onChange={(e) => updateClock(index, e.target.value)}
+                    placeholder={`מזהה שעון ${index + 1}`}
+                    dir="ltr"
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive hover:text-destructive shrink-0"
+                    onClick={() => removeClock(index)}
+                    aria-label={`הסר שעון ${index + 1}`}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addClock}
+                className="mt-1"
+              >
+                <Plus className="me-1.5 h-4 w-4" />
+                הוסף שעון
+              </Button>
+
+              {/* Clocks serialised as JSON array of non-empty clock IDs */}
+              <input
+                type="hidden"
+                name="attendance_clocks"
+                value={JSON.stringify(clocks.filter((c) => c.trim() !== ''))}
+              />
+            </div>
+
+            {/* ══════════════════════════════════════════════════════════════
+                Section 7: מיקום פרויקט (Location) — PROJ-11
+            ══════════════════════════════════════════════════════════════ */}
+            <SectionHeading title="מיקום פרויקט" />
+            <div className="bg-muted/10 rounded-lg p-4 space-y-3">
+
+              <div className="grid grid-cols-3 gap-3">
+                {/* Latitude — read-only, set by map click */}
+                <div className="space-y-1">
+                  <FieldLabel>קו רוחב (Latitude)</FieldLabel>
+                  <Input
+                    value={latitude !== null ? latitude.toFixed(6) : ''}
+                    readOnly
+                    placeholder="לא נבחר"
+                    dir="ltr"
+                    className="bg-muted/30"
+                  />
+                </div>
+
+                {/* Longitude — read-only, set by map click */}
+                <div className="space-y-1">
+                  <FieldLabel>קו אורך (Longitude)</FieldLabel>
+                  <Input
+                    value={longitude !== null ? longitude.toFixed(6) : ''}
+                    readOnly
+                    placeholder="לא נבחר"
+                    dir="ltr"
+                    className="bg-muted/30"
+                  />
+                </div>
+
+                {/* Radius — editable, updates circle on map */}
+                <div className="space-y-1">
+                  <FieldLabel>רדיוס כיסוי (מטרים)</FieldLabel>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={radius}
+                    onChange={(e) => setRadius(Math.max(0, Number(e.target.value) || 0))}
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              {/* Hidden inputs — submitted in FormData to Server Action */}
+              <input type="hidden" name="latitude" value={latitude !== null ? String(latitude) : ''} />
+              <input type="hidden" name="longitude" value={longitude !== null ? String(longitude) : ''} />
+              <input type="hidden" name="radius" value={radius} />
+
+              <p className="text-xs text-muted-foreground">
+                לחץ על המפה לסימון מיקום הפרויקט. העיגול הכחול מציג את רדיוס כיסוי שעון הנוכחות.
+              </p>
+
+              {/* react-leaflet map — loaded only client-side via dynamic import (ssr: false) */}
+              <DynamicLocationPicker
+                latitude={latitude}
+                longitude={longitude}
+                radius={radius}
+                onLocationChange={(lat, lng) => {
+                  setLatitude(lat)
+                  setLongitude(lng)
+                }}
+              />
+            </div>
+
+            {/* ── Server-level form error ── */}
+            {errors?._form && (
+              <p className="text-sm text-destructive px-1">{errors._form[0]}</p>
+            )}
+
+          </div>{/* end scrollable body */}
+
+          {/* ── Sticky footer — duplicate buttons for long-form UX ── */}
+          <DialogFooter className="border-t px-6 py-3 shrink-0 flex flex-row justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isPending}
             >
-              <option value="active">פעיל</option>
-              <option value="view_only">לצפייה בלבד</option>
-              <option value="inactive">לא פעיל</option>
-            </select>
-          </div>
-
-          {/* Boolean defaults — required by Server Action */}
-          <input type="hidden" name="pm_notifications" value="true" />
-          <input type="hidden" name="sm_notifications" value="true" />
-          <input type="hidden" name="cvc_is_employee" value="true" />
-          <input type="hidden" name="supervision_notifications" value="false" />
-          <input type="hidden" name="supervision_attach_reports" value="false" />
-          <input type="hidden" name="radius" value="100" />
-
-          {errorMsg && (
-            <p className="text-sm text-destructive">{errorMsg}</p>
-          )}
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               ביטול
             </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? 'שומר...' : isEdit ? 'עדכון' : 'שמירה'}
+            <Button
+              type="submit"
+              disabled={isPending}
+              className="bg-brand-primary hover:bg-brand-primary/90 active:scale-95 transition-transform text-white"
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="ms-2 h-4 w-4 animate-spin" />
+                  שומר...
+                </>
+              ) : isEdit ? 'שמור שינויים' : 'צור פרויקט'}
             </Button>
           </DialogFooter>
+
         </form>
       </DialogContent>
     </Dialog>
