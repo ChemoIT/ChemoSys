@@ -204,3 +204,14 @@ export async function logout(): Promise<never> {
   await supabase.auth.signOut();
   redirect("/login");
 }
+
+/**
+ * logoutApp — signs out the current user and redirects to /chemosys (ChemoSys login).
+ * Used by AppLogoutButton in the (app) shell. Distinct from logout() which redirects
+ * to /login (admin). ChemoSys users should return to the ChemoSys login page, not admin.
+ */
+export async function logoutApp(): Promise<never> {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect("/chemosys");
+}
