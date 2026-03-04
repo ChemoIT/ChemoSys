@@ -72,10 +72,11 @@ Plans:
 3. Checkbox "זכור אותי" שומר את ה-session — יוזר שסגר ופתח את הדפדפן לא נדרש להתחבר מחדש
 4. ניסיון כניסה כושל חוזר 5 פעמים ב-60 שניות מקבל חסימה — הודעת שגיאה מוצגת
 
-**Plans:** TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 07-01: ChemoSys login page + rate limiting
+- [ ] 07-01-PLAN.md — loginApp() Server Action + rate limit refactor + (chemosys) layout + ChemoSys login page
+- [ ] 07-02-PLAN.md — Module selection page at /app with permission-gated buttons + human verification
 
 ---
 
@@ -153,7 +154,7 @@ Plans:
 | 4. Projects | v1.0 | 4/4 | Complete | 2026-03-03 |
 | 5. Settings and Observability | v1.0 | 4/4 | Complete | 2026-03-04 |
 | 6. DB + Auth Foundation | v2.0 | 2/2 | Complete | 2026-03-04 |
-| 7. ChemoSys Login | v2.0 | 0/1 | Not started | - |
+| 7. ChemoSys Login | v2.0 | 0/2 | Not started | - |
 | 8. (app) Shell | v2.0 | 0/1 | Not started | - |
 | 9. Fleet Home | v2.0 | 0/1 | Not started | - |
 | 10. Equipment + Mobile Polish | v2.0 | 0/1 | Not started | - |
