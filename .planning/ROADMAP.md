@@ -27,7 +27,7 @@
 
 - [x] **Phase 6: DB + Auth Foundation** — מיגרציה, תיקון ניתוב auth, הרחבת dal.ts — completed 2026-03-04
 - [x] **Phase 7: ChemoSys Login** — דף כניסה ייעודי עם בחירת מודול לפי הרשאות — completed 2026-03-04
-- [ ] **Phase 8: (app) Shell** — route group + layout + header + module switcher
+- [x] **Phase 8: (app) Shell** — route group + layout + header + module switcher — completed 2026-03-04
 - [ ] **Phase 9: Fleet Home** — דף בית צי רכב עם grid של 16 תתי-מודולים
 - [ ] **Phase 10: Equipment + Mobile Polish** — דף בית צמ"ה + רספונסיביות + וריפיקציה
 
@@ -75,8 +75,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 07-01-PLAN.md — loginApp() Server Action + rate limit refactor + (chemosys) layout + ChemoSys login page
-- [ ] 07-02-PLAN.md — Module selection page at /app with permission-gated buttons + human verification
+- [x] 07-01-PLAN.md — loginApp() Server Action + rate limit refactor + (chemosys) layout + ChemoSys login page
+- [x] 07-02-PLAN.md — Module selection page at /app with permission-gated buttons + human verification
 
 ---
 
@@ -97,7 +97,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 08-01-PLAN.md — (app)/layout.tsx + AppHeader + ModuleSwitcher + logoutApp() + /app page cleanup
+- [x] 08-01-PLAN.md — (app)/layout.tsx + AppHeader + ModuleSwitcher + logoutApp() + /app page cleanup
 
 ---
 
@@ -155,7 +155,7 @@ Plans:
 | 5. Settings and Observability | v1.0 | 4/4 | Complete | 2026-03-04 |
 | 6. DB + Auth Foundation | v2.0 | 2/2 | Complete | 2026-03-04 |
 | 7. ChemoSys Login | v2.0 | 2/2 | Complete | 2026-03-04 |
-| 8. (app) Shell | v2.0 | 0/1 | Planned | - |
+| 8. (app) Shell | v2.0 | 1/1 | Complete | 2026-03-04 |
 | 9. Fleet Home | v2.0 | 0/1 | Not started | - |
 | 10. Equipment + Mobile Polish | v2.0 | 0/1 | Not started | - |
 
@@ -168,4 +168,4 @@ v2.0: 23/23 requirements mapped. See [REQUIREMENTS.md](REQUIREMENTS.md).
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-04 — Phase 7 complete*
+*Last updated: 2026-03-04 — Phase 8 complete*

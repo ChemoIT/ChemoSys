@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** v2.0 Phase 8 — (app) Shell
+**Current focus:** v2.0 Phase 9 — Fleet Home
 
 ## Current Position
 
-Phase: 8 of 10 ((app) Shell)
-Plan: 1 of 1 in current phase
-Status: Phase 8 COMPLETE
+Phase: 9 of 10 (Fleet Home)
+Plan: 0 of 1 in current phase
+Status: Ready to plan Phase 9
 Last activity: 2026-03-04 — Session #16
 
-Progress: v2.0 [████████████░░░░░░░░] 63% (5/8 plans complete)
+Progress: v2.0 [██████████████░░░░░░] 75% (6/8 plans complete)
 
 ## v1.0 Summary
 
@@ -73,25 +73,28 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-04 (session #16)
-Stopped at: Phase 8 COMPLETE — 08-01-PLAN.md executed fully.
+Stopped at: Phase 8 COMPLETE — verified, ROADMAP updated. Ready to plan Phase 9.
 
 ### Context for next session:
 
-**Status:** Phase 8 DONE — all committed. Ready for Phase 9 (fleet module pages).
+**Status:** Phase 8 DONE — all committed and verified (6/6 must-haves). Ready for Phase 9.
 
-**Commits this session:**
-- `4e838e9` — feat(08-01): add logoutApp() action + (app)/layout shell + AppHeader + ModuleSwitcher + AppLogoutButton
+**Commits this session (Phase 8):**
+- `4e838e9` — feat(08-01): logoutApp() + (app)/layout + AppHeader + ModuleSwitcher + AppLogoutButton
 - `618bcc7` — feat(08-01): clean up /app/page.tsx — remove redundant fullscreen styling
+- `be7a749` — docs(08-01): SUMMARY.md + STATE.md
 
 **What Phase 9 needs to build:**
-1. `/app/fleet` page — FleetSubModuleGrid with permitted sub-modules (app_fleet_vehicles, app_fleet_drivers, etc.)
-2. Sub-module navigation pattern — how to pass sub-module permissions server→client
-3. Decision needed: pattern for Set<string> sub-module permissions to FleetSubModuleGrid
+1. `/app/fleet` page — FleetSubModuleGrid with permitted sub-modules (16 fleet sub-module cards)
+2. Sub-module cards: Hebrew name + Lucide icon, permission-gated (gray if no access)
+3. Click on permitted sub-module → placeholder "בקרוב" page (not 404)
+4. `/app/fleet` guarded — user without `app_fleet` redirected back
+5. Decision needed: pattern for Set<string> sub-module permissions to FleetSubModuleGrid
 
 **Key files to reference:**
 - `src/lib/dal.ts` — `verifyAppUser()`, `getAppNavPermissions()`
-- `src/app/(app)/layout.tsx` — new authenticated shell (Phase 8 output)
+- `src/app/(app)/layout.tsx` — authenticated shell (Phase 8 output)
 - `src/components/app/AppHeader.tsx` — header pattern reference
-- `src/actions/auth.ts` — `logoutApp()` server action
+- `src/components/app/ModuleSwitcher.tsx` — module config pattern
 
 Resume file: None
