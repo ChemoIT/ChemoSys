@@ -12,15 +12,19 @@
 
 import { verifySession } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { UsersTable } from '@/components/admin/users/UsersTable'
 import { Badge } from '@/components/ui/badge'
+
+const EMPLOYEES_PAGE_SIZE = 1000
 
 export default async function UsersPage() {
   await verifySession()
 
   const supabase = await createClient()
 
-  const [usersRes, employeesRes, templatesRes] = await Promise.all([
+  // Step 1: Fetch users, employee count, and templates in parallel
+  const [usersRes, empCountRes, templatesRes] = await Promise.all([
     supabase
       .from('users')
       .select(
@@ -30,10 +34,9 @@ export default async function UsersPage() {
       .order('created_at', { ascending: false }),
     supabase
       .from('employees')
-      .select('id, first_name, last_name, employee_number, email, id_number, companies(name)')
+      .select('id', { count: 'exact', head: true })
       .is('deleted_at', null)
-      .eq('status', 'active')
-      .order('last_name'),
+      .in('status', ['active', 'suspended']),
     supabase
       .from('role_templates')
       .select('id, name')
@@ -42,11 +45,62 @@ export default async function UsersPage() {
   ])
 
   if (usersRes.error) console.error('[UsersPage] users fetch error:', usersRes.error.message)
-  if (employeesRes.error) console.error('[UsersPage] employees fetch error:', employeesRes.error.message)
+  if (empCountRes.error) console.error('[UsersPage] employees count error:', empCountRes.error.message)
   if (templatesRes.error) console.error('[UsersPage] templates fetch error:', templatesRes.error.message)
 
+  // Step 2: Fetch ALL active employees via paginated parallel queries
+  const empTotal = empCountRes.count ?? 0
+  const empPages = Math.ceil(empTotal / EMPLOYEES_PAGE_SIZE)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let employees: any[] = []
+
+  if (empPages > 0) {
+    const empPromises = Array.from({ length: empPages }, (_, i) => {
+      const from = i * EMPLOYEES_PAGE_SIZE
+      const to = from + EMPLOYEES_PAGE_SIZE - 1
+      return supabase
+        .from('employees')
+        .select('id, first_name, last_name, employee_number, email, id_number, companies(name)')
+        .is('deleted_at', null)
+        .in('status', ['active', 'suspended'])
+        .order('last_name')
+        .range(from, to)
+    })
+
+    const empResults = await Promise.all(empPromises)
+
+    for (const res of empResults) {
+      if (res.error) {
+        console.error('[UsersPage] Employee page fetch error:', res.error.message)
+      } else if (res.data) {
+        employees.push(...res.data)
+      }
+    }
+  }
+
+  // Fetch auth emails for all users via admin client
+  const adminClient = createAdminClient()
+  const authEmailMap = new Map<string, string>()
+  const activeUsers = usersRes.data ?? []
+  if (activeUsers.length > 0) {
+    // Batch-fetch auth users (listUsers paginates, but our user count is small)
+    const { data: authList } = await adminClient.auth.admin.listUsers({ perPage: 1000 })
+    if (authList?.users) {
+      for (const au of authList.users) {
+        if (au.email) authEmailMap.set(au.id, au.email)
+      }
+    }
+  }
+
+  // Merge auth email into each user record
+  const usersWithAuthEmail = activeUsers.map((u) => ({
+    ...u,
+    auth_email: authEmailMap.get(u.auth_user_id) ?? null,
+  }))
+
   // Employees already linked to active users — exclude from the create form search
-  const linkedEmployeeIds = (usersRes.data ?? []).map((u) => u.employee_id)
+  const linkedEmployeeIds = activeUsers.map((u) => u.employee_id)
 
   return (
     <div className="space-y-6">
@@ -56,9 +110,9 @@ export default async function UsersPage() {
       </div>
 
       <UsersTable
-        users={(usersRes.data ?? []) as unknown as Parameters<typeof UsersTable>[0]['users']}
+        users={usersWithAuthEmail as unknown as Parameters<typeof UsersTable>[0]['users']}
         employees={
-          (employeesRes.data ?? []) as unknown as Parameters<typeof UsersTable>[0]['employees']
+          employees as unknown as Parameters<typeof UsersTable>[0]['employees']
         }
         linkedEmployeeIds={linkedEmployeeIds}
         templates={templatesRes.data ?? []}

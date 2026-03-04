@@ -107,13 +107,28 @@ export async function createUser(
     await assignTemplateInternal(newUser.id, template_id, session.userId)
   }
 
+  // ---------------------------------------------------------------------------
+  // ChemoSys module access (app_fleet / app_equipment checkboxes)
+  // ---------------------------------------------------------------------------
+  const appFleet = formData.get('app_fleet') === '1'
+  const appEquipment = formData.get('app_equipment') === '1'
+  const appRows: Array<{ user_id: string; module_key: string; level: number; is_override: boolean; template_id: null }> = []
+  if (appFleet) appRows.push({ user_id: newUser!.id, module_key: 'app_fleet', level: 1, is_override: true, template_id: null })
+  if (appEquipment) appRows.push({ user_id: newUser!.id, module_key: 'app_equipment', level: 1, is_override: true, template_id: null })
+  if (appRows.length > 0) {
+    // Uses adminClient — permission writes are admin-only (00013 RLS policy)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: permError } = await (adminClient.from('user_permissions') as any).upsert(appRows, { onConflict: 'user_id,module_key' })
+    if (permError) console.error('[createUser] permission upsert failed:', permError.message)
+  }
+
   await writeAuditLog({
     userId: session.userId,
     action: 'INSERT',
     entityType: 'users',
     entityId: newUser!.id,
     oldData: null,
-    newData: { auth_user_id: authUserId, employee_id: employee_id!, is_blocked: false },
+    newData: { auth_user_id: authUserId, employee_id: employee_id!, is_blocked: false, app_fleet: appFleet, app_equipment: appEquipment },
   })
 
   revalidatePath('/admin/users')
@@ -121,52 +136,93 @@ export async function createUser(
 }
 
 // ---------------------------------------------------------------------------
-// updateUser
+// updateUserAuth — Update auth email and/or password + ChemoSys permissions
 // ---------------------------------------------------------------------------
 
 /**
- * updateUser — Update public.users metadata (notes, etc.).
- * The only field editable post-creation is notes.
- * Re-linking to a different employee is intentionally not supported
- * to preserve audit integrity — delete and recreate instead.
+ * updateUserAuth — Updates auth credentials (email, password) via admin API
+ * and ChemoSys module permissions (app_fleet, app_equipment).
+ *
+ * Uses adminClient for auth.admin.updateUserById (service_role).
+ * Uses RLS client for user_permissions upsert.
  */
-export async function updateUser(
-  id: string,
-  prevState: unknown,
+export async function updateUserAuth(
+  userId: string,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<SimpleResult> {
   const session = await verifySession()
   const supabase = await createClient()
+  const adminClient = createAdminClient()
 
-  const notes = formData.get('notes') as string | null
-
-  const { data: oldData } = await supabase
+  // Fetch user to get auth_user_id
+  const { data: user, error: fetchError } = await supabase
     .from('users')
-    .select('*')
-    .eq('id', id)
+    .select('auth_user_id')
+    .eq('id', userId)
     .single()
 
-  const { data, error } = await supabase
-    .from('users')
-    .update({
-      notes: notes || null,
-      updated_by: session.userId,
-    })
-    .eq('id', id)
-    .select()
-    .single()
-
-  if (error) {
-    return { success: false, error: { _form: [error.message] } }
+  if (fetchError || !user) {
+    return { success: false, error: 'יוזר לא נמצא' }
   }
+
+  // Build auth update payload (only non-empty fields)
+  const newEmail = (formData.get('email') as string)?.trim()
+  const newPassword = (formData.get('password') as string)?.trim()
+
+  const authUpdate: Record<string, unknown> = {}
+  if (newEmail) authUpdate.email = newEmail
+  if (newPassword && newPassword.length >= 6) authUpdate.password = newPassword
+
+  // Validate email format
+  if (newEmail && !newEmail.includes('@')) {
+    return { success: false, error: 'כתובת מייל לא תקינה' }
+  }
+  if (newPassword && newPassword.length > 0 && newPassword.length < 6) {
+    return { success: false, error: 'סיסמה חייבת להכיל לפחות 6 תווים' }
+  }
+
+  // Update auth if there are changes
+  if (Object.keys(authUpdate).length > 0) {
+    const { error: authError } = await adminClient.auth.admin.updateUserById(
+      user.auth_user_id,
+      authUpdate
+    )
+    if (authError) {
+      return { success: false, error: authError.message }
+    }
+  }
+
+  // Update ChemoSys module permissions
+  // Uses adminClient to bypass RLS — permission writes are admin-only (00013 policy)
+  // and we already verified the caller is admin via verifySession().
+  const appFleet = formData.get('app_fleet') === '1'
+  const appEquipment = formData.get('app_equipment') === '1'
+  const appRows = [
+    { user_id: userId, module_key: 'app_fleet', level: appFleet ? 1 : 0, is_override: true, template_id: null },
+    { user_id: userId, module_key: 'app_equipment', level: appEquipment ? 1 : 0, is_override: true, template_id: null },
+  ]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: permError } = await (adminClient.from('user_permissions') as any).upsert(appRows, { onConflict: 'user_id,module_key' })
+  if (permError) {
+    console.error('[updateUserAuth] permission upsert failed:', permError.message)
+    return { success: false, error: 'שגיאה בעדכון הרשאות: ' + permError.message }
+  }
+
+  // Mark updated_by
+  await supabase.from('users').update({ updated_by: session.userId }).eq('id', userId)
 
   await writeAuditLog({
     userId: session.userId,
     action: 'UPDATE',
     entityType: 'users',
-    entityId: id,
-    oldData: oldData as Record<string, unknown>,
-    newData: data as Record<string, unknown>,
+    entityId: userId,
+    oldData: null,
+    newData: {
+      email_changed: !!newEmail,
+      password_changed: !!newPassword,
+      app_fleet: appFleet,
+      app_equipment: appEquipment,
+    },
   })
 
   revalidatePath('/admin/users')
@@ -391,8 +447,9 @@ async function assignTemplateInternal(
   actingUserId: string
 ): Promise<SimpleResult> {
   const supabase = await createClient()
+  const adminClient = createAdminClient()
 
-  // Fetch template permissions
+  // Fetch template permissions (read — RLS allows SELECT for authenticated)
   const { data: templatePerms, error: fetchError } = await supabase
     .from('template_permissions')
     .select('module_key, level')
@@ -403,8 +460,9 @@ async function assignTemplateInternal(
   }
 
   // Delete all non-override user permissions (template-sourced rows)
-  const { error: deleteError } = await supabase
-    .from('user_permissions')
+  // Uses adminClient — permission writes are admin-only (00013 RLS policy)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: deleteError } = await (adminClient.from('user_permissions') as any)
     .delete()
     .eq('user_id', userId)
     .eq('is_override', false)
@@ -423,7 +481,8 @@ async function assignTemplateInternal(
       is_override: false,
     }))
 
-    const { error: insertError } = await supabase.from('user_permissions').insert(rows)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: insertError } = await (adminClient.from('user_permissions') as any).insert(rows)
 
     if (insertError) {
       return { success: false, error: insertError.message }
@@ -464,6 +523,7 @@ export async function saveUserPermissions(
 ): Promise<SimpleResult> {
   const session = await verifySession()
   const supabase = await createClient()
+  const adminClient = createAdminClient()
 
   const MODULE_KEYS = [
     'dashboard',
@@ -477,8 +537,8 @@ export async function saveUserPermissions(
     'settings',
   ] as const
 
-  // Build upsert rows from formData
-  const rows = MODULE_KEYS.map((key) => {
+  // Build upsert rows from formData (admin modules)
+  const rows: Array<{ user_id: string; module_key: string; level: number; is_override: boolean; template_id: string | null }> = MODULE_KEYS.map((key) => {
     const raw = formData.get(`perm_${key}`)
     const level = raw !== null ? parseInt(String(raw), 10) : 0
     return {
@@ -486,12 +546,25 @@ export async function saveUserPermissions(
       module_key: key,
       level: isNaN(level) ? 0 : level,
       is_override: true,
-      template_id: null as string | null,
+      template_id: null,
     }
   })
 
-  const { error } = await supabase
-    .from('user_permissions')
+  // ChemoSys module access (checkboxes → level 1 if checked, 0 if unchecked)
+  const APP_MODULES = ['app_fleet', 'app_equipment'] as const
+  for (const appKey of APP_MODULES) {
+    rows.push({
+      user_id: userId,
+      module_key: appKey,
+      level: formData.get(appKey) === '1' ? 1 : 0,
+      is_override: true,
+      template_id: null,
+    })
+  }
+
+  // Uses adminClient — permission writes are admin-only (00013 RLS policy)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (adminClient.from('user_permissions') as any)
     .upsert(rows, { onConflict: 'user_id,module_key' })
 
   if (error) {

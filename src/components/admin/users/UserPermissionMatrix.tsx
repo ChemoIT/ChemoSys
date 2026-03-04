@@ -25,7 +25,7 @@
 
 import * as React from 'react'
 import { useTransition } from 'react'
-import { Loader2, Pencil, Shield } from 'lucide-react'
+import { Loader2, Pencil, Shield, Truck, HardHat } from 'lucide-react'
 import { toast } from 'sonner'
 import { assignTemplate, saveUserPermissions } from '@/actions/users'
 import {
@@ -126,6 +126,12 @@ export function UserPermissionMatrix({
 
   const [levels, setLevels] = React.useState<Record<ModuleKey, 0 | 1 | 2>>(initialLevels)
 
+  // ChemoSys app module access (app_fleet / app_equipment)
+  const initialAppFleet = React.useMemo(() => currentPermissions.some(p => p.module_key === 'app_fleet' && p.level >= 1), [currentPermissions])
+  const initialAppEquipment = React.useMemo(() => currentPermissions.some(p => p.module_key === 'app_equipment' && p.level >= 1), [currentPermissions])
+  const [appFleet, setAppFleet] = React.useState(initialAppFleet)
+  const [appEquipment, setAppEquipment] = React.useState(initialAppEquipment)
+
   // Build override set from currentPermissions
   const overrideKeys = React.useMemo(() => {
     const set = new Set<string>()
@@ -144,8 +150,10 @@ export function UserPermissionMatrix({
       setLevels(initialLevels)
       setChangedKeys(new Set())
       setSelectedTemplateId('')
+      setAppFleet(initialAppFleet)
+      setAppEquipment(initialAppEquipment)
     }
-  }, [open, initialLevels])
+  }, [open, initialLevels, initialAppFleet, initialAppEquipment])
 
   function handleLevelChange(key: ModuleKey, value: 0 | 1 | 2) {
     setLevels((prev) => ({ ...prev, [key]: value }))
@@ -229,6 +237,40 @@ export function UserPermissionMatrix({
             Permission matrix form
           ---------------------------------------------------------------- */}
         <form onSubmit={handleSave} className="flex-1 overflow-y-auto min-h-0 space-y-4">
+          {/* ChemoSys module access */}
+          <div className="rounded-md border p-4 space-y-3">
+            <h3 className="text-sm font-medium text-muted-foreground">גישה ל-ChemoSys</h3>
+            <div className="flex items-center gap-6">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="app_fleet"
+                  value="1"
+                  checked={appFleet}
+                  onChange={(e) => setAppFleet(e.target.checked)}
+                  className="h-4 w-4 accent-primary cursor-pointer"
+                  disabled={isLoading}
+                />
+                <Truck className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">צי רכב</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="app_equipment"
+                  value="1"
+                  checked={appEquipment}
+                  onChange={(e) => setAppEquipment(e.target.checked)}
+                  className="h-4 w-4 accent-primary cursor-pointer"
+                  disabled={isLoading}
+                />
+                <HardHat className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">צמ&quot;ה</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Admin permission matrix */}
           <div className="rounded-md border overflow-hidden">
             <table className="w-full text-sm">
               <thead>

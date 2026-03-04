@@ -97,9 +97,11 @@ function formatIdNumber(id: string | null | undefined): string {
 }
 
 /**
- * deriveStatusFromEndDate — compute status from end date value.
+ * deriveStatusFromEndDate — compute status from end date and dept number.
+ * Iron rule: dept_number '0' = always inactive, regardless of end_date.
  */
-function deriveStatusFromEndDate(endDate: string): 'active' | 'suspended' | 'inactive' {
+function deriveStatusFromEndDate(endDate: string, deptNumber?: string): 'active' | 'suspended' | 'inactive' {
+  if (deptNumber === '0') return 'inactive'
   if (!endDate) return 'active'
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -379,8 +381,10 @@ export function EmployeeForm({
   }, [state, onOpenChange, onSaved])
 
   // Auto-calculate status when end_date changes (still manually overridable)
+  // Iron rule: dept 0 = always inactive — overrides end_date logic
   function handleEndDateChange(iso: string) {
-    setStatus(deriveStatusFromEndDate(iso))
+    const currentDeptNumber = filteredDepts.find((d) => d.id === deptId)?.dept_number
+    setStatus(deriveStatusFromEndDate(iso, currentDeptNumber))
   }
 
   // Department dropdowns:
@@ -591,7 +595,7 @@ export function EmployeeForm({
           <SectionHeading title="שיוך ארגוני" />
 
           <div className="bg-muted/10 rounded-lg p-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               <div className="space-y-1">
                 <FieldLabel required>חברה</FieldLabel>
                 <select
@@ -608,16 +612,42 @@ export function EmployeeForm({
                 <FieldError errors={errors} field="company_id" />
               </div>
               <div className="space-y-1">
+                <FieldLabel>מס׳ מחלקה</FieldLabel>
+                <Input
+                  value={deptId ? (filteredDepts.find((d) => d.id === deptId)?.dept_number ?? '') : ''}
+                  onChange={(e) => {
+                    const num = e.target.value.trim()
+                    if (!num) { setDeptId(''); setSubDeptId(''); return }
+                    const match = filteredDepts.find((d) => d.dept_number === num)
+                    if (match) {
+                      setDeptId(match.id)
+                      setSubDeptId('')
+                      // Dept 0 = inactive
+                      if (num === '0') setStatus('inactive')
+                    }
+                  }}
+                  placeholder="מס׳"
+                  dir="ltr"
+                  className="text-center"
+                />
+              </div>
+              <div className="space-y-1">
                 <FieldLabel>מחלקה</FieldLabel>
                 <select
                   name="department_id"
                   value={deptId}
-                  onChange={(e) => { setDeptId(e.target.value); setSubDeptId('') }}
+                  onChange={(e) => {
+                    setDeptId(e.target.value)
+                    setSubDeptId('')
+                    // Dept 0 = inactive
+                    const dept = filteredDepts.find((d) => d.id === e.target.value)
+                    if (dept?.dept_number === '0') setStatus('inactive')
+                  }}
                   className={selectClass}
                 >
                   <option value="">בחר מחלקה</option>
                   {filteredDepts.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
+                    <option key={d.id} value={d.id}>{d.dept_number} — {d.name}</option>
                   ))}
                 </select>
               </div>
@@ -632,7 +662,7 @@ export function EmployeeForm({
                 >
                   <option value="">{deptId ? 'בחר תת-מחלקה' : 'בחר מחלקה תחילה'}</option>
                   {filteredSubDepts.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
+                    <option key={d.id} value={d.id}>{d.dept_number} — {d.name}</option>
                   ))}
                 </select>
               </div>

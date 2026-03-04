@@ -17,28 +17,30 @@
  *     Phase 1 = preview counts only (no DB writes).
  *     Phase 2 = upsert via bulk_upsert_employees() RPC (single DB transaction).
  *
- * Excel column mapping (1-based, from payroll system export):
- *   EMPLOYEE_NUMBER       = col  1  (A)
- *   FIRST_NAME            = col  3  (C)
- *   LAST_NAME             = col  4  (D)
- *   ID_NUMBER             = col  6  (F)
- *   GENDER_CODE           = col  7  (G)  ז=male, נ=female
- *   STREET                = col  9  (I)
- *   HOUSE_NUMBER          = col 10  (J)
- *   CITY                  = col 11  (K)
- *   MOBILE_PHONE          = col 13  (M)
- *   ADDITIONAL_PHONE      = col 14  (N)
- *   EMAIL                 = col 15  (O)
- *   DATE_OF_BIRTH         = col 16  (P)
- *   SALARY_SYSTEM_LICENSE = col 45  (AS) רישוי רכב במערכת שכר
- *   CITIZENSHIP_CODE      = col 46  (AT) כ=ישראלי, ח=זר
- *   START_DATE            = col 65  (BM) dd/mm/yy
- *   END_DATE              = col 66  (BN) dd/mm/yy
- *   DEPT_NUMBER           = col 72  (BT) department number → UUID lookup
- *   SUB_DEPT_NUMBER       = col 73  (BU) sub-department number → UUID lookup
- *   PASSPORT_NUMBER       = col 79  (CA)
+ * Excel column detection: DYNAMIC — columns are resolved by scanning the Hebrew
+ * header text in row 1 (see HEADER_MAP). This handles Michpal 2000 exports with
+ * varying column counts (133, 150, etc.) where later columns shift positions.
  *
- * Note: col 74 (BV) = קוד משרה בי"ל — NOT passport number (contains Hebrew codes like "ע")
+ * Mapped fields (header text → field):
+ *   מספר עובד              → EMPLOYEE_NUMBER
+ *   שם פרטי                → FIRST_NAME
+ *   שם משפחה               → LAST_NAME
+ *   מספר זהות              → ID_NUMBER
+ *   קוד מין                → GENDER_CODE   ז=male, נ=female
+ *   כתובת (exact)          → STREET
+ *   מספר בית               → HOUSE_NUMBER
+ *   ישוב                   → CITY
+ *   טלפון (exact)          → MOBILE_PHONE
+ *   טלפון נוסף             → ADDITIONAL_PHONE
+ *   דוא"ל                  → EMAIL
+ *   תאריך לידה             → DATE_OF_BIRTH
+ *   רישוי רכב              → SALARY_SYSTEM_LICENSE
+ *   קוד תושב               → CITIZENSHIP_CODE  כ=ישראלי, ח=זר
+ *   תאריך תחילת עבודה      → START_DATE   dd/mm/yy
+ *   תאריך הפסקת עבודה      → END_DATE     dd/mm/yy
+ *   מספר מחלקה             → DEPT_NUMBER   → UUID lookup
+ *   מספר תת-מחלקה          → SUB_DEPT_NUMBER → UUID lookup
+ *   מספר דרכון             → PASSPORT_NUMBER
  */
 
 import { revalidatePath } from 'next/cache'
@@ -49,29 +51,88 @@ import { writeAuditLog } from '@/lib/audit'
 import { EmployeeSchema } from '@/lib/schemas'
 
 // ---------------------------------------------------------------------------
-// Excel column index constants (1-based, from payroll system export)
+// Dynamic Excel column detection — header-based mapping
 // ---------------------------------------------------------------------------
-const COL = {
-  EMPLOYEE_NUMBER:       1,   // מספר עובד
-  FIRST_NAME:            3,   // שם פרטי
-  LAST_NAME:             4,   // שם משפחה
-  ID_NUMBER:             6,   // מספר זהות
-  GENDER_CODE:           7,   // קוד מין: ז=male, נ=female
-  STREET:                9,   // כתובת
-  HOUSE_NUMBER:          10,  // מספר בית
-  CITY:                  11,  // עיר
-  MOBILE_PHONE:          13,  // טלפון נייד
-  ADDITIONAL_PHONE:      14,  // טלפון נוסף
-  EMAIL:                 15,  // דוא"ל
-  DATE_OF_BIRTH:         16,  // תאריך לידה
-  SALARY_SYSTEM_LICENSE: 45,  // רישוי רכב במערכת שכר (AS)
-  CITIZENSHIP_CODE:      46,  // אזרחות: כ=ישראלי, ח=זר (AT)
-  START_DATE:            65,  // תאריך תחילת עבודה (BM)
-  END_DATE:              66,  // תאריך הפסקת עבודה (BN)
-  DEPT_NUMBER:           72,  // מספר מחלקה (BT)
-  SUB_DEPT_NUMBER:       73,  // מספר תת-מחלקה (BU)
-  PASSPORT_NUMBER:       79,  // מספר דרכון (CA)
-} as const
+// Michpal 2000 exports vary in column count (133–150+). Instead of hardcoded
+// indices we scan row 1 headers and resolve each field dynamically.
+//
+// `exact: true` means the header text must equal the pattern exactly (not just
+// include it). Required when a short header is a substring of other headers:
+//   "כתובת" ⊂ "כתובת - שמאל", "כתובת - מספר בית", "כתובת - ישוב", etc.
+//   "טלפון" ⊂ "טלפון נוסף"
+// ---------------------------------------------------------------------------
+
+type HeaderPattern = {
+  field: string
+  patterns: string[]
+  exact?: boolean
+}
+
+const HEADER_MAP: HeaderPattern[] = [
+  { field: 'EMPLOYEE_NUMBER',       patterns: ['מספר עובד'] },
+  { field: 'FIRST_NAME',            patterns: ['שם פרטי'] },
+  { field: 'LAST_NAME',             patterns: ['שם משפחה'] },
+  { field: 'ID_NUMBER',             patterns: ['מספר זהות'] },
+  { field: 'GENDER_CODE',           patterns: ['קוד מין'] },
+  { field: 'STREET',                patterns: ['כתובת'], exact: true },
+  { field: 'HOUSE_NUMBER',          patterns: ['מספר בית'] },
+  { field: 'CITY',                  patterns: ['ישוב'] },
+  { field: 'MOBILE_PHONE',          patterns: ['טלפון'], exact: true },
+  { field: 'ADDITIONAL_PHONE',      patterns: ['טלפון נוסף'] },
+  { field: 'EMAIL',                 patterns: ['דוא"ל', 'דואל', 'אימייל'] },
+  { field: 'DATE_OF_BIRTH',         patterns: ['תאריך לידה'] },
+  { field: 'SALARY_SYSTEM_LICENSE', patterns: ['רישוי רכב'] },
+  { field: 'CITIZENSHIP_CODE',      patterns: ['קוד תושב'] },
+  { field: 'START_DATE',            patterns: ['תאריך תחילת עבודה'] },
+  { field: 'END_DATE',              patterns: ['תאריך הפסקת עבודה'] },
+  { field: 'DEPT_NUMBER',           patterns: ['מספר מחלקה'] },
+  { field: 'SUB_DEPT_NUMBER',       patterns: ['מספר תת-מחלקה', 'תת מחלקה'] },
+  { field: 'PASSPORT_NUMBER',       patterns: ['מספר דרכון', 'דרכון'] },
+]
+
+/** field name → 1-based column index */
+type ColumnMap = Record<string, number>
+
+/**
+ * detectColumns — scan the worksheet header row and build a dynamic column map.
+ * Returns a Record<fieldName, colNumber> for every field whose header was found.
+ * Missing fields are simply absent from the map (graceful degradation).
+ */
+function detectColumns(worksheet: ExcelJS.Worksheet): ColumnMap {
+  const headerRow = worksheet.getRow(1)
+  const colMap: ColumnMap = {}
+
+  // Collect all non-empty header cells
+  const headers: { col: number; text: string }[] = []
+  headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+    const text = String(cell.value ?? '').trim()
+    if (text) headers.push({ col: colNumber, text })
+  })
+
+  // Track claimed columns to prevent double-matching
+  const claimed = new Set<number>()
+
+  for (const { field, patterns, exact } of HEADER_MAP) {
+    for (const pattern of patterns) {
+      const match = headers.find(h =>
+        !claimed.has(h.col) && (exact ? h.text === pattern : h.text.includes(pattern))
+      )
+      if (match) {
+        colMap[field] = match.col
+        claimed.add(match.col)
+        break
+      }
+    }
+  }
+
+  return colMap
+}
+
+/** Safe cell read — returns the cell value if the column was detected, null otherwise. */
+function getCell(row: ExcelJS.Row, col: ColumnMap, field: string): ExcelJS.CellValue {
+  const colIndex = col[field]
+  return colIndex ? row.getCell(colIndex).value : null
+}
 
 // ---------------------------------------------------------------------------
 // Helper functions for Excel cell → DB field conversion
@@ -149,12 +210,15 @@ function mapCitizenship(value: ExcelJS.CellValue): 'israeli' | 'foreign' {
 }
 
 /**
- * deriveStatus — determine employee status from end_date.
+ * deriveStatus — determine employee status from end_date and dept_number.
+ * Iron rule: dept_number '0' = always inactive, regardless of end_date.
+ * - Dept 0         → inactive (לא פעיל, red)
  * - No end_date    → active (פעיל, green)
  * - Future end_date → suspended / notice period (הודעה מוקדמת, yellow)
  * - Past/today end_date → inactive (לא פעיל, red)
  */
-function deriveStatus(endDate: string | null): 'active' | 'suspended' | 'inactive' {
+function deriveStatus(endDate: string | null, deptNumber?: string | null): 'active' | 'suspended' | 'inactive' {
+  if (deptNumber === '0') return 'inactive'
   if (!endDate) return 'active'
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -199,10 +263,10 @@ type SkippedRowDetail = {
 }
 
 /**
- * parseExcelBufferAsync — async Excel parser.
- * Skips the header row (row 1) and any row missing employee_number or last_name.
- * Returns an array of ParsedEmployeeRow (one per valid data row) plus detailed
- * info about each skipped row (row number + which fields are missing).
+ * parseExcelBufferAsync — async Excel parser with dynamic column detection.
+ * Scans row 1 headers to resolve column positions, then iterates data rows.
+ * Skips any row missing employee_number or last_name.
+ * Throws Error('MISSING_HEADERS') if the critical columns are not found.
  */
 async function parseExcelBufferAsync(
   buffer: ArrayBuffer
@@ -218,6 +282,18 @@ async function parseExcelBufferAsync(
     return { rows: [], skippedRows: [] }
   }
 
+  // Dynamic column detection from header row
+  const col = detectColumns(worksheet)
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[importEmployees] Detected column mapping:', col)
+  }
+
+  // Validate critical columns exist
+  if (!col.EMPLOYEE_NUMBER || !col.LAST_NAME) {
+    throw new Error('MISSING_HEADERS')
+  }
+
   const rows: ParsedEmployeeRow[] = []
   const skippedRows: SkippedRowDetail[] = []
 
@@ -225,8 +301,8 @@ async function parseExcelBufferAsync(
     // Skip header row
     if (rowIndex === 1) return
 
-    const employeeNumber = cellToString(row.getCell(COL.EMPLOYEE_NUMBER).value)
-    const lastName        = cellToString(row.getCell(COL.LAST_NAME).value)
+    const employeeNumber = cellToString(getCell(row, col, 'EMPLOYEE_NUMBER'))
+    const lastName        = cellToString(getCell(row, col, 'LAST_NAME'))
 
     // Skip rows without the minimum required fields — collect detail
     if (!employeeNumber || !lastName) {
@@ -237,41 +313,42 @@ async function parseExcelBufferAsync(
       return
     }
 
-    const firstName = cellToString(row.getCell(COL.FIRST_NAME).value) ?? ''
+    const firstName = cellToString(getCell(row, col, 'FIRST_NAME')) ?? ''
 
-    // Citizenship: column AT — כ=israeli, ח=foreign
-    const citizenship = mapCitizenship(row.getCell(COL.CITIZENSHIP_CODE).value)
+    // Citizenship: קוד תושב — כ=israeli, ח=foreign
+    const citizenship = mapCitizenship(getCell(row, col, 'CITIZENSHIP_CODE'))
 
     // Correspondence language: hebrew for Israeli citizens (editable in form)
     const correspondenceLanguage: 'hebrew' | 'english' =
       citizenship === 'israeli' ? 'hebrew' : 'english'
 
-    // Status: derived from end_date
-    const endDate = cellToDateString(row.getCell(COL.END_DATE).value)
-    const status  = deriveStatus(endDate)
+    // Status: derived from end_date + dept_number (dept 0 = always inactive)
+    const endDate    = cellToDateString(getCell(row, col, 'END_DATE'))
+    const deptNumber = cellToString(getCell(row, col, 'DEPT_NUMBER'))
+    const status     = deriveStatus(endDate, deptNumber)
 
     rows.push({
       rowIndex,
       employee_number:         employeeNumber,
       first_name:              firstName,
       last_name:               lastName,
-      id_number:               cellToString(row.getCell(COL.ID_NUMBER).value),
-      gender:                  mapGender(row.getCell(COL.GENDER_CODE).value),
-      street:                  cellToString(row.getCell(COL.STREET).value),
-      house_number:            cellToString(row.getCell(COL.HOUSE_NUMBER).value),
-      city:                    cellToString(row.getCell(COL.CITY).value),
-      mobile_phone:            cellToString(row.getCell(COL.MOBILE_PHONE).value),
-      additional_phone:        cellToString(row.getCell(COL.ADDITIONAL_PHONE).value),
-      email:                   cellToString(row.getCell(COL.EMAIL).value),
-      date_of_birth:           cellToDateString(row.getCell(COL.DATE_OF_BIRTH).value),
-      start_date:              cellToDateString(row.getCell(COL.START_DATE).value),
+      id_number:               cellToString(getCell(row, col, 'ID_NUMBER')),
+      gender:                  mapGender(getCell(row, col, 'GENDER_CODE')),
+      street:                  cellToString(getCell(row, col, 'STREET')),
+      house_number:            cellToString(getCell(row, col, 'HOUSE_NUMBER')),
+      city:                    cellToString(getCell(row, col, 'CITY')),
+      mobile_phone:            cellToString(getCell(row, col, 'MOBILE_PHONE')),
+      additional_phone:        cellToString(getCell(row, col, 'ADDITIONAL_PHONE')),
+      email:                   cellToString(getCell(row, col, 'EMAIL')),
+      date_of_birth:           cellToDateString(getCell(row, col, 'DATE_OF_BIRTH')),
+      start_date:              cellToDateString(getCell(row, col, 'START_DATE')),
       end_date:                endDate,
-      dept_number:             cellToString(row.getCell(COL.DEPT_NUMBER).value),
-      sub_dept_number:         cellToString(row.getCell(COL.SUB_DEPT_NUMBER).value),
-      passport_number:         cellToString(row.getCell(COL.PASSPORT_NUMBER).value),
+      dept_number:             cellToString(getCell(row, col, 'DEPT_NUMBER')),
+      sub_dept_number:         cellToString(getCell(row, col, 'SUB_DEPT_NUMBER')),
+      passport_number:         cellToString(getCell(row, col, 'PASSPORT_NUMBER')),
       citizenship,
       correspondence_language: correspondenceLanguage,
-      salary_system_license:   cellToString(row.getCell(COL.SALARY_SYSTEM_LICENSE).value),
+      salary_system_license:   cellToString(getCell(row, col, 'SALARY_SYSTEM_LICENSE')),
       status,
     })
   })
@@ -744,7 +821,11 @@ export async function importEmployeesAction(
     rows        = result.rows
     skippedRows = result.skippedRows
   } catch (err) {
-    console.error('[importEmployeesAction] Excel parse error:', err instanceof Error ? err.message : 'Unknown error')
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    if (msg === 'MISSING_HEADERS') {
+      return { success: false, error: 'לא נמצאו כותרות חובה (מספר עובד / שם משפחה) בשורה הראשונה של הקובץ' }
+    }
+    console.error('[importEmployeesAction] Excel parse error:', msg)
     return { success: false, error: 'שגיאה בקריאת קובץ ה-Excel. ודא שהקובץ תקין ובפורמט .xlsx' }
   }
 

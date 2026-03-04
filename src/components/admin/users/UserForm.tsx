@@ -226,6 +226,31 @@ export function UserForm({
                   )}
                 </div>
 
+                {/* ChemoSys module access */}
+                <div className="space-y-2">
+                  <Label>גישה ל-ChemoSys</Label>
+                  <div className="flex items-center gap-6 rounded-md border bg-muted/30 px-3 py-2.5">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="app_fleet"
+                        value="1"
+                        className="h-4 w-4 accent-primary cursor-pointer"
+                      />
+                      <span className="text-sm">צי רכב</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="app_equipment"
+                        value="1"
+                        className="h-4 w-4 accent-primary cursor-pointer"
+                      />
+                      <span className="text-sm">צמ&quot;ה</span>
+                    </label>
+                  </div>
+                </div>
+
                 {/* Template (optional) */}
                 {templates.length > 0 && (
                   <div className="space-y-2">

@@ -94,7 +94,10 @@ function parseDepartmentsPdf(text: string): ParsedDept[] {
     if (seen.has(deptNumber)) continue
     seen.add(deptNumber)
 
-    results.push({ deptNumber, name: nameRaw })
+    // Reverse word order — pdf-parse extracts Hebrew RTL text with words
+    // in visual (LTR) order, so "בקרת איכות" becomes "איכות בקרת".
+    const name = nameRaw.split(' ').reverse().join(' ')
+    results.push({ deptNumber, name })
   }
 
   return results
