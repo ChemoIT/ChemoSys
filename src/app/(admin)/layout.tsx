@@ -8,9 +8,11 @@
 // Sidebar is fixed at inset-y-0 start-0 (right side in RTL).
 // Content area offset: ps-64 (padding-start = padding-right in RTL = space for right sidebar).
 
+import { redirect } from 'next/navigation'
 import { Sidebar } from '@/components/shared/Sidebar'
 import { MobileSidebar } from '@/components/shared/MobileSidebar'
 import { verifySession } from '@/lib/dal'
+import { createClient } from '@/lib/supabase/server'
 
 export default async function AdminLayout({
   children,
@@ -19,6 +21,23 @@ export default async function AdminLayout({
 }) {
   // Protect entire admin shell — redirects to /login if no valid session.
   const session = await verifySession()
+
+  // Guard: block non-admin users from the admin shell.
+  // is_admin flag lives in public.users table (added in migration 00012).
+  // maybeSingle() returns null if no row exists — that means bootstrap admin (Sharon
+  // before first user creation) → allow access.
+  // userRow.is_admin === false → regular ChemoSys user → redirect to app login.
+  const supabase = await createClient()
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('is_admin')
+    .eq('auth_user_id', session.userId)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (userRow !== null && !userRow.is_admin) {
+    redirect('/chemosys')
+  }
 
   return (
     <div className="flex min-h-screen bg-brand-bg">
