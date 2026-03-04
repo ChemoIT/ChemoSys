@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 
 ## Current Position
 
-Phase: 6 of 10 (DB + Auth Foundation)
-Plan: 2 of 2 in current phase (Phase 6 COMPLETE)
-Status: Phase complete — ready for Phase 7
-Last activity: 2026-03-04 — Plan 06-02 complete (dal.ts refactor + cached RPC + ChemoSys auth functions)
+Phase: 7 of 10 (ChemoSys Login)
+Plan: 1 of 2 in current phase
+Status: In progress — Plan 07-01 complete, Plan 07-02 pending
+Last activity: 2026-03-04 — Plan 07-01 complete (ChemoSys login page + loginApp() Server Action)
 
-Progress: v2.0 [████░░░░░░░░░░░░░░░░] 33% (2/6 plans complete)
+Progress: v2.0 [█████░░░░░░░░░░░░░░░] 38% (3/8 plans complete)
 
 ## v1.0 Summary
 
@@ -42,6 +42,9 @@ Progress: v2.0 [████░░░░░░░░░░░░░░░░] 33
 - **[06-02]** verifyAppUser does NOT block is_admin users — admins can use ChemoSys too
 - **[06-02]** getAppNavPermissions is plain async function (not cached) — delegates to already-cached getPermissionsRpc
 - **[06-02]** Admin login redirect changed to /admin/dashboard (was /admin/companies)
+- **[07-01]** loginApp() does NOT call verifyAppUser() after signInWithPassword — session propagates on next request, /app/page.tsx handles the guard in Phase 8
+- **[07-01]** checkRateLimit(ip, store) generic helper — loginAttempts and loginAppAttempts are separate Maps (different attack surfaces must not share rate limit counters)
+- **[07-01]** (chemosys)/layout.tsx uses bg-sidebar-bg (#1B3A4B) + radial teal CSS gradient — visually distinct from admin (bg-brand-bg #F5F7FA)
 
 ### Pending Todos
 
@@ -55,5 +58,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 06-02-PLAN.md — Phase 6 fully complete. dal.ts refactored with cached RPC helper, verifyAppUser() and getAppNavPermissions() added, admin login redirect fixed. Awaiting Migration 00016 run in Supabase before Phase 7+.
+Stopped at: Completed 07-01-PLAN.md — /chemosys login page live with dark layout, loginApp() Server Action, independent rate limiting, remember-me (chemosys_app_remember key). Plan 07-02 is next.
 Resume file: None
