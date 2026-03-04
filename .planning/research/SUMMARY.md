@@ -1,17 +1,19 @@
 # Project Research Summary
 
-**Project:** ChemoSys — מערכת ניהול פנימית לחמו אהרון
-**Domain:** Internal enterprise admin panel (HR + project + user management)
-**Researched:** 2026-03-01
-**Confidence:** HIGH for core decisions; MEDIUM for ecosystem libraries
+**Project:** ChemoSys v2.0 — Employee-Facing Operational Shell (Fleet + Equipment)
+**Domain:** Internal fleet and heavy equipment management system for energy infrastructure company
+**Researched:** 2026-03-04
+**Confidence:** HIGH (architecture + pitfalls based on direct codebase analysis); MEDIUM (features + competitor analysis)
+
+---
 
 ## Executive Summary
 
-ChemoSys is a Hebrew-first, RTL internal admin panel for Chemo Aharon Ltd., an energy infrastructure contractor operating multiple legal entities. The system must manage employees across companies, import/export data from an existing payroll system, enforce granular permissions per user, and track all mutations for compliance — all in Hebrew. Research confirms this is a well-understood domain (enterprise admin panels), but the combination of RTL Hebrew, multi-company soft-delete semantics, composite key Excel matching, and a custom RBAC system makes this moderately complex to implement correctly. The recommended approach is Next.js 15.x App Router + Supabase + Vercel (pre-decided constraints), with shadcn/ui for RTL-tunable components, TanStack Table for data tables, React Hook Form + Zod for validation, and ExcelJS for RTL-aware Excel handling.
+ChemoSys v2.0 is an employee-facing operational module built on top of the existing v1.0 admin panel. It introduces a new `(app)` route group into the same Next.js 16 + Supabase project, accessed by managers and field workers — not Sharon. The system replaces a 10-year-old Liberty Basic fleet management system with 16 fleet sub-modules and a heavy equipment (tzama) module. The v2.0 milestone is a shell-only build: the `(app)` route group, the shared header with module switcher, fleet and equipment home dashboards, and the 16 sub-module tiles. No sub-module content is built in v2.0 — that work is explicitly deferred to v2.1 through v2.15.
 
-The critical architectural insight is that this system must be built security-first. Permissions must be enforced server-side on every mutation (not just in the UI), the Supabase service role key must never reach the browser, and RTL layout must be configured from Day 1 — retrofitting RTL into a system built LTR is expensive. The permission system design (template-based with per-user overrides) is the most architecturally complex piece and must be implemented early because every subsequent module depends on it.
+The recommended approach is maximum reuse of v1.0 infrastructure: the same Supabase Auth session, the same `dal.ts` permission functions (with targeted extensions), the same UI component library, and the same RTL Hebrew layout patterns. Only 2 new npm packages are needed (`recharts` + `qr-scanner`) plus 4 shadcn/ui components. The entire v2.0 shell can be built with surgical changes to 3 existing files (`proxy.ts`, `auth.ts`, `(admin)/layout.tsx`) and approximately 8 new files. The `modules` table in the DB is the only data change required — one new migration seeding 18 module keys.
 
-The top risks are: (1) RLS policies creating infinite recursion on the permissions table — use a SECURITY DEFINER function; (2) Vercel function timeout on Excel bulk import — use batch upsert, not row-by-row; (3) soft delete conflicting with unique constraints — use partial unique indexes from Day 1. Address all three before writing any feature code. The phased build order from architecture research is well-reasoned: auth and DB schema first, permission infrastructure second, then reference data (companies, departments), then the core employee module, then users and access control, then projects, and finally settings and observability.
+The key risk is introducing the second user type (employee vs admin) into an existing system that was designed for a single user. Six critical pitfalls involve auth and permission routing: proxy.ts redirects, login Server Action redirect targets, admin layout bypassing employee sessions, getNavPermissions() leaking admin keys into the employee nav, missing `verifyAppUser()` guard, and module key namespace collisions. All six must be addressed in Phase 1 — before any employee-facing page is created. If even one is skipped, employees can land on the admin interface or admins can be blocked from the app. These are not performance issues; they are security and correctness gates.
 
 ---
 
@@ -19,200 +21,181 @@ The top risks are: (1) RLS policies creating infinite recursion on the permissio
 
 ### Recommended Stack
 
-The stack is constrained at the infrastructure level (Next.js + Supabase + Vercel) and research focused on what to add on top. Next.js 15.2 (App Router, React 19) is confirmed stable with `middleware.ts` renamed to `proxy.ts` in Next.js v16 — verify version at implementation time. The `@supabase/ssr` package is the current standard for auth; the old `@supabase/auth-helpers-nextjs` is deprecated and must not be used. Tailwind CSS v4.1 is scaffolded by default with `create-next-app`; its `rtl:/ltr:` modifiers activate automatically when `dir="rtl"` is set on `<html>`.
+The v1.0 stack requires no new packages for the shell infrastructure. Two npm packages are justified for v2.0 sub-module content: `recharts@^3.7.0` (dashboard charts, React 19 compatible, composable with shadcn/ui chart wrapper) and `qr-scanner@^1.4.2` (camera QR scanning for camp vehicle check-in — 5x lighter than alternatives, uses BarcodeDetector API natively). Four shadcn/ui components via CLI: `chart`, `tooltip`, `collapsible`, `navigation-menu`. Everything else — routing, permissions, forms, tables, auth, RTL, components — reuses v1.0 patterns without modification.
 
-**Core technologies:**
-- **Next.js 15.x + React 19:** Full-stack framework with App Router; Server Components reduce client-side state management complexity significantly
-- **@supabase/ssr:** Current auth package for Next.js App Router; replaces deprecated auth-helpers — use `createServerClient` in Server Components, `createBrowserClient` in Client Components
-- **Tailwind CSS v4.1:** RTL support via logical utilities (`ps-`, `pe-`, `ms-`, `me-`, `start-`, `end-`); set `dir="rtl"` on `<html>` from Day 1
-- **shadcn/ui:** Component source is owned by the project — essential for RTL since physical CSS properties in components can be manually overridden
-- **TanStack Table v8:** Headless MIT-licensed table engine; compose with shadcn/ui Table component; supports server-side pagination for large employee datasets
-- **React Hook Form v7 + Zod v3 + @hookform/resolvers:** Official Next.js recommendation for form validation; Zod schemas double as TypeScript types
-- **ExcelJS v4:** Server-side only; RTL worksheet support (`rightToLeft: true`); Hebrew column headers; use `iconv-lite` if payroll system exports legacy CSV in Windows-1255
-- **Heebo font:** Load via `next/font/google` with `subsets: ['hebrew', 'latin']` and `display: 'swap'`; prevents CLS and ensures consistent Hebrew rendering
+**Core technologies for v2.0 shell:**
+- `recharts@^3.7.0`: Fleet/equipment dashboard charts — only React 19-compatible chart library with native shadcn/ui integration (verified npm 2026-03-04)
+- `qr-scanner@^1.4.2`: Camp vehicle QR tracking — 524KB vs html5-qrcode's 2.6MB, requires `dynamic()` with `ssr: false`, HTTPS required in production
+- `@radix-ui/react-tooltip`, `collapsible`, `navigation-menu`: New Radix primitives for AppHeader and module switcher — install via `npx shadcn@latest add`
+- `next-themes` (already installed): Wire `ThemeProvider` and toggle button — zero-install feature unlock
 
-**Skip:** Redux/React Query (Server Components handle server state), AG Grid (GPL), MUI DataGrid (conflicts with Tailwind), NextAuth.js (Supabase Auth is already in stack), Zustand (only introduce if prop drilling becomes a real problem).
+**Do not install:** react-query, Redux/Zustand, i18n libraries, Chart.js, react-chartjs-2, html5-qrcode, or any state management beyond React state + Server Components.
 
 ### Expected Features
 
-Research identified a clear feature hierarchy based on build dependencies and operational priority for an Israeli energy infrastructure firm.
+The fleet module replaces a legacy system that managers and field workers depend on daily. Users will immediately compare every workflow to what they could do in the Liberty Basic system. Missing any of the 12 table-stakes fleet features means the system feels like a downgrade.
 
-**Must have (table stakes):**
-- Employee list with search + filter by company, department, status, role tag
-- Employee profile CRUD with soft delete (never hard delete)
-- Excel import from payroll system with composite key matching (employee_number + company_id)
-- Excel export matching import column structure
-- Company and Department CRUD (prerequisites for everything else)
-- User account management (one user linked to one employee)
-- Role-based permissions at module level (no access / read / read+write)
-- Role templates (predefined permission sets with per-user overrides)
-- Login + session management via Supabase Auth
-- Audit log capturing every create/update/delete with actor + before/after JSON
-- RTL Hebrew UI throughout
-- Dashboard with summary stats
-- Project list with status tracking and manager linkage
+**Must have (table stakes for v2.0 shell):**
+- `(app)` route group with top-header layout and module switcher
+- ChemoSys login/post-auth routing: admins to `/admin/dashboard`, employees to `/app`
+- Fleet home: 6 stat cards (active projects live, others as placeholder zeros with "(בפיתוח)" label)
+- Fleet sub-module grid: 16 tiles with Hebrew labels, Lucide icons, responsive layout (2-col mobile / 4-col desktop)
+- Equipment home: placeholder tiles with "בפיתוח" label
+- Permission wiring: `verifyAppUser()` in `(app)` layout, `checkPagePermission()` on each page
+- DB migration 00016: 18 module keys seeded in `modules` table with `app_` prefix
 
-**Should have (differentiators for ChemoSys):**
-- Excel import preview with conflict resolution UI before committing (prevents silent data corruption)
-- Granular per-user permission overrides on top of role templates
-- Composite employee key (employee_number + company_id) mirroring payroll system logic
-- Audit log with before/after JSON diff (not just "what changed" but "what the old value was")
-- Per-module nav visibility — users only see tabs they can access
-- Map view for project coordinates (react-leaflet, deferred to Phase 4)
-- Role tag system (many-to-many, cross-department tags like "safety officer")
+**Should have (for sub-module milestones v2.1+):**
+- Driver card (כרטיס נהג) — license categories, expiry dates per category, medical certificate
+- Vehicle card (כרטיס רכב) — registration, type, ownership, assigned driver, assigned project
+- Mileage management (ניהול ק"מ) — monthly report, driver submits, manager approves
+- Fuel management (דלק) — fills per vehicle, consumption rate, abnormal consumption alerts
+- Toll road management (כבישי אגרה) — Kvish 6 monthly billing reconciliation
+- Traffic violations (דוחות תנועה) — fine log, liability transfer, deadline tracking
+- Mechanical maintenance log (ספר טיפולים) — service history, next service date, cost
+- Safety forms (טפסי בטיחות) — daily vehicle inspection, mobile-first, non-completion alerts
+- Spare parts / tires (חלקי חילוף) — tire positions, parts inventory, cost attribution
+- Exception tables (טבלאות חריגים) — configurable thresholds for all alert logic
 
-**Defer to v2+:**
-- Real-time chat/messaging (WhatsApp/n8n handles field comms)
-- Payroll calculation engine (ChemoSys is downstream of payroll, not a payroll replacement)
-- Time tracking/attendance
-- Document/file attachment storage (adds S3 infrastructure complexity)
-- Email notification system
-- Native mobile app (responsive web covers the need)
-- AI-generated reports (build accurate data model first)
+**Should have (differentiators vs Liberty Basic, for future milestones):**
+- EV charging tracking — Chemo Aharon has electric vehicles; fuel-equivalent cost tracking is unique
+- Camp vehicle QR tracking — energy infrastructure camp model; replaces manual whiteboard at remote sites
+- Rental car order management — approval workflow + booking tracking
+- Document expiry alerts — 30/7/1 day warnings for regulatory documents (license, insurance, registration)
+- Cost allocation to projects — fleet costs linked to `projects` table for project P&L
 
-**Hard anti-features:**
-- Hard delete of any record (destroys audit trail — all deletes must be soft)
-- Public-facing pages (all routes require auth)
+**Defer to v3+:**
+- GPS tracking (requires vendor contract + hardware — Pointer, Matrix, or Ituran)
+- WhatsApp/SMS notifications (design notification_log hooks in DB now; wire n8n later)
+- Fuel card API import (Israeli providers have closed B2B APIs; use CSV for now)
+- Priority/SAP ERP integration
+- Native iOS/Android app (PWA covers 95% of use case)
 
 ### Architecture Approach
 
-The architecture follows a strict server-first pattern: Server Components fetch data, Client Components handle interactivity, Server Actions handle mutations. The key structural elements are route groups separating auth from admin layouts, a Data Access Layer (`lib/dal.ts`) centralizing auth and permission verification, a server-only permissions resolution function (`lib/permissions.ts`), and a `writeAuditLog` utility called from every mutation Server Action. The permission system is data-driven from a `modules` table, making new modules (e.g., fleet vehicles) addable without touching permission infrastructure — just add a row to `modules` and create route/component/action files.
+The `(app)` route group integrates into the existing project with minimal surgery to existing files. The architectural pattern is top-header layout (not sidebar) — correct for field-facing operational software on mobile. The existing `dal.ts` permission infrastructure works for ChemoSys module keys without modification; only a new `verifyAppUser()` function and a new `getAppNavPermissions()` function (filtering for `app_`-namespaced keys) need to be added. The `proxy.ts` middleware requires no changes since the shared `/login` handles both user types. The `(admin)` layout needs an `is_admin` guard added. The login Server Action needs post-login user-type branching.
 
-**Major components:**
-1. **`proxy.ts` (auth guard):** Optimistic cookie check only — redirect unauthenticated users; no DB permission queries here
-2. **`lib/dal.ts` (Data Access Layer):** Authoritative session verification via `supabase.auth.getUser()`; loads permission matrix; used by all Server Components and Actions
-3. **`lib/permissions.ts`:** Resolves user permissions by merging template defaults with individual overrides; results cached with `React.cache()` per request
-4. **`lib/audit.ts`:** Server-side audit log writer called from every mutation
-5. **`actions/*.ts` (Server Actions):** Every mutation follows auth → permission check → Zod validation → DB write → audit log → revalidatePath
-6. **`app/(admin)/*` route group:** Server Component pages per module tab; shares sidebar layout
-7. **Supabase schema:** Universal columns (`id`, `created_at`, `updated_at`, `created_by`, `updated_by`, `deleted_at`) on all tables; partial unique indexes for soft-delete compatibility; trigger-based `updated_at` automation; `SECURITY DEFINER` function for permission lookups to avoid RLS recursion
+**Major components for v2.0:**
+1. `src/app/(app)/layout.tsx` — ChemoSys root layout: calls `verifyAppUser()` + `getAppNavPermissions()`, renders `AppHeader`
+2. `src/components/app/AppHeader.tsx` — Top nav: CA logo, `ModuleSwitcher`, user email, logout (Client Component for `usePathname()`)
+3. `src/components/app/FleetSubModuleGrid.tsx` — 16-tile responsive grid; tiles grayed if sub-module key not in permitted list
+4. `src/app/(app)/app/page.tsx` — Module chooser: reads permissions, redirects to first permitted module
+5. `src/app/(app)/app/fleet/page.tsx` — Fleet home: `checkPagePermission('app_fleet', 1)`, stat cards, sub-module grid
+6. `src/app/(app)/app/equipment/page.tsx` — Equipment home: `checkPagePermission('app_equipment', 1)`, placeholder
+7. `supabase/migrations/00016_chemosys_modules.sql` — Seeds all 18 module keys with `app_` prefix namespace
 
-**Key DB schema decisions:**
-- `modules` table (seeded, data-driven sidebar and permission matrix)
-- `permission_templates` + `template_permissions` (named permission sets)
-- `user_permissions` (per-user overrides, merged on top of template)
-- `audit_log` with JSONB `old_data` and `new_data` columns (indexed on entity_type, entity_id, created_at)
-- Partial unique index: `CREATE UNIQUE INDEX ON employees (employee_number, company_id) WHERE deleted_at IS NULL`
+**Build order is non-negotiable (each step is a prerequisite for the next):**
+DB migration first → auth.ts post-login routing → `(admin)` layout `is_admin` guard → `dal.ts` new functions → `(app)` layout + `verifyAppUser()` → AppHeader → pages.
 
 ### Critical Pitfalls
 
-Research identified 8 critical pitfalls and 7 moderate pitfalls. The most important to address before writing any feature code:
+1. **Admin layout has no `is_admin` check** — Any authenticated employee with a valid JWT can visit `/admin/employees` and see colleague personal data. The `(admin)/layout.tsx` only calls `verifySession()` (JWT check), not a role check. Fix: add `is_admin` guard to `(admin)/layout.tsx` before v2.0 ships — this is a data protection requirement, not just UX.
 
-1. **RLS infinite recursion on permissions table** — Write a `SECURITY DEFINER` function `get_user_permissions(p_user_id)` that bypasses RLS; never query `user_permissions` inside an RLS policy on `user_permissions`. Address in Phase 1.
+2. **login Server Action hardcodes redirect to `/admin/companies`** — An employee who accidentally uses the admin login URL gets redirected to the admin panel. Fix: update `auth.ts` post-login logic to check `is_admin` and redirect accordingly: admins to `/admin/dashboard`, others to `/app`. Keep one shared login page (Option A from ARCHITECTURE.md).
 
-2. **Service role key exposed to browser** — `SUPABASE_SERVICE_ROLE_KEY` must never have the `NEXT_PUBLIC_` prefix. Add a CI/pre-commit grep check. Address in Phase 1.
+3. **Module keys not seeded = permission checks silently fail for ALL users** — `requirePermission('app_fleet', 1)` returns "no permission" for all users (including Sharon as admin) if no `modules` row exists with that key. The `is_admin` bypass in `get_user_permissions()` queries `FROM modules m` — unseeded keys return nothing. Fix: migration 00016 must run in Supabase BEFORE any `(app)` code is deployed. Hard dependency.
 
-3. **Deprecated `@supabase/auth-helpers-nextjs`** — Use `@supabase/ssr` exclusively. All tutorials showing `createClientComponentClient` / `createServerComponentClient` are outdated. Address in Phase 1.
+4. **Module key namespace collision** — Admin modules (`dashboard`, `companies`) and ChemoSys modules share the same `modules` table with no context column. Using `fleet` as a key means any admin template with a `fleet` grant could collide with ChemoSys access. Fix: prefix all ChemoSys module keys with `app_` from the start (`app_fleet`, `app_equipment`, etc.). Renaming later requires a data migration across three tables — 4-8 hours recovery cost.
 
-4. **RTL layout broken by physical CSS properties** — Use logical Tailwind utilities (`ps-`, `pe-`, `ms-`, `me-`, `start-`, `end-`) from Day 1. Set `dir="rtl"` on `<html>` immediately. Develop in RTL mode from the first component. Address in Phase 1.
+5. **`getNavPermissions()` leaks admin keys into employee sidebar** — The existing function returns all user permission keys without filtering by context. If called from `(app)` layout, employees see "ניהול חברות" and "ניהול עובדים" in their nav. Fix: create `getAppNavPermissions()` that filters to `CHEMO_APP_MODULE_KEYS` (keys starting with `app_`) only.
 
-5. **Soft delete conflicts with UNIQUE constraints** — Use partial unique indexes (`WHERE deleted_at IS NULL`) instead of standard UNIQUE constraints. Address in DB schema before creating any table.
-
-6. **Vercel function timeout on Excel bulk import** — Use `supabase.upsert([...all rows])` in a single call, not per-row loop. Consider Vercel Pro (60s limit) or Supabase Edge Functions. Parse Excel client-side to reduce server processing time. Address during Phase 2 design.
-
-7. **Permission checks client-side only** — Every Server Action must call `requirePermission(module, level)` before executing. UI hiding is UX, not security. Address in Phase 1 pattern definition.
-
-8. **`getSession()` trusted in Server Components** — Always use `supabase.auth.getUser()` (round-trips to verify JWT) in all server contexts. `getSession()` reads the cookie without verification — a crafted cookie can spoof auth. Address in Phase 1.
+6. **N+1 RPC calls per page load** — `get_user_permissions()` RPC fires once in layout (`getAppNavPermissions()`) and again in each `checkPagePermission()` call on the page. Fix: wrap the raw RPC call in `React.cache()` in `dal.ts` so all permission functions share one cached result per request. `verifySession()` already does this — extend the pattern to the permissions RPC.
 
 ---
 
 ## Implications for Roadmap
 
-Based on the dependency graph from FEATURES.md and the build order from ARCHITECTURE.md, a 5-phase roadmap is recommended. Pitfalls inform which concerns must be addressed within each phase before moving forward.
+Based on research, the v2.0 milestone maps to 4 phases structured around the hard dependency chain identified in the architecture research.
 
-### Phase 1: Foundation — Auth, DB Schema, RTL Shell
+### Phase 1: DB + Auth Foundation (Gates Everything Else)
 
-**Rationale:** Every subsequent feature depends on auth working correctly, the DB schema being correct from the start (soft delete, partial indexes, triggers, RLS), and the RTL layout being established before components are built. Retrofitting any of these is expensive.
+**Rationale:** All application code depends on the DB migration and auth routing changes being correct. Building any `(app)` page before the migration runs causes silent permission failures. Building any employee-facing page before the `(admin)` layout is patched creates a data security hole. These are correctness prerequisites, not nice-to-have setup tasks.
 
-**Delivers:** Working login/logout, protected routes, correct DB schema with all universal columns and triggers, RTL admin shell with sidebar, and the permission evaluation infrastructure.
+**Delivers:**
+- Migration 00016 executed in Supabase: 18 module keys with `app_` prefix seeded to `modules` table
+- `src/actions/auth.ts` updated: post-login routing checks `is_admin` → `/admin/dashboard` or `/app`
+- `src/app/(admin)/layout.tsx` patched: `is_admin` guard added (employees with valid session blocked from admin)
+- `src/lib/dal.ts` extended: `verifyAppUser()`, `getAppNavPermissions()`, `getUserPermissionsRaw` with `React.cache()`
 
-**Addresses:** Auth (login, session, logout), RTL UI foundation, Dashboard (basic), Companies CRUD, Departments CRUD, Role Tags CRUD — the simplest entities with no foreign dependencies.
+**Addresses:** Pitfalls 1, 2, 3, 4, 5, 6 (all six critical auth and permission pitfalls from PITFALLS.md)
+**Avoids:** Session collision, silent permission failures, admin key namespace collision, N+1 DB calls
+**Research flag:** Standard patterns — all changes are documented in ARCHITECTURE.md and PITFALLS.md with exact file locations and code samples. No additional research needed.
 
-**Avoids:** Pitfalls 1, 2, 3, 4, 5, 7, 8, 10, 12, 13, 14, 17 — all of which must be addressed before or during schema/auth setup.
+### Phase 2: (app) Route Group + Shell Layout
 
-**Research flag:** Standard patterns — no additional research needed. Auth + Supabase + Next.js patterns are well-documented.
+**Rationale:** With DB and auth in place, the shell layout can be built. The layout is the container for all future employee pages and cannot be built before Phase 1. The `AppHeader` and `ModuleSwitcher` are layout dependencies.
 
----
+**Delivers:**
+- `src/app/(app)/layout.tsx` — calls `verifyAppUser()` + `getAppNavPermissions()`
+- `src/components/app/AppHeader.tsx` — top nav: CA logo, module switcher, user email, logout
+- `src/components/app/ModuleSwitcher.tsx` — filters permitted modules, active state via `usePathname()`
+- `src/app/(app)/app/page.tsx` — module chooser: reads permissions, redirects to first permitted module
+- Install `recharts` + run `npx shadcn@latest add chart tooltip collapsible navigation-menu`
 
-### Phase 2: Data Operations — Excel Import and Export
+**Uses:** `verifyAppUser()` and `getAppNavPermissions()` from Phase 1
+**Implements:** ChemoSys top-header layout (field-worker mobile UX — full-width content, no sidebar offset)
+**Avoids:** Anti-pattern of permission checks in client components — `AppHeader` receives `permittedModules: string[]` as props from server layout
+**Research flag:** Standard patterns — top-header layout, module switcher, and logout are established shadcn/ui patterns.
 
-**Rationale:** Payroll integration via Excel is the primary operational pain point for ChemoSys. It depends on the employee model being stable (Phase 1 establishes companies and departments). This phase is isolated enough to build independently of the permission system.
+### Phase 3: Fleet Home Dashboard + Sub-Module Grid
 
-**Delivers:** Excel import with composite key matching, conflict detection preview UI, import confirmation step, Excel export. Import history log.
+**Rationale:** Fleet is the primary deliverable of v2.0 and the main value delivery to managers. The 16 tile grid must display all sub-modules even though the pages behind them are stubs. Stats must show real data where possible (active projects from existing table) and honest placeholders where sub-module tables don't exist yet.
 
-**Addresses:** Excel import (with encoding handling for Hebrew Windows-1255), export matching import columns, composite key (employee_number + company_id) matching, import preview before commit.
+**Delivers:**
+- `src/app/(app)/app/fleet/page.tsx` — `checkPagePermission('app_fleet', 1)`, 6 stat cards, sub-module grid
+- `src/components/app/FleetSubModuleGrid.tsx` — 16 tiles, 2-col mobile / 4-col desktop, grayed if no sub-module permission
+- `src/components/shared/StatsGrid.tsx` — generic stat card grid (refactored from admin `StatsCards.tsx`)
+- Stat cards: active projects (live from `projects` table), remaining 5 as placeholder zeros with "(בפיתוח)" label
 
-**Avoids:** Pitfalls 7 (Vercel timeout — batch upsert), 9 (Hebrew dates/encoding — `cellDates: true`, `codepage: 1255`), 15 (silent composite key mismatches — preview step required).
+**Uses:** recharts (optional for stat card sparklines), Lucide icons per tile, `permittedSubModules: string[]` from server layout
+**Features:** Fleet home dashboard + 16 sub-module tile menu (both P1 priority features from FEATURES.md)
+**Avoids:** Hardcoding tile visibility client-side only — server component fetches permissions and passes `permittedSubModules` to the grid
+**Research flag:** Sub-module tile permission filtering: the exact pattern for checking which of 16 sub-module keys a user has access to within a single page needs a concrete implementation decision before coding `FleetSubModuleGrid.tsx`. Consider passing a `Set<string>` of permitted keys from the server.
 
-**Research flag:** Needs implementation-time research. Test with real payroll export files before building import logic. Composite key mapping from Excel company codes to DB company_id UUIDs needs a configuration mapping step — design this upfront.
+### Phase 4: Equipment Home + Mobile Polish + Verification
 
----
+**Rationale:** Equipment module is secondary for v2.0 but must exist so the module switcher has a second destination. Mobile responsiveness is non-negotiable given field-worker use case. End-to-end testing completes the milestone.
 
-### Phase 3: Access Control — Users and Permissions
+**Delivers:**
+- `src/app/(app)/app/equipment/page.tsx` — `checkPagePermission('app_equipment', 1)`, placeholder stat cards, "בפיתוח" tiles
+- `/app/no-account` and `/app/blocked` error pages for `verifyAppUser()` redirect targets
+- Mobile RTL visual review: every new component tested at 375px in RTL mode
+- End-to-end test: employee login → module selection → fleet home → equipment home → logout
+- Sharon admin test: Sharon can visit both `/admin/dashboard` and `/app/fleet` (is_admin bypass works for both)
 
-**Rationale:** The permission system can only be properly built after the employee model is stable (users are linked to employees). Permission templates and module registry are pre-seeded from Phase 1, so the infrastructure is ready — this phase builds the management UI.
-
-**Delivers:** User account creation (linked to employees + Supabase Auth), role template CRUD, per-user permission override UI (permission matrix grid), nav visibility driven by resolved permissions.
-
-**Addresses:** User management, role templates, granular permission overrides, module-level nav visibility control.
-
-**Avoids:** Pitfall 8 (server-side permission enforcement — the `requirePermission()` utility established in Phase 1 is already in use by this phase), Pitfall 12 (Auth user lifecycle — define disable/delete flow before building the UI).
-
-**Research flag:** Standard patterns — the permission system architecture is defined in ARCHITECTURE.md with full SQL schema and resolution logic. No additional research needed.
-
----
-
-### Phase 4: Projects and Operational Layer
-
-**Rationale:** Projects reference employees as managers (FK to employees table), so the employee module must be complete first. Map view for project coordinates is the only component with an external library dependency (react-leaflet) that is deferred until here.
-
-**Delivers:** Projects CRUD with status tracking (planning / active / on-hold / completed), manager assignment (employee FK), project-employee linkage, optional map view for geo-located infrastructure sites.
-
-**Addresses:** Project management, status tracking, map view for coordinates, employee-project relationships.
-
-**Avoids:** Pitfall 19 (next/image external domain config for ch-ah.info assets, and react-leaflet SSR issue requiring `dynamic()` with `ssr: false`).
-
-**Research flag:** Map library choice needs validation. react-leaflet is free (OpenStreetMap) and sufficient for "view on map". If satellite imagery of infrastructure sites is required by users, Google Maps (`@vis.gl/react-google-maps`) should be evaluated — has a cost. Decide at Phase 4 planning time.
-
----
-
-### Phase 5: Settings, Observability, and Polish
-
-**Rationale:** System settings and the config.ini Route Handler are standalone (no feature dependencies). The audit log viewer reads accumulated data from prior phases. Dashboard enhancements are safe to defer because the data model must be mature before meaningful aggregates can be computed.
-
-**Delivers:** System settings panel, config.ini read/write via cPanel FTP Route Handler, full audit log viewer (filterable by user, entity, date range), enhanced dashboard with aggregate stats and recent activity, loading skeletons, error boundaries, mobile/tablet responsive pass.
-
-**Addresses:** Audit log viewer, dashboard enhancements, config management, error handling polish.
-
-**Avoids:** Pitfall 6 (audit log performance — paginate all audit queries, use indexes; if volume grows with fleet module later, consider monthly partitioning).
-
-**Research flag:** config.ini Route Handler accessing cPanel FTP needs research at implementation time. cPanel API vs direct FTP vs file system access — verify what `ch-ah.info` cPanel exposes. This is the one non-standard integration in the system.
+**Uses:** `EquipmentPlaceholder.tsx` (simple component — not a full sub-module grid)
+**Implements:** Mobile-first field-worker UX (44px touch targets, responsive tile grid verified)
+**Avoids:** RTL breakage in new shadcn/ui components — NavigationMenu, Sheet, Tabs each tested visually before sign-off
+**Research flag:** Equipment sub-module list is TBD (characterization needed before v2.15). For v2.0, a generic "בפיתוח" placeholder is sufficient — no research needed for this phase.
 
 ---
 
 ### Phase Ordering Rationale
 
-- **Auth before everything:** All Server Actions require `verifySession()` and permission checks. Building features before auth is working produces code that must be retrofitted.
-- **DB schema before features:** Soft delete, partial indexes, triggers, and RLS must be set up correctly before any table is created — these cannot be retrofitted cheaply.
-- **RTL from Day 1:** Switching from LTR to RTL mid-development requires touching every component with directional CSS. Set `dir="rtl"` on the first commit.
-- **Permission infrastructure before modules:** The permission check pattern (`requirePermission()` in every Server Action) must be established before any module is built — or those modules will lack server-side protection.
-- **Reference data before employees:** Companies and departments are FK prerequisites for the employees table.
-- **Employees before users:** Users are linked to employees; the employee model must be stable.
-- **Employees before projects:** Projects reference employees as managers.
-- **Everything before the audit viewer:** The audit log viewer is read-only and reads data accumulated by all prior phases.
+The order is driven by two dependency chains:
+
+**Chain 1 (hard prerequisite):** DB migration → `dal.ts` functions → auth routing → `(app)` layout → pages. Every step is a prerequisite for the next. Skipping Phase 1 means Phase 2 work will not function.
+
+**Chain 2 (security gate):** The `(admin)` layout patch (Phase 1) must complete before any employee user account is created in Supabase Auth. If an employee account exists before the admin layout has an `is_admin` guard, that employee can visit `/admin/employees` and see colleague personal data. This is a personal data exposure risk under Israeli privacy law, not just a UX issue.
+
+**Grouping logic:** Phases 1-2 are infrastructure-only with no user-visible deliverables. Phases 3-4 deliver the visible UI. This separation lets Sharon verify the infrastructure is solid before any feature UI is shown to employees.
 
 ---
 
 ### Research Flags
 
-**Needs research during planning:**
-- **Phase 2 (Excel import):** Test with real payroll export files before writing import logic. The company code → `company_id` mapping is project-specific and needs a configuration design decision.
-- **Phase 4 (Map view):** Decide between react-leaflet (free, OpenStreetMap) vs Google Maps (paid, better satellite) based on actual user need for infrastructure site visibility.
-- **Phase 5 (config.ini):** Research cPanel API capabilities for reading/writing config files on ch-ah.info hosting before designing the Route Handler.
+**Phases needing deeper research during planning:**
 
-**Standard patterns (skip deep research):**
-- **Phase 1:** Next.js + Supabase auth patterns are thoroughly documented and consistent.
-- **Phase 3:** Permission system architecture is fully defined in ARCHITECTURE.md with SQL schemas and TypeScript patterns.
+- **Phase 3 (sub-module tile permissions):** The `getNavPermissions()` function returns a flat array of module keys. Filtering it for sub-module-level tiles (which of 16 fleet sub-modules a user can access) requires either a second RPC call or extending the cached result. The exact pattern for passing this data to `FleetSubModuleGrid.tsx` needs a concrete decision before implementation begins.
+
+- **Future v2.1 (Vehicle Card + Driver Card):** These are the foundational data models for all 14 remaining fleet sub-modules. Wrong column choices propagate through 14 future milestones. DB schema design deserves its own research phase before v2.1 planning begins.
+
+**Phases with established patterns (skip research-phase):**
+
+- **Phase 1 (DB + Auth):** All changes are direct edits to known files. Migration SQL, dal.ts changes, and auth.ts changes are all documented in ARCHITECTURE.md and PITFALLS.md with code samples.
+
+- **Phase 2 (Shell Layout):** Top-header layout, module switcher, and logout are standard shadcn/ui patterns reusing v1.0 component conventions.
+
+- **Phase 4 (Equipment placeholder + mobile polish):** Entirely derivative of Phase 3 with simpler content.
 
 ---
 
@@ -220,50 +203,53 @@ Based on the dependency graph from FEATURES.md and the build order from ARCHITEC
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Core framework choices verified against official Next.js 15.2 release notes, Tailwind v4.1 blog, and Next.js auth docs. Note: Next.js v16 renamed `middleware.ts` to `proxy.ts` — ARCHITECTURE.md includes this; verify exact version used at install time. |
-| Features | MEDIUM | Based on domain expertise + project context from PROJECT.md. No user interviews or usage analytics available. Feature priority is inferred, not validated with actual users. |
-| Architecture | HIGH | Architecture patterns sourced from official Next.js docs (DAL pattern, optimistic proxy pattern, Server Action pattern). DB schema patterns are standard PostgreSQL. |
-| Pitfalls | HIGH | Most pitfalls are well-documented in official Supabase/Next.js docs and community post-mortems. Excel/Hebrew encoding and composite key matching are MEDIUM (more project-specific). |
+| Stack | HIGH | All new packages verified against npm registry on 2026-03-04. Version compatibility confirmed. recharts peer deps explicitly list React 19. qr-scanner HTTPS requirement is web spec, not assumption. |
+| Features | MEDIUM | 12 table-stakes fleet features based on Israeli fleet management domain knowledge (training data). Israeli regulatory requirements confirmed by domain knowledge but specific regulation numbers unverified — validate against current Ministry of Transport circulars before implementing compliance claims. Competitor analysis is LOW confidence. |
+| Architecture | HIGH | Based on direct analysis of 18 source files in the existing codebase. All claims cite specific file + line numbers in ARCHITECTURE.md. No assumptions. The proxy.ts single-redirect issue and hardcoded `/admin/companies` redirect were confirmed by direct file reads. |
+| Pitfalls | HIGH | 11 pitfalls identified by direct code inspection of proxy.ts, dal.ts, (admin)/layout.tsx, auth.ts, and all migrations 00001-00015. All pitfall descriptions include the exact current code that causes the problem. |
 
-**Overall confidence:** HIGH for technical decisions; MEDIUM for feature prioritization pending user validation.
+**Overall confidence:** HIGH for v2.0 shell execution. MEDIUM for the feature content of future sub-module milestones (v2.1+).
 
 ### Gaps to Address
 
-- **Excel company code mapping:** The payroll system exports a company code or name in Excel. How this maps to `company_id` UUIDs in the DB is undefined. Needs a configuration design (mapping table? wizard step? hardcoded?) before Phase 2 begins.
+- **`app_` prefix vs no prefix decision:** PITFALLS.md recommends `app_fleet`, `app_equipment` etc. to avoid namespace collision. ARCHITECTURE.md uses `fleet`, `equipment` without prefix. This inconsistency must be resolved before migration 00016 is written — once keys are in the DB and permissions are granted, renaming costs 4-8 hours. **Decision: adopt the `app_` prefix.** It is the more conservative choice and explicitly prevents a known collision risk.
 
-- **Actual payroll export format:** Research assumed `.xlsx` with standard column structure. The real export format (column names in Hebrew, date formats, company identifiers) must be obtained from the payroll system before Phase 2 implementation. Get a sample file early.
+- **Shared `/login` vs separate `/app/login`:** ARCHITECTURE.md recommends Option A (shared `/login`, post-login routing based on `is_admin`). PITFALLS.md Pitfall 1 warns about proxy.ts redirect logic for a separate `/app/login`. These are reconcilable: with Option A (shared login), proxy.ts does NOT need a second login URL exclusion because there is only one login URL. Confirm this decision in Phase 1 implementation.
 
-- **Next.js version — middleware vs proxy:** ARCHITECTURE.md states Next.js v16 renamed `middleware.ts` to `proxy.ts`. STACK.md references Next.js 15.2. These may conflict depending on actual installed version. Verify at scaffold time: `npx next --version`.
+- **Israeli regulatory compliance specifics:** Feature research confirms that driver license tracking, annual vehicle inspection (טסט), and daily safety form (בדיקה יומית) are regulatory requirements. However, specific regulation numbers and current Ministry of Transport circulars were not web-searched (WebSearch was unavailable during research). Before marking compliance features as "complete" in future milestones, verify current requirements with Sharon or the company's transport compliance officer.
 
-- **config.ini access method:** Phase 5 includes a Route Handler to read/write config.ini on cPanel hosting. The exact access mechanism (cPanel API, FTP, SSH, or file served via web) is not defined. Research this before Phase 5 planning.
+- **Equipment module sub-module list:** The 16 fleet sub-modules are fully defined. The equipment sub-modules are explicitly TBD — "characterization needed" per FEATURES.md. Equipment module characterization must happen before v2.15 milestone planning.
 
-- **Feature validation:** The feature list is research-derived. Before Phase 3 (access control) is built, validate the permission model with Sharon — specifically: what does a typical "project manager" permission set look like? Are there department heads with partial access? Is there a super-admin role?
+- **`getNavPermissions()` bootstrap fallback for Sharon in `(app)` context:** The existing function returns all admin module keys for a user with no `public.users` row (Sharon bootstrap case). If Sharon tests `(app)` routes, `getAppNavPermissions()` must handle this gracefully — returning all `app_` keys for admin users, not the admin module keys. Confirm the `is_admin` bypass in `get_user_permissions()` RPC will naturally include newly seeded `app_` keys (it queries `FROM modules m` — yes, it will include them automatically once migration 00016 runs).
 
 ---
 
 ## Sources
 
-### Primary (HIGH confidence)
-- https://nextjs.org/blog/next-15-2 — Next.js 15.2 stable release (verified 2026-03-01)
-- https://nextjs.org/docs/app/getting-started/installation — Node.js 20.9+ minimum requirement
-- https://nextjs.org/docs/app/guides/authentication — DAL pattern, Zod validation, Server Action security
-- https://nextjs.org/docs/app/api-reference/file-conventions/proxy — proxy.ts (formerly middleware.ts, renamed in v16)
-- https://tailwindcss.com/blog — Tailwind CSS v4.1 stable (2025-04-03)
-- https://tailwindcss.com/docs/hover-focus-and-other-states — RTL logical utilities
+### Primary (HIGH confidence — direct codebase analysis, 2026-03-04)
+- `src/proxy.ts` — confirmed single redirect target `/login`, no path branching
+- `src/lib/dal.ts` — confirmed `verifySession()` uses `getClaims()` (no network call), `React.cache()` wraps it, `getNavPermissions()` has hardcoded admin fallback
+- `src/actions/auth.ts` — confirmed hardcoded `redirect("/admin/companies")` on success
+- `src/app/(admin)/layout.tsx` — confirmed no `is_admin` check, only `verifySession()`
+- `supabase/migrations/00003_seed_modules.sql` — confirmed 9 admin keys, no ChemoSys keys
+- `supabase/migrations/00012_access_control.sql` — confirmed `is_admin` bypass returns all modules from `modules` table via `FROM modules m`
+- `npm info recharts dist-tags` — confirmed 3.7.0 latest stable, React 19 peer dep (2026-03-04)
+- `npm info qr-scanner dist-tags` — confirmed 1.4.2 latest stable (2026-03-04)
+- `npm info @radix-ui/react-tooltip version` — confirmed 1.2.8 (2026-03-04)
+- `npm info @radix-ui/react-collapsible version` — confirmed 1.1.12 (2026-03-04)
+- `npm info @radix-ui/react-navigation-menu version` — confirmed 1.2.14 (2026-03-04)
 
-### Secondary (MEDIUM confidence)
-- Supabase official migration guide — `@supabase/ssr` replacing deprecated `auth-helpers-nextjs`
-- ExcelJS GitHub docs — RTL worksheet (`rightToLeft: true`) and Hebrew column support
-- TanStack Table v8 — ecosystem position as Next.js community recommendation
-- react-leaflet — SSR workaround (`dynamic()` with `ssr: false`)
-- Community pattern: permission system with SECURITY DEFINER to avoid RLS recursion
+### Secondary (MEDIUM confidence — domain knowledge, training data through August 2025)
+- Israeli fleet management systems (Shlager, NetFleet, Track) — feature landscape and expected functionality
+- Israeli regulatory context: Transport Authority requirements for commercial fleets — driver license, annual test, daily inspection
+- shadcn/ui chart component wrapping recharts — community-verified pattern
+- qr-scanner BarcodeDetector API behavior — README-based, not directly tested
 
-### Tertiary (LOW confidence / verify at implementation)
-- ExcelJS `rightToLeft` worksheet property — verify in current v4 docs at implementation time
-- Heebo `hebrew` subset availability in `next/font/google` — verify at install time
-- Next.js v16 `proxy.ts` rename — verify exact version installed before using this convention
+### Tertiary (LOW confidence — requires validation)
+- Competitor feature comparison: Shlager, NetFleet, Track, Ituran (training knowledge through 2024, market may have evolved)
+- Israeli regulatory compliance: specific regulation numbers and current Ministry of Transport circulars (unverified — WebSearch unavailable during research)
 
 ---
 
-*Research completed: 2026-03-01*
+*Research completed: 2026-03-04*
 *Ready for roadmap: yes*

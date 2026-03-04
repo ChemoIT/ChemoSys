@@ -1,23 +1,40 @@
-# Architecture Patterns
+# Architecture Research — ChemoSys v2.0 Shell Integration
 
-**Project:** ChemoSys — מערכת ניהול פנימית לחמו אהרון
-**Domain:** Internal Admin Panel — Next.js App Router + Supabase
-**Researched:** 2026-03-01
-**Next.js Version Verified:** 16.1.6 (docs last updated 2026-02-27)
-
----
-
-## Critical Version Note
-
-Next.js v16 renamed `middleware.ts` to `proxy.ts`. The `middleware` export function is now called `proxy`. A codemod exists to migrate. All route protection in this project uses `proxy.ts`.
-
-Source: https://nextjs.org/docs/app/api-reference/file-conventions/proxy (HIGH confidence — official docs)
+**Domain:** Employee-facing operational system (ChemoSys) added to existing Next.js Admin Panel
+**Researched:** 2026-03-04
+**Confidence:** HIGH — based on direct analysis of existing codebase (18 source files read)
 
 ---
 
-## Recommended Architecture
+## Context: What Already Exists
 
-### System Overview
+This is a **subsequent milestone** research document. v1.0 shipped a complete admin panel. The
+architecture below documents how to integrate the new `(app)` route group into the existing
+codebase — not how to build from scratch.
+
+### Existing Route Groups
+
+```
+src/app/
+├── (auth)/           — /login  (public, centered layout, shared between admin and ChemoSys)
+├── (admin)/          — /admin/* (Sharon-only, right sidebar, verifySession() only guard)
+└── layout.tsx        — Root: html lang="he" dir="rtl", Heebo font, Toaster
+```
+
+### Existing Auth Infrastructure (Already Working)
+
+| Component | File | Role |
+|-----------|------|------|
+| Token refresh | `src/proxy.ts` | Refreshes Supabase JWT on every request, redirects unauthenticated to /login |
+| Session verify | `src/lib/dal.ts` `verifySession()` | Fast local JWT check via `getClaims()`, no network call |
+| Permission check | `src/lib/dal.ts` `requirePermission()` | Calls `get_user_permissions()` RPC, throws if insufficient |
+| Page guard | `src/lib/dal.ts` `checkPagePermission()` | Returns boolean, used for AccessDenied render |
+| Nav filter | `src/lib/dal.ts` `getNavPermissions()` | Returns list of allowed module_keys for current user |
+| DB RPC | `get_user_permissions(p_user_id)` | SECURITY DEFINER, returns all modules for is_admin, actual perms for others |
+
+---
+
+## System Overview: After v2.0 Integration
 
 ```
 Browser
@@ -25,654 +42,638 @@ Browser
   | HTTPS
   v
 Vercel (Edge)
-  |-- proxy.ts  (auth guard: cookie check → redirect to /login)
+  |-- proxy.ts  (JWT refresh + redirect unauthenticated to /login)
+  |             (currently redirects /app/* to /login if no user — needs update for ChemoSys)
   |
   v
-Next.js App Router (Node.js Runtime on Vercel)
-  |-- (auth) route group     → /login page, no sidebar layout
-  |-- (admin) route group    → /admin/* pages, sidebar layout
-      |-- Server Components  → fetch data from Supabase directly
-      |-- Client Components  → UI interactions, forms, tabs
-      |-- Server Actions     → mutations (create/update/soft-delete)
-      |-- Route Handlers     → API endpoints (Excel import/export, config.ini)
+Next.js App Router
+  |
+  |-- (auth)/                   /login page
+  |     login.tsx               shared for both admin and ChemoSys
+  |     (auth action redirects to /admin/* or /app/* based on post-login target)
+  |
+  |-- (admin)/                  /admin/* pages (Sharon-only)
+  |     layout.tsx              RTL right sidebar, verifySession() only
+  |     admin/dashboard/        Stats + audit feed
+  |     admin/employees/        CRUD
+  |     ...
+  |
+  |-- (app)/                    /app/* pages (ChemoSys — managers + field workers)
+        layout.tsx              Top header + module switcher, verifySession() + permission guard
+        app/
+          page.tsx              Redirect to /app/fleet (or first permitted module)
+          fleet/
+            page.tsx            Fleet module home (dashboard + 16 sub-module menu)
+            layout.tsx          (optional — fleet-specific sub-layout)
+          equipment/
+            page.tsx            Equipment module home (dashboard + placeholder)
+            layout.tsx          (optional)
   |
   v
-lib/dal.ts (Data Access Layer)
-  |-- verifySession()        → validates Supabase JWT, loads user permissions
-  |-- getPermissions(userId) → loads module permission matrix from DB
+lib/dal.ts  (unchanged — works for both admin and ChemoSys)
   |
   v
-Supabase (PostgreSQL on AWS)
-  |-- Auth (JWT via @supabase/ssr)
-  |-- Tables: companies, departments, employees, users, projects ...
-  |-- RLS: enabled but permissive (app-level permission enforcement)
-  |-- Triggers: updated_at auto-update, audit_log auto-insert
+Supabase PostgreSQL
+  modules table  (needs new ChemoSys rows: fleet, equipment, fleet sub-modules)
+  user_permissions table  (already supports any module_key)
+  get_user_permissions() RPC  (already returns all modules — no change needed)
 ```
 
 ---
 
-## Component Boundaries
+## Route Structure
 
-| Component | Responsibility | Communicates With |
-|-----------|---------------|-------------------|
-| `proxy.ts` | Optimistic auth check via cookie. Redirect unauthenticated users to /login. No DB calls. | Next.js router, cookie store |
-| `lib/dal.ts` | Authoritative auth + permission check. Used by Server Components and Server Actions. | Supabase (via server client), React cache |
-| `lib/supabase/server.ts` | Creates Supabase server client (reads cookies, refreshes session). Used in RSC and Server Actions. | Supabase Auth API |
-| `lib/supabase/browser.ts` | Creates Supabase browser client. Used only in Client Components needing real-time. | Supabase Auth API |
-| `lib/permissions.ts` | Loads and evaluates module permission matrix for a user. Called via DAL. | Supabase DB (user_permissions table) |
-| `lib/audit.ts` | Server-side audit log writer. Called from every Server Action that mutates data. | Supabase DB (audit_log table) |
-| `app/(admin)/layout.tsx` | Admin shell: sidebar, header, RTL wrapper. Receives user context. | DAL (getUser), sidebar nav |
-| `app/(admin)/admin/[tab]/page.tsx` | Per-tab Server Component pages (companies, employees, etc.). | DAL, Server Actions |
-| `components/admin/` | Tab-specific UI components. Mix of Server and Client. | Server Actions, hooks |
-| `components/shared/` | Reusable UI: DataTable, Modal, Confirm, Toast, Form fields. | No DB contact |
-| `app/api/` | Route Handlers: Excel import/export, config.ini read/write. | Supabase, filesystem (cPanel FTP) |
+### URL Design
+
+```
+/login                     — shared login page (no change)
+/admin/*                   — admin panel (no change)
+/app/                      — ChemoSys root (redirect to first permitted module)
+/app/fleet                 — Fleet module home (dashboard + 16 sub-module tiles)
+/app/fleet/driver-card     — (future) sub-module page
+/app/fleet/vehicle-card    — (future) sub-module page
+... (16 sub-modules — stub routes in v2.0, full build in future milestones)
+/app/equipment             — Equipment module home (dashboard + placeholder)
+```
+
+### File Structure — New Files for v2.0
+
+```
+src/app/
+├── (app)/                         NEW route group
+│   ├── layout.tsx                 NEW ChemoSys shell layout
+│   └── app/
+│       ├── page.tsx               NEW redirect to first permitted module
+│       ├── fleet/
+│       │   └── page.tsx           NEW Fleet home — dashboard + 16 sub-module menu
+│       └── equipment/
+│           └── page.tsx           NEW Equipment home — dashboard + placeholder
+│
+src/components/
+├── app/                           NEW ChemoSys-specific components
+│   ├── AppHeader.tsx              NEW top nav: logo, module switcher, user menu
+│   ├── ModuleSwitcher.tsx         NEW buttons to jump between fleet / equipment
+│   ├── FleetSubModuleGrid.tsx     NEW 16-tile sub-module menu
+│   └── AppStatCard.tsx            NEW (or reuse admin StatsCards pattern)
+│
+src/actions/
+└── app-auth.ts                    NEW login redirect logic for ChemoSys entry
+```
+
+### Files Modified (Minimal Surgery)
+
+| File | Change |
+|------|--------|
+| `src/proxy.ts` | Add `/app/*` to the protected routes check (same logic as `/admin/*`) |
+| `src/actions/auth.ts` | Add `redirectTo` parameter so login can redirect to `/app/fleet` instead of `/admin/companies` |
+| `supabase/migrations/000XX_chemosys_modules.sql` | NEW migration to seed fleet/equipment module keys |
 
 ---
 
-## Folder Structure
+## Layout Architecture
+
+### Admin Layout (Existing — No Change)
 
 ```
-src/
-├── app/
-│   ├── (auth)/                        # Route group — no sidebar layout
-│   │   ├── layout.tsx                 # Auth layout: centered, logo
-│   │   └── login/
-│   │       └── page.tsx               # Login form (Server Component + Server Action)
-│   │
-│   ├── (admin)/                       # Route group — sidebar layout
-│   │   ├── layout.tsx                 # Admin shell: sidebar + RTL wrapper
-│   │   └── admin/
-│   │       ├── page.tsx               # Redirect → /admin/dashboard
-│   │       ├── dashboard/
-│   │       │   └── page.tsx           # Tab 0: Dashboard (Server Component)
-│   │       ├── companies/
-│   │       │   └── page.tsx           # Tab 1: Companies CRUD
-│   │       ├── departments/
-│   │       │   └── page.tsx           # Tab 2: Departments hierarchy
-│   │       ├── role-tags/
-│   │       │   └── page.tsx           # Tab 3: Role tags
-│   │       ├── employees/
-│   │       │   └── page.tsx           # Tab 4: Employees CRUD + Excel
-│   │       ├── users/
-│   │       │   └── page.tsx           # Tab 5: Users + permission matrix
-│   │       ├── permission-templates/
-│   │       │   └── page.tsx           # Tab 6: Permission templates
-│   │       ├── projects/
-│   │       │   └── page.tsx           # Tab 7: Projects CRUD
-│   │       ├── settings/
-│   │       │   └── page.tsx           # Tab 8: System settings + config.ini
-│   │       └── audit-log/
-│   │           └── page.tsx           # Audit log viewer
-│   │
-│   ├── api/
-│   │   ├── employees/
-│   │   │   ├── import/route.ts        # POST: Excel import
-│   │   │   └── export/route.ts        # GET: Excel export
-│   │   └── settings/
-│   │       └── config/route.ts        # GET/POST: config.ini read/write
-│   │
-│   ├── layout.tsx                     # Root layout (html, body, fonts, RTL dir)
-│   ├── globals.css
-│   └── not-found.tsx
-│
-├── components/
-│   ├── admin/                         # Module-specific components
-│   │   ├── employees/
-│   │   │   ├── EmployeeTable.tsx      # Client: sortable/filterable table
-│   │   │   ├── EmployeeForm.tsx       # Client: create/edit form
-│   │   │   └── EmployeeImport.tsx     # Client: Excel upload UI
-│   │   ├── users/
-│   │   │   ├── UserTable.tsx
-│   │   │   ├── UserForm.tsx
-│   │   │   └── PermissionMatrix.tsx   # Client: permission grid (module × level)
-│   │   ├── permission-templates/
-│   │   │   └── TemplateForm.tsx
-│   │   └── [other-modules]/
-│   │
-│   └── shared/                        # Reusable UI (no business logic)
-│       ├── DataTable.tsx              # Generic sortable table with soft-delete toggle
-│       ├── Modal.tsx                  # Generic confirm/edit modal
-│       ├── Toast.tsx                  # Notification system
-│       ├── Sidebar.tsx                # Admin sidebar (module list + active state)
-│       ├── TabNav.tsx                 # Tab navigation component
-│       ├── SoftDeleteBadge.tsx        # Active/deleted status indicator
-│       └── RTLProvider.tsx            # RTL + i18n context provider
-│
-├── lib/
-│   ├── supabase/
-│   │   ├── server.ts                  # createServerClient() — for RSC + Server Actions
-│   │   └── browser.ts                 # createBrowserClient() — for Client Components
-│   ├── dal.ts                         # Data Access Layer: verifySession, getUser, getPermissions
-│   ├── permissions.ts                 # Permission evaluation: hasAccess(userId, module, level)
-│   ├── audit.ts                       # writeAuditLog(action, entity, oldVal, newVal)
-│   ├── excel.ts                       # Excel import/export utilities (ExcelJS)
-│   └── utils.ts                       # Shared utilities (formatDate, softDeleteFilter, etc.)
-│
-├── actions/                           # Server Actions (mutations)
-│   ├── auth.ts                        # login, logout
-│   ├── companies.ts                   # createCompany, updateCompany, softDeleteCompany
-│   ├── departments.ts
-│   ├── employees.ts                   # CRUD + Excel import logic
-│   ├── users.ts                       # createUser, updatePermissions, applyTemplate
-│   ├── projects.ts
-│   └── settings.ts
-│
-├── types/
-│   ├── database.ts                    # Supabase generated types (from supabase gen types)
-│   ├── permissions.ts                 # PermissionLevel, ModulePermission, PermissionMatrix
-│   └── entities.ts                    # Employee, Company, Project, etc. (DTOs)
-│
-└── proxy.ts                           # Auth guard (formerly middleware.ts in Next.js <16)
+┌─────────────────────────────────────────────────────┐
+│  Sidebar (right, dark navy #1B3A4B, 64 = w-64)      │
+│  ┌────────┐  ┌─────────────────────────────────┐    │
+│  │ CA logo│  │   Main Content (lg:ps-64)        │    │
+│  │ nav    │  │   Server Component pages         │    │
+│  │ items  │  │                                  │    │
+│  │ logout │  │                                  │    │
+│  └────────┘  └─────────────────────────────────┘    │
+└─────────────────────────────────────────────────────┘
+```
+
+### ChemoSys Layout (New)
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Header (top, sticky, dark navy, h-14)              │
+│  [CA logo]  [FleetModule ▼]  [Equipment]  [avatar]  │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│   Main Content                                      │
+│   Fleet Home: stat cards + 16 sub-module tiles      │
+│   Equipment Home: stat cards + placeholder          │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+The ChemoSys layout uses a **top header** (not sidebar). This is the correct UX for module-based
+operational software accessed from mobile devices in the field.
+
+### Why Top Header Instead of Sidebar
+
+- Field workers use mobile phones — sidebar collapses to a hamburger which is extra tap
+- Module switching (fleet ↔ equipment) is top-level navigation, not per-page
+- Operational dashboards benefit from full-width layout with no sidebar offset
+- Simpler mobile UX: header stays, content scrolls below
+
+---
+
+## Login Flow for ChemoSys
+
+### Current State
+
+The existing `/login` page calls `login()` Server Action which always redirects to
+`/admin/companies` on success. This is hardcoded.
+
+### v2.0 Login Flow (Updated)
+
+Two options for ChemoSys login. The better option:
+
+**Option A — Same /login page, redirect based on user type (RECOMMENDED)**
+
+```
+User visits /login
+  → fills email + password
+  → clicks "כניסה"
+  → login() Server Action:
+      → verifySession succeeds
+      → check if user has is_admin = true → redirect /admin/dashboard
+      → check if user has any /app/* module permission → redirect /app/fleet
+      → else → redirect /app/ (show "no permissions" placeholder)
+```
+
+This means ONE login URL for all users. Sharon goes to admin, employees go to ChemoSys.
+No separate `/app/login` URL needed.
+
+**Option B — Add /app/login page**
+
+Separate login UI with ChemoSys branding. Calls the same Supabase `signInWithPassword()`.
+Adds complexity for no real benefit — same credentials, same session, same Supabase Auth.
+Not recommended unless the UX must visually distinguish the two entry points.
+
+### Module Selection Buttons on Login Page
+
+The PROJECT.md specifies "module selection buttons on login page." The correct implementation:
+
+```
+AFTER login succeeds (user is authenticated):
+  → fetch user's permitted modules from get_user_permissions()
+  → render buttons for each permitted module
+  → user clicks "צי רכב" → redirect /app/fleet
+  → user clicks "צמ"ה" → redirect /app/equipment
+  → if only 1 module permitted → auto-redirect without showing chooser
+  → if 0 modules permitted → show "אין הרשאות — פנה לאדמין" screen
+```
+
+This is a **post-login module chooser**, not a pre-login module selector. The user authenticates
+first, then the system shows what they have access to.
+
+### Implementation Pattern
+
+```typescript
+// src/actions/auth.ts  (modified login action)
+export async function login(_prevState: LoginState, formData: FormData): Promise<LoginState> {
+  // ... rate limiting, validation (unchanged) ...
+
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) return { error: 'מייל או סיסמה שגויים' }
+
+  // Check is_admin first
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('is_admin, auth_user_id')
+    .eq('auth_user_id', (await supabase.auth.getClaims()).data?.claims?.sub)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (!userRow || userRow.is_admin) {
+    redirect('/admin/dashboard')
+  }
+
+  // For ChemoSys users — redirect to module chooser or first module
+  redirect('/app')  // (app)/app/page.tsx handles the module selection UI
+}
+```
+
+---
+
+## Permission Integration
+
+### How checkPagePermission() Wires into ChemoSys Pages
+
+The existing `checkPagePermission()` in `dal.ts` already works for any `module_key`. No changes
+to the DAL are needed. The pattern for ChemoSys pages is identical to admin pages:
+
+```typescript
+// src/app/(app)/app/fleet/page.tsx
+import { checkPagePermission } from '@/lib/dal'
+import { AccessDenied } from '@/components/shared/AccessDenied'
+
+export default async function FleetHomePage() {
+  // verifySession() is called by (app)/layout.tsx — already done before page renders
+  const canView = await checkPagePermission('fleet', 1)  // level 1 = read
+  if (!canView) return <AccessDenied />
+
+  // ... fetch fleet stats, render dashboard
+}
+```
+
+### How requirePermission() Wires into ChemoSys Server Actions
+
+```typescript
+// src/actions/fleet.ts  (future)
+'use server'
+export async function updateDriverCard(formData: FormData) {
+  await requirePermission('fleet_driver_card', 2)  // level 2 = read+write
+  // ... mutation
+}
+```
+
+### (app) Layout — Permission Check + Module Switcher
+
+```typescript
+// src/app/(app)/layout.tsx
+import { verifySession, getNavPermissions } from '@/lib/dal'
+import { AppHeader } from '@/components/app/AppHeader'
+
+export default async function AppLayout({ children }) {
+  const session = await verifySession()  // redirects to /login if unauthenticated
+
+  // Load permitted modules for module switcher
+  const permitted = await getNavPermissions()
+  // permitted = ['fleet', 'equipment', ...] for ChemoSys users
+
+  return (
+    <div className="min-h-screen bg-brand-bg flex flex-col">
+      <AppHeader user={session} permittedModules={permitted} />
+      <main className="flex-1 p-4 lg:p-6">
+        {children}
+      </main>
+    </div>
+  )
+}
+```
+
+**Note:** `getNavPermissions()` currently returns admin module keys hardcoded for the bootstrap
+case. It needs a small update to also include ChemoSys modules once they are seeded.
+
+---
+
+## Module Definitions in DB
+
+### New Migration: `000XX_chemosys_modules.sql`
+
+The `modules` table `parent_key` column supports hierarchy. Use it for sub-modules:
+
+```sql
+-- ChemoSys top-level modules
+INSERT INTO modules (key, name_he, parent_key, sort_order, icon) VALUES
+  ('fleet',            'צי רכב',               NULL,    10, 'Truck'),
+  ('equipment',        'צמ"ה',                  NULL,    11, 'HardHat')
+ON CONFLICT (key) DO NOTHING;
+
+-- Fleet sub-modules (16)
+INSERT INTO modules (key, name_he, parent_key, sort_order, icon) VALUES
+  ('fleet_driver_card',      'כרטיס נהג',              'fleet', 1, 'IdCard'),
+  ('fleet_vehicle_card',     'כרטיס רכב',              'fleet', 2, 'Car'),
+  ('fleet_expenses',         'סל הוצאות',              'fleet', 3, 'Receipt'),
+  ('fleet_mileage',          'ניהול ק"מ',              'fleet', 4, 'Gauge'),
+  ('fleet_fuel',             'דלק',                    'fleet', 5, 'Fuel'),
+  ('fleet_tolls',            'כבישי אגרה',             'fleet', 6, 'Road'),
+  ('fleet_violations',       'דוחות תעבורה/משטרה/נזקים','fleet', 7, 'AlertTriangle'),
+  ('fleet_exceptions',       'טבלאות חריגים',          'fleet', 8, 'TableProperties'),
+  ('fleet_ev_charging',      'טעינת רכב חשמלי',        'fleet', 9, 'Zap'),
+  ('fleet_rental',           'הזמנת רכב שכור',         'fleet', 10, 'KeySquare'),
+  ('fleet_safety_forms',     'טפסי בטיחות',            'fleet', 11, 'ShieldCheck'),
+  ('fleet_invoices',         'אישורי חשבוניות ספקים',  'fleet', 12, 'FileCheck'),
+  ('fleet_maintenance_log',  'ספר טיפולים מכניים',     'fleet', 13, 'Wrench'),
+  ('fleet_parts',            'חלקי חילוף/צמיגים',      'fleet', 14, 'Settings2'),
+  ('fleet_camp_vehicles',    'רכבי מחנה + QR',         'fleet', 15, 'QrCode'),
+  ('fleet_reports',          'הפקת דוחות',             'fleet', 16, 'FileBarChart')
+ON CONFLICT (key) DO NOTHING;
+
+-- Equipment top-level only (sub-modules defined in future milestone)
+-- No sub-module seeds for equipment in v2.0
+```
+
+### Permission Key Strategy
+
+Top-level module access (`fleet` level 1) = can see the fleet home page and its sub-module menu.
+Sub-module access (`fleet_driver_card` level 1) = can open that specific sub-module.
+
+In v2.0, checking `fleet` permission is sufficient — the sub-module pages don't exist yet.
+Future milestones implement `fleet_driver_card` etc. when building each sub-module.
+
+---
+
+## Shared Components: Reuse vs New
+
+### Directly Reusable (No Changes)
+
+| Component | Path | Used in ChemoSys For |
+|-----------|------|---------------------|
+| `AccessDenied` | `components/shared/AccessDenied.tsx` | Permission denied on any (app) page |
+| `LogoutButton` | `components/shared/LogoutButton.tsx` | AppHeader user menu |
+| `RefreshButton` | `components/shared/RefreshButton.tsx` | Dashboard refresh |
+| `Button`, `Card`, `Badge`, etc. | `components/ui/` | All ChemoSys UI |
+| `Skeleton` | `components/ui/skeleton.tsx` | Loading states |
+| Brand CSS vars | `app/globals.css` | Same colors, same font |
+
+### Reusable With Minor Adaptation
+
+| Component | Current Form | Adaptation for ChemoSys |
+|-----------|-------------|------------------------|
+| `StatsCards` | Admin-specific Stats type (employees, projects, etc.) | Extract generic `StatItem[]` type. Admin and fleet home each pass their own items. |
+| `DataTable` | Generic — already accepts any column config | Reuse as-is |
+| `DeleteConfirmDialog` | Generic title + description | Reuse as-is |
+
+### New Components Required
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| `AppHeader` | `components/app/AppHeader.tsx` | Top header: CA logo, module switcher, user email, logout |
+| `ModuleSwitcher` | `components/app/ModuleSwitcher.tsx` | Dropdown/buttons to navigate between fleet / equipment (only shows permitted modules) |
+| `FleetSubModuleGrid` | `components/app/FleetSubModuleGrid.tsx` | 16-tile responsive grid — each tile = icon + Hebrew label + disabled if no permission |
+| `ModuleHomeSkeleton` | `components/app/ModuleHomeSkeleton.tsx` | Loading state for module home pages |
+
+### StatsCards Refactor Plan
+
+Extract the generic pattern from admin's `StatsCards.tsx`:
+
+```typescript
+// components/shared/StatsGrid.tsx  (new generic)
+type StatItem = {
+  label: string
+  value: number | string
+  icon: LucideIcon
+  color: string
+  bg: string
+}
+export function StatsGrid({ items }: { items: StatItem[] }) { ... }
+
+// components/admin/dashboard/StatsCards.tsx  (updated — use StatsGrid)
+// components/app/fleet/FleetStatsCards.tsx   (new — use StatsGrid)
 ```
 
 ---
 
 ## Data Flow
 
-### Authentication Flow
+### ChemoSys Page Load Flow
 
 ```
-User visits /admin/*
-  → proxy.ts runs (Edge, no DB)
-      → reads 'sb-auth-token' cookie
-      → if no valid JWT → redirect /login
-      → if valid → NextResponse.next()
-  → RSC page.tsx renders
-      → calls verifySession() from lib/dal.ts
-          → createServerClient() reads cookie
-          → supabase.auth.getUser() validates JWT with Supabase
-          → if invalid → redirect('/login')
-          → returns { userId, email }
-      → calls getPermissions(userId)
-          → queries user_permissions table
-          → returns PermissionMatrix
-      → passes permissionMatrix to child components as props
+User visits /app/fleet
+  → proxy.ts runs:
+      → no valid JWT → redirect /login
+      → valid JWT → NextResponse.next()
+  →
+  → (app)/layout.tsx (Server Component):
+      → verifySession()  [React cache — fast JWT check]
+      → getNavPermissions()  [DB call — loads user's module keys]
+      → renders AppHeader with permittedModules
+      → renders {children}
+  →
+  → (app)/app/fleet/page.tsx (Server Component):
+      → checkPagePermission('fleet', 1)  [DB call via get_user_permissions RPC]
+      → if false → return <AccessDenied />
+      → fetch fleet stats  [future: fleet-specific tables]
+      → return <FleetStatCards /> + <FleetSubModuleGrid />
 ```
 
-### Mutation Flow (Server Action)
+### Deduplication Note
+
+`verifySession()` and `checkPagePermission()` both call into `getNavPermissions()` which calls
+the RPC. React `cache()` wraps `verifySession()` so it only runs once per render tree — the
+underlying JWT check is deduplicated. The RPC call in `checkPagePermission()` is a second call
+but it is cheap (SECURITY DEFINER, indexed lookup). This is the same pattern used in the admin
+panel and it performs well.
+
+### Module Switcher Data Flow
 
 ```
-User clicks "Save" in EmployeeForm (Client Component)
-  → calls updateEmployee(formData) Server Action
-      → verifySession() → checks auth
-      → hasAccess(userId, 'employees', 'write') → checks permission
-      → validate input with Zod schema
-      → createServerClient()
-          → supabase.from('employees').update({...}).eq('id', id)
-          → updated_at set by DB trigger automatically
-          → updated_by set by Server Action
-      → writeAuditLog('UPDATE', 'employees', oldData, newData)
-      → revalidatePath('/admin/employees')
-      → return { success: true }
-  → Client Component shows success Toast
+AppHeader receives permittedModules: string[]  (from layout.tsx server fetch)
+  → filters CHEMOSYS_MODULES config array to only permitted entries
+  → renders active module highlighted
+  → clicking another module → client-side Link navigation → /app/equipment
 ```
 
-### Permission Check Flow
+The module switcher is a **client component** (needs `usePathname()` for active state) wrapped
+inside the server layout that passes the permitted modules list as props. Same pattern as
+`SidebarNav.tsx` in the admin shell.
+
+---
+
+## Component Boundary Map
 
 ```
-lib/permissions.ts:
+(app)/layout.tsx  [Server]
+  ├── verifySession()  → guards entire (app) tree
+  ├── getNavPermissions()  → gets permitted modules
+  └── AppHeader.tsx  [Client — needs usePathname for active module]
+          └── ModuleSwitcher.tsx  [Client]
+                └── LogoutButton.tsx  [Client — calls logout() Server Action]
 
-hasAccess(userId, module, level):
-  → loadPermissions(userId)  [React cache — memoized per request]
-      → query: user_permissions WHERE user_id = userId AND deleted_at IS NULL
-      → query: users WHERE id = userId → get template_id
-      → query: template_permissions WHERE template_id = template_id
-      → merge: user overrides take priority over template defaults
-  → return permissionMatrix[module].level >= requiredLevel
-      → NO_ACCESS = 0, READ = 1, READ_WRITE = 2
+(app)/app/fleet/page.tsx  [Server]
+  ├── checkPagePermission('fleet', 1)  → AccessDenied if no permission
+  ├── fetch fleet stats (future)
+  ├── StatsGrid.tsx  [Client — stat cards]
+  └── FleetSubModuleGrid.tsx  [Client — 16 tiles]
+          └── each tile = Link + icon + label + disabled state
+
+(app)/app/equipment/page.tsx  [Server]
+  ├── checkPagePermission('equipment', 1)
+  ├── StatsGrid.tsx  (placeholder zeros in v2.0)
+  └── EquipmentPlaceholder.tsx  [Client — "coming soon" state]
 ```
 
 ---
 
-## DB Schema Patterns
+## Proxy.ts Update
 
-### Universal Columns (All Tables)
+The current `proxy.ts` only redirects to `/login` if the user is not authenticated and the path
+is not `/login` or `/auth`. The `/app/*` routes are already covered by this rule (they're not
+excluded), so technically no change is needed for the auth redirect.
 
-```sql
-id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-created_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-updated_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-created_by  UUID REFERENCES auth.users(id),
-updated_by  UUID REFERENCES auth.users(id),
-deleted_at  TIMESTAMPTZ DEFAULT NULL   -- NULL = active, NOT NULL = soft deleted
-```
-
-### Permission Tables
-
-```sql
--- Module registry (source of truth for permission matrix)
-CREATE TABLE modules (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  key         TEXT UNIQUE NOT NULL,     -- 'employees', 'vehicles', etc.
-  label_he    TEXT NOT NULL,            -- Hebrew display name
-  parent_key  TEXT REFERENCES modules(key),  -- for sub-modules
-  sort_order  INT NOT NULL DEFAULT 0,
-  is_active   BOOLEAN DEFAULT TRUE
-);
-
--- Role templates
-CREATE TABLE permission_templates (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name        TEXT NOT NULL,
-  description TEXT,
-  created_at  TIMESTAMPTZ DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ DEFAULT NOW(),
-  deleted_at  TIMESTAMPTZ
-);
-
--- Template permission matrix
-CREATE TABLE template_permissions (
-  template_id UUID REFERENCES permission_templates(id) ON DELETE CASCADE,
-  module_key  TEXT REFERENCES modules(key),
-  level       SMALLINT NOT NULL DEFAULT 0,  -- 0=none, 1=read, 2=read+write
-  PRIMARY KEY (template_id, module_key)
-);
-
--- User permission overrides
-CREATE TABLE user_permissions (
-  user_id     UUID REFERENCES public.users(id) ON DELETE CASCADE,
-  module_key  TEXT REFERENCES modules(key),
-  level       SMALLINT NOT NULL DEFAULT 0,
-  PRIMARY KEY (user_id, module_key)
-);
-
--- Users table (linked to Supabase auth.users)
-CREATE TABLE users (
-  id              UUID PRIMARY KEY REFERENCES auth.users(id),
-  employee_id     UUID REFERENCES employees(id),
-  template_id     UUID REFERENCES permission_templates(id),
-  is_active       BOOLEAN DEFAULT TRUE,
-  created_at      TIMESTAMPTZ DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ DEFAULT NOW(),
-  created_by      UUID REFERENCES auth.users(id),
-  updated_by      UUID REFERENCES auth.users(id),
-  deleted_at      TIMESTAMPTZ
-);
-```
-
-### Audit Log Table
-
-```sql
-CREATE TABLE audit_log (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  user_id     UUID REFERENCES auth.users(id),
-  action      TEXT NOT NULL,         -- 'INSERT', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT'
-  entity_type TEXT NOT NULL,         -- 'employees', 'companies', etc.
-  entity_id   UUID,
-  old_data    JSONB,                 -- snapshot before change
-  new_data    JSONB,                 -- snapshot after change
-  ip_address  TEXT,
-  user_agent  TEXT
-);
-
--- No soft delete on audit_log — it is the immutable record
--- Index for common queries
-CREATE INDEX idx_audit_log_user_id ON audit_log(user_id);
-CREATE INDEX idx_audit_log_entity ON audit_log(entity_type, entity_id);
-CREATE INDEX idx_audit_log_created_at ON audit_log(created_at DESC);
-```
-
-### DB Triggers
-
-```sql
--- Auto-update updated_at on every UPDATE
-CREATE OR REPLACE FUNCTION set_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Apply to all tables with updated_at:
-CREATE TRIGGER trigger_companies_updated_at
-  BEFORE UPDATE ON companies
-  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
--- (repeat for each table)
-```
-
-### Soft Delete Query Pattern
+However, the current redirect-after-login in `auth.ts` always goes to `/admin/companies`. This
+must be updated to route ChemoSys users to `/app/fleet` (or `/app` module chooser).
 
 ```typescript
-// Every query MUST filter deleted_at
-const { data } = await supabase
-  .from('employees')
-  .select('*')
-  .is('deleted_at', null)   // active records only
-  .order('created_at', { ascending: false })
+// Current (v1.0):
+redirect('/admin/companies')
 
-// Soft delete
-await supabase
-  .from('employees')
-  .update({ deleted_at: new Date().toISOString(), updated_by: userId })
-  .eq('id', employeeId)
+// New (v2.0):
+// After login, check is_admin. If not admin, redirect to /app.
+// (app)/app/page.tsx handles the module routing logic.
+if (userRow?.is_admin) {
+  redirect('/admin/dashboard')
+} else {
+  redirect('/app')
+}
+```
+
+The `/app/page.tsx` then reads permitted modules and redirects to the first one:
+
+```typescript
+// src/app/(app)/app/page.tsx
+import { getNavPermissions } from '@/lib/dal'
+import { redirect } from 'next/navigation'
+
+export default async function AppRootPage() {
+  const permitted = await getNavPermissions()
+
+  // Module priority order — first match wins
+  const CHEMOSYS_MODULES = ['fleet', 'equipment']
+  const first = CHEMOSYS_MODULES.find(m => permitted.includes(m))
+
+  if (first === 'fleet') redirect('/app/fleet')
+  if (first === 'equipment') redirect('/app/equipment')
+
+  // No permitted modules
+  return <NoPermissionsPage />
+}
 ```
 
 ---
 
-## Auth Layer: proxy.ts Pattern
+## DB Migration Order
 
-```typescript
-// proxy.ts (root level — formerly middleware.ts, renamed in Next.js v16)
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
-
-export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request })
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => request.cookies.getAll(),
-        setAll: (cookies) => {
-          cookies.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options)
-          })
-        },
-      },
-    }
-  )
-
-  // Refresh session (required for Supabase SSR)
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
-  const isAdminRoute = request.nextUrl.pathname.startsWith('/admin')
-
-  if (isAdminRoute && !user) {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
-
-  if (isAuthRoute && user) {
-    return NextResponse.redirect(new URL('/admin/dashboard', request.url))
-  }
-
-  return response
-}
-
-export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.png$).*)'],
-}
+```
+00016_chemosys_modules.sql
+  → Inserts fleet, equipment, and 16 fleet sub-module keys into modules table
+  → Idempotent (ON CONFLICT DO NOTHING)
+  → Run BEFORE building (app) pages
 ```
 
-Note: proxy.ts CAN call Supabase for session refresh (Supabase SSR requires it). Granular permission checks (DB queries for module access) are NOT done here — those happen in the DAL inside each page/action.
+No other DB changes needed. The existing `user_permissions`, `get_user_permissions()` RPC, and
+`users.is_admin` columns all work for ChemoSys module keys without modification.
 
----
-
-## State Management
-
-### Rule: Server-First
-
-In Next.js App Router, the default is Server Components. Use Client Components only when needed (interactivity, browser APIs, hooks).
-
-| State Type | Where | Tool |
-|------------|-------|------|
-| Server data (initial load) | Server Components | Supabase server client + DAL |
-| Form state | Client Components | React `useActionState` + Server Actions |
-| UI state (modals, tabs, filters) | Client Components | `useState` / `useReducer` |
-| User session / permissions | Server Components | DAL + `React.cache()` |
-| Real-time updates (future) | Client Components | Supabase Realtime |
-
-Do NOT use Zustand, Redux, or global client stores for this admin panel. Data comes from the server. The only client state needed is UI state (which modal is open, which tab is active, filter values before submit).
-
-Exception: If the permission matrix needs to be available deep in a client component tree, pass it as a prop from the Server Component parent, or use React Context within a Client Component subtree.
-
----
-
-## Patterns to Follow
-
-### Pattern 1: Server Component fetches, Client Component renders
-
-```typescript
-// app/(admin)/admin/employees/page.tsx — Server Component
-import { verifySession } from '@/lib/dal'
-import { hasAccess } from '@/lib/permissions'
-import { EmployeeTable } from '@/components/admin/employees/EmployeeTable'
-
-export default async function EmployeesPage() {
-  const session = await verifySession()
-  const canWrite = await hasAccess(session.userId, 'employees', 'write')
-
-  const { data: employees } = await supabase
-    .from('employees')
-    .select('*, companies(name), departments(name)')
-    .is('deleted_at', null)
-    .order('last_name')
-
-  return <EmployeeTable employees={employees} canWrite={canWrite} />
-}
-
-// components/admin/employees/EmployeeTable.tsx — Client Component
-'use client'
-export function EmployeeTable({ employees, canWrite }: Props) {
-  // All interactivity here (filters, modals, pagination)
-}
-```
-
-### Pattern 2: Server Action with auth + permission + audit
-
-```typescript
-// actions/employees.ts
-'use server'
-import { verifySession } from '@/lib/dal'
-import { hasAccess } from '@/lib/permissions'
-import { writeAuditLog } from '@/lib/audit'
-import { revalidatePath } from 'next/cache'
-import { z } from 'zod'
-
-const EmployeeUpdateSchema = z.object({
-  id: z.string().uuid(),
-  first_name: z.string().min(1),
-  last_name: z.string().min(1),
-  // ...
-})
-
-export async function updateEmployee(formData: FormData) {
-  // 1. Auth
-  const session = await verifySession()
-
-  // 2. Permission
-  if (!await hasAccess(session.userId, 'employees', 'write')) {
-    return { error: 'אין הרשאה לעדכן עובדים' }
-  }
-
-  // 3. Validate
-  const parsed = EmployeeUpdateSchema.safeParse(Object.fromEntries(formData))
-  if (!parsed.success) {
-    return { error: parsed.error.flatten().fieldErrors }
-  }
-
-  // 4. Get old data for audit
-  const { data: oldData } = await supabase
-    .from('employees').select('*').eq('id', parsed.data.id).single()
-
-  // 5. Mutate
-  const { data, error } = await supabase
-    .from('employees')
-    .update({ ...parsed.data, updated_by: session.userId })
-    .eq('id', parsed.data.id)
-    .select()
-    .single()
-
-  if (error) return { error: 'שגיאה בעדכון העובד' }
-
-  // 6. Audit log
-  await writeAuditLog({
-    userId: session.userId,
-    action: 'UPDATE',
-    entityType: 'employees',
-    entityId: parsed.data.id,
-    oldData,
-    newData: data,
-  })
-
-  // 7. Revalidate
-  revalidatePath('/admin/employees')
-  return { success: true }
-}
-```
-
-### Pattern 3: Adding a new module (extensibility)
-
-When adding a future module (e.g., vehicle fleet):
-
-1. Add row to `modules` table: `{ key: 'vehicles', label_he: 'צי רכב', sort_order: 10 }`
-2. Create DB tables with standard columns (id, created_at, updated_at, created_by, updated_by, deleted_at)
-3. Create `app/(admin)/admin/vehicles/page.tsx` — Server Component
-4. Create `components/admin/vehicles/` — Client Components
-5. Create `actions/vehicles.ts` — Server Actions
-6. Sidebar auto-discovers module from `modules` table query
-7. Permission templates automatically include new module (default level = 0 = no access)
-
-The sidebar and permission system are designed to be data-driven from the `modules` table, so no code changes are needed to the permission infrastructure.
+To grant a ChemoSys user access to fleet: admin panel Users page → set `fleet` permission to
+level 1 (read) or 2 (read+write). The permission matrix UI already handles any module_key.
 
 ---
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: DB calls in proxy.ts beyond session refresh
+### Anti-Pattern 1: Separate Login Page for ChemoSys
 
-**What:** Querying user_permissions or any business table in proxy.ts
-**Why bad:** proxy.ts runs on every request including prefetches. DB round-trip per request = severe performance degradation at scale.
-**Instead:** proxy.ts only refreshes Supabase session (required by @supabase/ssr) and checks if a JWT exists. All permission checks happen in the DAL inside each page.
+**What:** Creating `/app/login` as a second login page with its own form
+**Why bad:** Same Supabase Auth, same credentials, same session cookies — double maintenance with
+zero benefit. Two login URLs confuses users.
+**Instead:** One `/login` page, post-login redirect based on `is_admin` flag.
 
-### Anti-Pattern 2: Checking permissions only in the UI
+### Anti-Pattern 2: Hiding Sub-Module Tiles Client-Side Only
 
-**What:** Hiding a "Delete" button client-side but not checking in the Server Action
-**Why bad:** Server Actions are public endpoints. A user can call them directly.
-**Instead:** Every Server Action must call `hasAccess()` before executing. UI hiding is UX, not security.
+**What:** Rendering all 16 fleet sub-module tiles, then greying out based on client-side
+permission data passed as props
+**Why bad:** The permission data must come from the server — passing it as client-side props
+means the data was fetched server-side anyway. The greying logic is fine, but do not let the
+server component pass a simple `isAdmin: true` boolean that bypasses permission checks.
+**Instead:** Server Component fetches permissions, passes `permittedSubModules: string[]` as
+props to the Client Component grid. Tiles are greyed if module_key not in the list.
 
-### Anti-Pattern 3: Querying `auth.users` directly from client
+### Anti-Pattern 3: Duplicating getNavPermissions Logic in AppLayout
 
-**What:** Using anon key to query auth schema tables
-**Why bad:** auth.users is not exposed via the public schema. Will fail.
-**Instead:** Use `supabase.auth.getUser()` for session user, and your `public.users` table for app user data.
+**What:** Writing a second version of `getNavPermissions()` in the new `(app)/layout.tsx`
+specifically for ChemoSys module keys
+**Why bad:** Two permission functions diverge over time, bugs in one don't appear in the other.
+**Instead:** Call `getNavPermissions()` from `dal.ts` as-is. The function returns whatever keys
+the user has — it doesn't filter by app context. Fleet/equipment keys will be in the result
+once the migration adds them.
 
-### Anti-Pattern 4: Skipping soft delete filter
+### Anti-Pattern 4: Checking Permissions in AppHeader Client Component
 
-**What:** `supabase.from('employees').select('*')` without `.is('deleted_at', null)`
-**Why bad:** Returns deleted records. Users see ghost data.
-**Instead:** Create a utility `withSoftDelete(query)` that always appends `.is('deleted_at', null)`. Or use a Postgres View that filters deleted_at.
+**What:** Making the AppHeader fetch user permissions on the client via a Supabase browser
+client to decide which modules to show
+**Why bad:** Exposes permission logic to the browser, causes a loading flash (module list
+appears after client hydration), adds a network call on every navigation.
+**Instead:** Server Component layout fetches permissions, passes `permittedModules: string[]`
+down to AppHeader as props. AppHeader is a client component only for `usePathname()` active state.
 
-### Anti-Pattern 5: Supabase client in Client Component with service role key
+### Anti-Pattern 5: Sub-Module Routes as Parallel Routes
 
-**What:** Using `SUPABASE_SERVICE_ROLE_KEY` in browser client
-**Why bad:** Exposes admin key to browser. Bypasses all RLS. Critical security vulnerability.
-**Instead:** Browser client always uses NEXT_PUBLIC_SUPABASE_ANON_KEY. Service role only used in Route Handlers or Server Actions when genuinely needed (e.g., admin operations that must bypass RLS).
-
-### Anti-Pattern 6: Flat tab components in a single giant file
-
-**What:** One 2000-line `AdminPanel.tsx` with all 9 tabs
-**Why bad:** Un-maintainable, can't be split into Server/Client correctly, slow to compile.
-**Instead:** Each tab is its own `page.tsx` at its own URL segment. Navigation between tabs = client-side navigation (no full reload because they share the same layout).
+**What:** Using Next.js parallel routes (`@slot` syntax) for the 16 fleet sub-modules
+**Why bad:** Unnecessary complexity. Each sub-module is an independent page with its own data.
+Standard nested routes are the correct model.
+**Instead:** `(app)/app/fleet/[sub-module]/page.tsx` for each sub-module when built in future
+milestones.
 
 ---
 
-## Suggested Build Order (Dependencies)
+## Build Order for v2.0
 
-Dependencies flow bottom-up: infrastructure must exist before features that depend on it.
+Dependencies flow bottom-up. Cannot build ChemoSys pages until migration and DAL updates are done.
 
 ```
-Phase 1: Foundation
-  [1] Supabase project setup — DB schema, RLS, triggers
-  [2] Next.js project scaffold — proxy.ts, route groups, layouts
-  [3] lib/supabase/ clients (server + browser)
-  [4] proxy.ts auth guard
-  [5] lib/dal.ts — verifySession, getUser
-  [6] Login page + logout action
+Step 1: DB Migration (required first)
+  → supabase/migrations/000XX_chemosys_modules.sql
+  → Adds fleet, equipment, and 16 fleet sub-module keys to modules table
+  → Run in Supabase Dashboard before any app code
 
-  Why first: Everything else depends on auth working correctly.
+Step 2: Update auth redirect (required second)
+  → src/actions/auth.ts
+  → Post-login: is_admin → /admin/dashboard, else → /app
+  → This makes the login flow work end-to-end
 
-Phase 2: Permission Infrastructure
-  [7] modules table + seed data (all 9 admin modules)
-  [8] permission_templates + user_permissions tables
-  [9] lib/permissions.ts — hasAccess(), loadPermissions()
-  [10] Permission matrix UI component (PermissionMatrix.tsx)
+Step 3: (app) Route Group + Layout (required third)
+  → src/app/(app)/layout.tsx
+  → verifySession() + getNavPermissions() + AppHeader
+  → Everything inside (app) depends on this layout
 
-  Why second: All tab pages need permission checks. Build once, use everywhere.
+Step 4: AppHeader + ModuleSwitcher (required fourth)
+  → src/components/app/AppHeader.tsx
+  → src/components/app/ModuleSwitcher.tsx
+  → Layout needs these to render
 
-Phase 3: Admin Shell + Core Entities
-  [11] Admin layout — sidebar, RTL wrapper, header
-  [12] Sidebar — reads modules from DB dynamically
-  [13] companies CRUD (simplest entity, no foreign deps)
-  [14] departments CRUD (depends on companies)
-  [15] role-tags CRUD (independent)
-  [16] writeAuditLog utility
+Step 5: /app root page (required fifth)
+  → src/app/(app)/app/page.tsx
+  → Reads permitted modules, redirects to first
+  → Needed for login redirect to work
 
-  Why third: Reference data needed before employees (employees reference companies/departments).
+Step 6: Fleet home page (main feature)
+  → src/app/(app)/app/fleet/page.tsx
+  → checkPagePermission + stats + FleetSubModuleGrid
+  → Depends on migration (fleet module key must exist)
 
-Phase 4: Core Module — Employees
-  [17] employees CRUD (depends on companies, departments, role-tags)
-  [18] Excel import (employees)
-  [19] Excel export (employees)
-  [20] Composite unique key validation (employee_number + company_id)
+Step 7: FleetSubModuleGrid component
+  → src/components/app/FleetSubModuleGrid.tsx
+  → 16-tile responsive grid (4 cols desktop / 2 cols mobile)
+  → Depends on migration (fleet_* module keys for permission check)
 
-  Why fourth: Most complex entity, depends on all reference data.
+Step 8: Equipment home page (secondary feature)
+  → src/app/(app)/app/equipment/page.tsx
+  → checkPagePermission + placeholder
+  → Simpler than fleet — no sub-module grid needed in v2.0
 
-Phase 5: Users + Permissions
-  [21] users CRUD (link to employees + Supabase Auth)
-  [22] Apply template action
-  [23] Individual permission override
-  [24] Tab 6: permission-templates CRUD
-
-  Why fifth: Depends on employees existing. Permissions depend on modules being seeded.
-
-Phase 6: Projects + Settings
-  [25] projects CRUD (references employees as managers)
-  [26] settings page (API integrations, config.ini)
-  [27] config.ini Route Handler (read/write via FTP or cPanel API)
-
-  Why sixth: References employees. Settings is standalone.
-
-Phase 7: Audit Log Viewer
-  [28] Audit log page (filterable: user, entity, date range)
-
-  Why last: Reads accumulated data. Infrastructure (writeAuditLog) already in place.
-
-Phase 8: Polish
-  [29] Dashboard Tab 0 — aggregate stats, recent activity
-  [30] Loading skeletons (loading.tsx per route)
-  [31] Error boundaries (error.tsx per route)
-  [32] Mobile/tablet responsive pass
+Step 9: StatsGrid refactor (optional cleanup)
+  → Extract generic StatsGrid from admin StatsCards
+  → Used by fleet and equipment home pages
+  → Can be skipped if fleet stats are placeholder zeros in v2.0
 ```
 
 ---
 
 ## Scalability Considerations
 
-| Concern | Current (Admin Panel) | Future (Fleet + Equipment modules) |
-|---------|----------------------|-----------------------------------|
-| New modules | Add row to `modules` table + new route segment | Same pattern — zero permission infra changes |
-| Permission granularity | Module-level | Can extend to sub-module: `vehicles:maintenance` |
-| Audit log volume | Low (internal admin) | High (fleet events) — add partitioning by month |
-| Real-time data | Not needed | Vehicle location — add Supabase Realtime to specific pages |
-| Multi-company | One company (Chemo Aharon) | company_id scoping already on employees — extend to projects/vehicles |
+| Concern | v2.0 (Shell) | Future Milestones | Scale Ceiling |
+|---------|-------------|-------------------|---------------|
+| Adding new ChemoSys module | Add row to modules table + new route | Same pattern, no infra change | Unlimited |
+| Adding sub-modules | Already seeded in modules table | Build pages as needed | 16 fleet sub-modules already seeded |
+| Fleet data volume | No fleet tables yet | Add partitioned tables per entity | PostgreSQL handles 10M+ rows easily |
+| Real-time vehicle data | Not in v2.0 | Supabase Realtime on specific pages | Supabase Free tier: 200 concurrent connections |
+| Permission granularity | Module-level (fleet level 1/2) | Sub-module level (fleet_driver_card) | Already modeled in DB |
+| Mobile field workers | Responsive CSS, top header layout | PWA installable if needed | No native app required |
 
 ---
 
-## RTL + i18n Architecture
+## Integration Points Summary
 
-```typescript
-// app/layout.tsx
-export default function RootLayout({ children }) {
-  return (
-    <html lang="he" dir="rtl">
-      <body className="font-heebo">
-        {children}
-      </body>
-    </html>
-  )
-}
-
-// tailwind.config.ts
-// Use RTL-aware utilities: ps- (padding-start), pe- (padding-end)
-// instead of pl- / pr- for correct RTL/LTR flipping
-```
-
-For i18n readiness: keep all Hebrew strings in `lib/strings.he.ts` from day one. This makes future English translation a find-replace rather than a hunt through components.
+| Integration Point | File | Change Type | Notes |
+|-------------------|------|-------------|-------|
+| Proxy auth redirect | `src/proxy.ts` | No change needed | Already redirects non-/login to /login |
+| Login post-redirect | `src/actions/auth.ts` | Modify redirect logic | is_admin check before redirect |
+| DAL permissions | `src/lib/dal.ts` | No change | Works for any module_key |
+| Modules table | `supabase/migrations/` | New migration | Add fleet + equipment + 16 sub-module keys |
+| Admin permission matrix | Admin Users page | No change | Will display new fleet/equipment modules automatically |
+| Shared UI components | `src/components/ui/` | No change | All reusable as-is |
+| AccessDenied component | `src/components/shared/AccessDenied.tsx` | No change | Reuse directly |
+| StatsCards | `src/components/admin/dashboard/StatsCards.tsx` | Optional refactor | Extract generic StatsGrid |
+| Root layout | `src/app/layout.tsx` | No change | RTL + Heebo applies to all routes |
+| CSS variables | `src/app/globals.css` | No change | All brand colors reused |
 
 ---
 
@@ -680,13 +681,19 @@ For i18n readiness: keep all Hebrew strings in `lib/strings.he.ts` from day one.
 
 | Claim | Source | Confidence |
 |-------|--------|------------|
-| Next.js v16 renamed middleware to proxy | https://nextjs.org/docs/app/api-reference/file-conventions/proxy (official, 2026-02-27) | HIGH |
-| Route groups (folderName) convention | https://nextjs.org/docs/app/api-reference/file-conventions/route-groups (official) | HIGH |
-| Server Actions pattern (`'use server'`, `useActionState`) | https://nextjs.org/docs/app/getting-started/updating-data (official) | HIGH |
-| DAL + verifySession pattern | https://nextjs.org/docs/app/guides/authentication (official) | HIGH |
-| proxy.ts optimistic check only (no DB) for permissions | https://nextjs.org/docs/app/guides/authentication#optimistic-checks-with-proxy-optional (official) | HIGH |
-| Parallel routes for conditional rendering | https://nextjs.org/docs/app/api-reference/file-conventions/parallel-routes (official) | HIGH |
-| `src/` folder + feature-split organization | https://nextjs.org/docs/app/getting-started/project-structure (official) | HIGH |
-| Supabase @supabase/ssr server client pattern | Training data — Supabase docs WebFetch blocked | MEDIUM |
-| Postgres trigger for updated_at | Standard PostgreSQL pattern | HIGH |
-| Audit log schema design | Standard enterprise pattern | HIGH |
+| Route groups isolation: each group gets its own layout | Direct codebase analysis — `(admin)/layout.tsx` and `(auth)/layout.tsx` | HIGH |
+| verifySession() uses getClaims() not getUser() — no network call | `src/lib/dal.ts` lines 30-48 | HIGH |
+| get_user_permissions() is SECURITY DEFINER, returns all modules for is_admin | `supabase/migrations/00012_access_control.sql` lines 30-60 | HIGH |
+| modules table has parent_key column for sub-module hierarchy | `supabase/migrations/00001_foundation_schema.sql` lines 108-117 | HIGH |
+| proxy.ts redirects to /login for all non-/login, non-/auth paths | `src/proxy.ts` lines 54-62 | HIGH |
+| getNavPermissions() returns hardcoded list for bootstrap admin | `src/lib/dal.ts` lines 106-108 | HIGH |
+| React cache() wraps verifySession() for deduplication | `src/lib/dal.ts` line 30 | HIGH |
+| auth.ts redirects to /admin/companies on success — needs update | `src/actions/auth.ts` line 92 | HIGH |
+| Admin layout is Sharon-only — no module permission checks | `src/app/(admin)/layout.tsx` comment lines 1-6 | HIGH |
+| 16 fleet sub-module names | `src/app/(admin)/PROJECT.md` lines 104-105 | HIGH |
+
+---
+
+*Architecture research for: ChemoSys v2.0 Shell Integration*
+*Researched: 2026-03-04*
+*Based on: Direct analysis of 18 source files — HIGH confidence throughout*

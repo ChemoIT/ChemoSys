@@ -1,695 +1,534 @@
-# Domain Pitfalls — ChemoSys Admin Panel
+# Domain Pitfalls — ChemoSys v2.0 Employee App Shell
 
-**Domain:** Internal admin panel — Next.js App Router + Supabase + RTL Hebrew
-**Researched:** 2026-03-01
-**Confidence:** HIGH (core pitfalls are well-established patterns; sourced from training on official Supabase docs, Next.js docs, and community post-mortems through Aug 2025)
+**Domain:** Adding employee-facing (app) route group to existing Next.js 16 + Supabase admin panel
+**Researched:** 2026-03-04
+**Confidence:** HIGH — based on direct code inspection of the existing system (proxy.ts, dal.ts, migrations, layouts, auth.ts) plus established Next.js App Router and Supabase patterns
+
+---
+
+## Context: What Already Exists
+
+Before reading these pitfalls, understand the current system state:
+
+| What | Current State |
+|------|--------------|
+| Route groups | `(admin)` — Sharon-only, `(auth)` — public login page |
+| Auth proxy | `src/proxy.ts` — single redirect target: `/login` |
+| Session guard | `verifySession()` — local JWT claim check, cached per request |
+| Permission stack | `requirePermission()`, `checkPagePermission()`, `getNavPermissions()` — all implemented in `dal.ts`, **never wired to a production page yet** |
+| Modules table | 9 admin keys seeded (`dashboard`, `companies`, `departments`, etc.) — no ChemoSys module keys exist |
+| Login flow | Single `/login` page → redirects to `/admin/companies` on success |
+| RLS | `get_user_permissions()` SECURITY DEFINER RPC exists and handles `is_admin` correctly |
+
+Adding `(app)` means these untested pieces get used for the first time in production. That is where most pitfalls live.
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, data loss, or security breaches.
-
 ---
 
-### Pitfall 1: RLS Infinite Recursion on Permission Lookups
+### Pitfall 1: proxy.ts Redirect Loop — (app) Routes Send Everyone to /login
 
 **What goes wrong:**
-You write an RLS policy on `user_permissions` that calls `auth.uid()` and then queries `user_permissions` itself to check if the user has access — creating an infinite recursive loop. Supabase will error with `stack depth limit exceeded` or silently return no rows.
+The current `proxy.ts` redirects ALL unauthenticated users to `/login`. The `(app)` group will use its own login page at `/app/login`. If an employee visits `/app/dashboard` without a session, proxy.ts sends them to `/login` (the admin login) instead of `/app/login`. The employee is confused, tries to log in, and is redirected to `/admin/companies` — a page they have no business seeing.
 
 **Why it happens:**
-Granular permission systems need to query a permissions table. The instinct is to write the RLS policy on that table using the same table as the source of truth. This is circular.
-
-**Consequences:**
-- Entire permission system breaks
-- All users lose access
-- Silent failures possible (returns empty set instead of erroring, so admin thinks "no permissions exist")
-
-**Warning signs:**
-- `ERROR: stack depth limit exceeded` in Supabase logs
-- Permission queries returning empty arrays for all users
-- Only service-role API calls work, anon/user calls return nothing
-
-**Prevention:**
-Define one "bootstrap" function that uses `SECURITY DEFINER` to bypass RLS for permission lookups:
-```sql
-CREATE OR REPLACE FUNCTION get_user_permissions(p_user_id UUID)
-RETURNS TABLE(module TEXT, sub_module TEXT, access_level TEXT)
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT module, sub_module, access_level
-  FROM user_permissions
-  WHERE user_id = p_user_id AND deleted_at IS NULL;
-$$;
-```
-Then write RLS policies that call this function — never query `user_permissions` directly inside a policy on `user_permissions`.
-
-**Phase:** Address in Phase 1 (DB Schema) before writing any RLS policies.
-
----
-
-### Pitfall 2: Using the `service_role` Key on the Client Side
-
-**What goes wrong:**
-`NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY` is set as a public env var (prefixed `NEXT_PUBLIC_`), exposing the service role key to the browser. The service role key bypasses ALL RLS policies — anyone with it has unrestricted database access.
-
-**Why it happens:**
-Developers use the service role key to "make things work" when RLS blocks them, then accidentally expose it in client code.
-
-**Consequences:**
-- Complete data breach — any browser user can read/write/delete all rows
-- No audit trail of unauthorized access
-- Unrecoverable if the key is used in production and logs are not watched
-
-**Warning signs:**
-- Any env var starting with `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE` in the codebase
-- `createClient(url, SERVICE_ROLE_KEY)` appearing in any file under `app/` or `components/`
-
-**Prevention:**
-- Service role key: ONLY in Server Actions, Route Handlers, and Supabase Edge Functions
-- Client components: ONLY use the anon key (`NEXT_PUBLIC_SUPABASE_ANON_KEY`)
-- Add a git pre-commit hook or CI check: `grep -r "SERVICE_ROLE" src/` must return empty
-- In Vercel: set `SUPABASE_SERVICE_ROLE_KEY` (no `NEXT_PUBLIC_` prefix) — never expose it
-
-**Phase:** Address in Phase 1 (Auth + Infrastructure setup) as a non-negotiable rule.
-
----
-
-### Pitfall 3: Supabase Auth Cookie Handling in Next.js App Router
-
-**What goes wrong:**
-The old `@supabase/auth-helpers-nextjs` package (now deprecated) handled cookies differently from the current `@supabase/ssr` package. Mixing them, or using the old pattern with App Router, causes:
-- Sessions not persisting across page navigation
-- `auth.uid()` returning `null` in Server Components even when user is logged in
-- Middleware not refreshing the session token, causing auto-logout after 1 hour
-
-**Why it happens:**
-Most tutorials and Stack Overflow answers still show the old `createClientComponentClient()` / `createServerComponentClient()` pattern from `auth-helpers-nextjs`. This API was deprecated in 2024.
-
-**Consequences:**
-- Users are logged out randomly (JWT expiry not refreshed)
-- Server Components always see unauthenticated state → 401s on all protected routes
-- Middleware redirects loop infinitely
-
-**Warning signs:**
-- Installing `@supabase/auth-helpers-nextjs` (deprecated package)
-- No middleware.ts file refreshing the session
-- `createServerComponentClient` or `createClientComponentClient` in codebase
-- Users reporting "logged out after a while" without explicit sign-out
-
-**Prevention:**
-Use `@supabase/ssr` (current package) exclusively:
+`proxy.ts` has a single hardcoded redirect target:
 ```typescript
-// lib/supabase/server.ts
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-
-export function createClient() {
-  const cookieStore = cookies()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
+// CURRENT CODE — only knows about one login page
+if (!user && !request.nextUrl.pathname.startsWith('/login') && ...) {
+  url.pathname = '/login'          // <-- always sends to admin login
+  return NextResponse.redirect(url)
 }
 ```
-Middleware must call `supabase.auth.getUser()` on every request to refresh the JWT.
+There is no path-aware branching. It was written when there was only one login.
 
-**Phase:** Address in Phase 1 (Auth foundation). This is the first thing to get right.
-
----
-
-### Pitfall 4: RTL Layout Breaking with Tailwind CSS — `left`/`right` vs `start`/`end`
-
-**What goes wrong:**
-Using `pl-4`, `mr-2`, `left-0`, `right-0` (physical directional utilities) instead of logical utilities (`ps-4`, `me-2`, `start-0`, `end-0`) in a Hebrew RTL interface. The layout works in LTR development but breaks when `dir="rtl"` is applied.
-
-**Why it happens:**
-Developers write CSS from muscle memory in LTR. Physical utilities (`left`, `right`, `pl`, `pr`, `ml`, `mr`) do not flip in RTL. Logical utilities (`start`, `end`, `ps`, `pe`, `ms`, `me`) flip automatically.
-
-**Consequences:**
-- Sidebar appears on wrong side
-- Icons appear opposite to text
-- Dropdowns open to the wrong side
-- Tooltips and popups overflow off-screen
-- The longer the development, the more painful the RTL fix
-
-**Warning signs:**
-- `className` contains `pl-`, `pr-`, `ml-`, `mr-`, `left-`, `right-` without a deliberate RTL override
-- Sidebar navigation working in LTR dev but looking wrong when you switch to Hebrew
-- Third-party component libraries using physical CSS properties internally
-
-**Prevention:**
-- Set `dir="rtl"` in `<html>` tag from Day 1 and develop in RTL mode from the start
-- Enforce a rule: use `ps-`, `pe-`, `ms-`, `me-`, `start-`, `end-` everywhere
-- Add Tailwind config check or ESLint rule to flag `pl-`, `pr-`, `ml-`, `mr-` usage
-- For shadcn/ui: it uses physical properties internally — test each component in RTL and add CSS overrides where needed
-- For the dark sidebar (right-side in RTL): set `dir="ltr"` on the sidebar explicitly if it needs to remain visually anchored regardless of locale
-
-**Phase:** Address in Phase 1 (UI foundation). Fix RTL before building any components.
-
----
-
-### Pitfall 5: Soft Delete Breaking Foreign Keys and Unique Constraints
-
-**What goes wrong:**
-Soft delete (`deleted_at IS NOT NULL`) conflicts with `UNIQUE` constraints. Example: Employee number 123 at company 1 is soft-deleted. You try to create a new Employee 123 at company 1 — the `UNIQUE(employee_number, company_id)` constraint fires even though the first record is "deleted". Also, RLS policies that don't filter `deleted_at IS NULL` expose deleted rows.
-
-**Why it happens:**
-Soft delete is applied as a simple nullable timestamp column, but the database still enforces constraints on all rows, active or deleted.
-
-**Consequences:**
-- Cannot re-hire an employee with the same employee number
-- Cannot restore a deleted record if a duplicate was created
-- Deleted rows appear in JOIN results, corrupting reports and audit views
-- RLS policies that don't filter soft-deleted rows leak deleted data
-
-**Warning signs:**
-- `duplicate key value violates unique constraint` errors when trying to create records that were previously soft-deleted
-- Queries returning rows with `deleted_at IS NOT NULL` when they shouldn't
-- COUNT() queries including deleted rows
-
-**Prevention:**
-
-1. **Partial unique indexes** instead of UNIQUE constraints:
-```sql
--- Only enforce uniqueness among non-deleted rows
-CREATE UNIQUE INDEX employees_active_unique
-  ON employees (employee_number, company_id)
-  WHERE deleted_at IS NULL;
-```
-
-2. **Views for all application queries:**
-```sql
-CREATE VIEW active_employees AS
-  SELECT * FROM employees WHERE deleted_at IS NULL;
-```
-
-3. **RLS policies must always include** `deleted_at IS NULL` filter or use the views.
-
-4. **FK references to soft-deleted rows:** Use a database trigger that prevents soft-deleting a parent if active children exist.
-
-**Phase:** Address in Phase 1 (DB Schema) before any table is created.
-
----
-
-### Pitfall 6: Audit Log Performance — Writing Synchronously on Every Mutation
-
-**What goes wrong:**
-Audit logging is implemented as a synchronous INSERT into an `audit_log` table on every mutation (create, update, delete). As the number of operations grows:
-- Each mutation takes twice as long (user waits for audit INSERT)
-- High-frequency operations (Excel import of 500 employees) create 500+ synchronous audit rows, causing timeouts
-- The `audit_log` table becomes the largest table and slows down all queries
-- Fetching audit history requires full table scans without proper indexing
-
-**Why it happens:**
-Audit logging is added "the easy way" — an INSERT after every mutation. No one thinks about scale until it's already slow.
-
-**Consequences:**
-- Excel import of 500 employees times out (Vercel's 10-second function limit)
-- Admin dashboard audit log tab loads slowly
-- Database CPU spikes on bulk operations
-
-**Warning signs:**
-- Audit log table has no composite index on `(entity_type, entity_id, created_at)`
-- Audit INSERTs happen in the same transaction as the mutation
-- No pagination on audit log queries (fetching all rows)
-- Bulk operations trigger one audit row per row changed
-
-**Prevention:**
-
-1. **Use a PostgreSQL trigger for audit logging** — moves the write off the application layer:
-```sql
-CREATE OR REPLACE FUNCTION audit_trigger_function()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO audit_log (
-    table_name, record_id, operation,
-    old_data, new_data, changed_by, changed_at
-  ) VALUES (
-    TG_TABLE_NAME,
-    COALESCE(NEW.id, OLD.id),
-    TG_OP,
-    to_jsonb(OLD),
-    to_jsonb(NEW),
-    auth.uid(),
-    NOW()
-  );
-  RETURN COALESCE(NEW, OLD);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-```
-
-2. **Index the audit log properly:**
-```sql
-CREATE INDEX audit_log_entity_idx ON audit_log (table_name, record_id, changed_at DESC);
-CREATE INDEX audit_log_user_idx ON audit_log (changed_by, changed_at DESC);
-CREATE INDEX audit_log_date_idx ON audit_log (changed_at DESC);
-```
-
-3. **For bulk imports:** Wrap in one transaction with a single "bulk import" audit entry at the application level, not one per row.
-
-4. **Paginate audit log queries** — never fetch all rows. Use `LIMIT 50 OFFSET N`.
-
-5. **Partition the audit_log table by month** if volume is expected to grow significantly (vehicle fleet module will add high-frequency events).
-
-**Phase:** Address in Phase 1 (DB Schema design) and revisited in the Excel import phase.
-
----
-
-### Pitfall 7: Vercel Function Timeout on Excel Import
-
-**What goes wrong:**
-Excel import of 500 employees runs as a single Next.js Route Handler or Server Action. Vercel's Hobby/Pro plans enforce a 10-second (Hobby) or 60-second (Pro) function execution limit. Processing, validating, matching composites, and upserting 500 rows hits this limit.
-
-**Why it happens:**
-The import is built as a simple loop:
-1. Parse Excel file
-2. For each row: validate → lookup composite key → upsert → log audit
-
-At 500 rows × ~50ms per DB round-trip = 25 seconds. Exceeds Hobby plan limit.
-
-**Consequences:**
-- Import silently fails mid-way — partial data imported, no error shown to user
-- User imports same file again → duplicates or incorrect overwrites
-- No way to know which rows succeeded
-
-**Warning signs:**
-- Import works on local dev (no timeout) but fails on Vercel
-- Vercel logs show `FUNCTION_INVOCATION_TIMEOUT`
-- Users report import "hanging" then showing generic error
-
-**Prevention:**
-
-1. **Batch upserts** — send all rows in a single `supabase.from('employees').upsert([...all rows])` call instead of one-by-one.
-
-2. **Upgrade Vercel plan** to Pro (60-second limit) or use Vercel's Fluid compute (no limit) for import routes.
-
-3. **Move import to Supabase Edge Function** — no Vercel timeout applies. Parse on client, POST JSON to Edge Function.
-
-4. **Client-side preview first** — parse Excel in the browser (SheetJS), show the user a preview table, then POST the parsed JSON (not the file) to the API. This removes parsing overhead from the function.
-
-5. **Progress feedback** — use Server-Sent Events or polling so user sees progress, not a spinner that eventually fails.
-
-**Phase:** Address in the Excel import phase. Plan for batch upsert from Day 1.
-
----
-
-### Pitfall 8: Permission System — Checking Permissions Client-Side Only
-
-**What goes wrong:**
-The UI hides buttons/tabs based on the user's permissions (loaded from `user_permissions` table). But the API routes/Server Actions that perform the actual mutations do not re-check permissions server-side. A determined user (or a script) can call the API directly, bypassing the UI restrictions.
-
-**Why it happens:**
-"The user can't see the button, so they can't do the action" — a classic client-side security mistake.
-
-**Consequences:**
-- Any user with a REST client can perform any action regardless of their assigned permissions
-- RLS is the last line of defense but not the permission system
-- Audit log shows unauthorized mutations with no indication they were unauthorized
-
-**Warning signs:**
-- Permission checks only appear in component render logic (`if (hasPermission) return <Button>`)
-- Server Actions have no permission check at the top
-- Route handlers trust `req.body` without verifying the caller's access level
-
-**Prevention:**
-Create a server-side permission check utility that must be called at the top of every mutation:
+**How to avoid:**
+Extend the proxy with path-aware redirect logic before adding any `(app)` routes:
 ```typescript
-// lib/permissions.ts
-export async function requirePermission(
-  supabase: SupabaseClient,
-  module: string,
-  subModule: string,
-  level: 'read' | 'write'
-) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthenticated')
+// Determine which login page to redirect to based on the request path
+const isAppRoute = request.nextUrl.pathname.startsWith('/app')
 
-  const perms = await get_user_permissions(user.id)
-  const perm = perms.find(p => p.module === module && p.sub_module === subModule)
-
-  if (!perm || !meetsLevel(perm.access_level, level)) {
-    throw new Error('Forbidden')
+if (!user) {
+  const loginPath = isAppRoute ? '/app/login' : '/login'
+  // Exclude both login pages from redirect
+  if (
+    !request.nextUrl.pathname.startsWith('/login') &&
+    !request.nextUrl.pathname.startsWith('/app/login') &&
+    !request.nextUrl.pathname.startsWith('/auth')
+  ) {
+    url.pathname = loginPath
+    return NextResponse.redirect(url)
   }
 }
 ```
-This must be called in EVERY Server Action and Route Handler that mutates data.
-
-**Phase:** Address in Phase 1 (Auth + Permissions foundation). Define the pattern before writing any mutation.
-
----
-
-## Moderate Pitfalls
-
----
-
-### Pitfall 9: Excel Hebrew Date and Encoding Issues
-
-**What goes wrong:**
-Excel files from Israeli payroll systems (like the described salary system export) use Windows-1255 or CP1252 encoding. SheetJS (xlsx library) reads dates as Excel serial numbers, not JavaScript Date objects. Hebrew text in cells can appear as garbled characters if encoding is not handled explicitly. Date fields like `תאריך לידה` (date of birth) come as numbers like `44927` (Excel date serial) instead of `2023-01-01`.
-
-**Why it happens:**
-Excel has its own date epoch (Jan 1, 1900) and SheetJS defaults to keeping raw values unless you set `cellDates: true`. Encoding issues arise when the file was saved in legacy Excel format (`.xls` vs `.xlsx`).
+Also update the matcher to exclude `/app/login` from redirect.
 
 **Warning signs:**
-- Date columns showing 5-digit numbers instead of dates
-- Hebrew column headers appearing as `???` or boxes
-- Fields that should be dates showing as strings like `"44927"`
+- Employee visits `/app/dashboard`, lands on admin login page
+- After logging in as employee, redirected to `/admin/companies`
+- Infinite redirect loop if `/app/login` is not excluded from the redirect check
 
-**Prevention:**
+**Phase to address:** Phase 1 of v2.0 (Shell setup) — FIRST thing before any (app) route is created.
+
+---
+
+### Pitfall 2: login Server Action Hardcodes Redirect to /admin/companies
+
+**What goes wrong:**
+The existing `login()` Server Action (in `src/actions/auth.ts`) always redirects to `/admin/companies` on success:
 ```typescript
-import * as XLSX from 'xlsx'
-
-const workbook = XLSX.read(buffer, {
-  type: 'buffer',
-  cellDates: true,     // Convert Excel dates to JS Date objects
-  codepage: 1255,      // Hebrew Windows code page
-})
+redirect("/admin/companies");  // <-- hardcoded, line 92
 ```
-Validate all date fields against a known range (e.g., birth date must be between 1930 and 2010) as a sanity check after parsing.
-
-**Phase:** Excel import phase. Test with real exported files from the salary system before building import logic.
-
----
-
-### Pitfall 10: Supabase Auth — `getSession()` vs `getUser()` Trust Issue
-
-**What goes wrong:**
-`supabase.auth.getSession()` reads the session from the cookie/localStorage without server verification. In Server Components, this session could be tampered with. `supabase.auth.getUser()` makes a round-trip to Supabase Auth to verify the JWT is valid. Using `getSession()` for security decisions in Server Components is a vulnerability.
+If an employee uses the admin `/login` page (which can happen accidentally), or if a shared login is ever considered, they land on an admin page they cannot access. The admin login page is visually the same — no indication it is admin-only.
 
 **Why it happens:**
-`getSession()` is faster and doesn't require a network call, so developers use it everywhere for convenience.
+When there was one user type, one redirect target made sense. v2.0 introduces a second user type with a different post-login destination.
 
-**Consequences:**
-- A crafted cookie can fool your server-side permission checks into thinking a user is authenticated
-- Privilege escalation attacks become possible
-
-**Warning signs:**
-- `getSession()` used in middleware.ts or Server Components for authentication decisions
-- No `getUser()` call before checking permissions on the server
-
-**Prevention:**
-- In middleware and Server Components: always use `getUser()` for authentication checks
-- `getSession()` is acceptable only in Client Components for reading non-sensitive session data (like displaying the user's name)
-
-**Phase:** Phase 1 (Auth setup). This rule must be in a CLAUDE.md or coding standards doc for the project.
-
----
-
-### Pitfall 11: Heebo Font — CLS and Missing Font Subsets
-
-**What goes wrong:**
-Heebo font is loaded from Google Fonts without the `display: swap` option or without pre-loading, causing Cumulative Layout Shift (CLS) — text renders in a fallback font, then jumps when Heebo loads. Additionally, if only the Latin subset is loaded, Hebrew characters fall back to the system font and look visually inconsistent.
-
-**Why it happens:**
-Next.js `next/font/google` is used without specifying the Hebrew subset explicitly.
-
-**Warning signs:**
-- Hebrew text on first load appears in a different font for 1-2 seconds
-- Lighthouse CLS score above 0.1
-- Characters look inconsistent (some Latin, some different Hebrew font)
-
-**Prevention:**
+**How to avoid:**
+Two separate Server Actions: `loginAdmin()` (existing) and `loginEmployee()` (new). Each has its own redirect target hardcoded:
 ```typescript
-// app/layout.tsx
-import { Heebo } from 'next/font/google'
-
-const heebo = Heebo({
-  subsets: ['hebrew', 'latin'],
-  display: 'swap',
-  variable: '--font-heebo',
-  weight: ['300', '400', '500', '600', '700', '800'],
-})
+// actions/auth-app.ts
+export async function loginEmployee(...): Promise<LoginState> {
+  // ... same Supabase signInWithPassword ...
+  // After success: check that this user has a public.users row
+  // If they do NOT (i.e., they are Sharon/bootstrap admin), reject with error
+  redirect("/app/dashboard")
+}
 ```
-Use `next/font/google` (not a `<link>` tag) — Next.js automatically handles preloading and self-hosting.
-
-**Phase:** Phase 1 (UI foundation).
-
----
-
-### Pitfall 12: Deleting a User from Supabase Auth Without Cleaning Up Application Data
-
-**What goes wrong:**
-Supabase Auth users live in `auth.users` (managed by Supabase). Your application users live in your `users` table with `auth_user_id` as a FK. If you delete a user from the Supabase Auth dashboard (not via your application), the FK constraint breaks or leaves orphaned records. Conversely, soft-deleting from your `users` table doesn't remove the Auth user — they can still log in.
-
-**Why it happens:**
-The Supabase Auth table is separate from the application data model. Developers manage them independently without coordination.
-
-**Consequences:**
-- Disabled employees can still authenticate via Supabase Auth
-- Dashboard shows "0 users" in your table but the person can log in
-- Auth user exists with no application record → crashes on any auth.uid() lookup
-
-**Prevention:**
-- Never soft-delete a `users` record without also calling `supabase.auth.admin.deleteUser(auth_user_id)` OR disabling the Auth user
-- Better: don't delete from Auth — disable the app user by setting `is_active = false` in your `users` table and enforce this via RLS: inactive users get an empty permission set
-- Add a database trigger: when `users.deleted_at IS NOT NULL`, automatically revoke all `user_permissions` rows for that user
-
-**Phase:** Phase 1 (Auth + User management design). Define this lifecycle before writing the user management screen.
-
----
-
-### Pitfall 13: Next.js Server Actions — Missing Error Boundaries and Undefined State
-
-**What goes wrong:**
-Server Actions that throw uncaught errors crash the entire React tree instead of showing a user-friendly error. In forms with Hebrew validation messages, errors returned as `string` from Server Actions are not properly handled — the UI shows a generic "Something went wrong" in English even though the app is Hebrew.
-
-**Why it happens:**
-Error handling in Server Actions requires explicit `try/catch` returning a result object, not throwing. And Hebrew error strings must be returned from the server, not generated client-side from error codes.
+Never share one login action between admin and employee paths.
 
 **Warning signs:**
-- Any Server Action without a `try/catch` block
-- Error handling that only logs to console, not returned to the client
-- Validation errors shown in English in a Hebrew UI
+- Employee successfully logs in but sees admin interface
+- Admin accidentally uses employee login and ends up at /app/dashboard
 
-**Prevention:**
+**Phase to address:** Phase 1 of v2.0 — create `loginEmployee` action immediately when creating the employee login page.
+
+---
+
+### Pitfall 3: getNavPermissions() Returns Admin Module Keys to (app) Layout
+
+**What goes wrong:**
+`getNavPermissions()` in `dal.ts` has a hardcoded fallback:
 ```typescript
-// Standard Server Action pattern
-export async function upsertEmployee(formData: FormData) {
-  try {
-    // ... logic
-    return { success: true, data: employee }
-  } catch (error) {
-    // Return Hebrew error messages from server
-    if (error instanceof ValidationError) {
-      return { success: false, error: error.hebrewMessage }
+// CURRENT CODE — line 107
+if (!userRow) {
+  return ['dashboard', 'companies', 'departments', 'role_tags', 'employees', 'users', 'templates', 'projects', 'settings']
+}
+```
+This fallback exists to support Sharon (no public.users row = bootstrap admin). If the `(app)` layout calls `getNavPermissions()` and the user happens to be Sharon (testing the employee app), they get admin module keys — which are meaningless in the employee nav context. Worse, if `getNavPermissions()` is used as-is in the `(app)` layout without filtering for ChemoSys-only module keys, admin module keys like `companies` and `employees` could appear in the employee sidebar.
+
+**Why it happens:**
+`getNavPermissions()` was designed for the admin sidebar. It returns raw module keys from the DB without context about which group (admin vs app) those keys belong to.
+
+**How to avoid:**
+Create a separate `getAppNavPermissions()` function that:
+1. Filters the returned module keys to only include ChemoSys module keys (e.g., `fleet`, `equipment`, `reports`)
+2. Has its own fallback (admin users testing the app should see all ChemoSys modules, not admin modules)
+
+```typescript
+// The ChemoSys module keys — defined as a constant shared with the seeder
+const CHEMO_APP_MODULE_KEYS = ['fleet', 'equipment', 'my_assignments', 'reports']
+
+export async function getAppNavPermissions(): Promise<string[]> {
+  const session = await verifySession()
+  const supabase = await createClient()
+  const { data: perms } = await supabase.rpc('get_user_permissions', { p_user_id: session.userId })
+
+  const allowed = new Set<string>()
+  for (const p of (perms ?? [])) {
+    if (p.level >= 1 && CHEMO_APP_MODULE_KEYS.includes(p.module_key)) {
+      allowed.add(p.module_key)
     }
-    return { success: false, error: 'שגיאת מערכת. נסה שנית.' }
   }
+  return Array.from(allowed)
 }
 ```
 
-**Phase:** Phase 1 (patterns established). Document the standard Server Action pattern before writing any.
+**Warning signs:**
+- Employee sidebar shows "ניהול חברות" or "ניהול עובדים" (admin modules)
+- Sharon sees zero nav items when testing the employee app (because admin modules are filtered out but no app modules are seeded yet)
+
+**Phase to address:** Phase 1 of v2.0, as part of the (app) layout creation.
 
 ---
 
-### Pitfall 14: RLS Policies — Forgetting to Enable RLS on New Tables
+### Pitfall 4: Module Keys Not Seeded — requirePermission() Silently Grants or Denies Access
 
 **What goes wrong:**
-Every new table created in Supabase has RLS disabled by default. If a developer creates a table (e.g., `role_templates`, `system_settings`) and forgets to enable RLS, ALL authenticated and anonymous users can read and write every row.
+`requirePermission('fleet', 1)` is called in an employee Server Action. The `modules` table has no row with `key = 'fleet'`. The `get_user_permissions()` RPC returns no row for `fleet`. The `perm?.level` is `undefined`, which coerces to `0`. The check `0 >= 1` fails → the Server Action throws "אין הרשאה למודול fleet" for every user including admin users. Everything appears broken from day one.
 
 **Why it happens:**
-RLS is opt-in in Supabase. The Supabase dashboard shows a warning, but it's easy to miss during rapid development.
+The `modules` table is the canonical list of valid module keys. `user_permissions.module_key` has no FK constraint to `modules.key` — it is plain TEXT. So keys can be used in permission grants that do not exist in the `modules` table, and keys can be checked in `requirePermission()` that are not yet seeded. The result is unpredictable.
+
+**How to avoid:**
+Before writing a single ChemoSys page or Server Action, run a migration that seeds all ChemoSys module keys:
+```sql
+-- 00016_seed_chemosys_modules.sql
+INSERT INTO modules (key, name_he, parent_key, sort_order, icon)
+VALUES
+  ('fleet',           'צי רכבים',         NULL, 10, 'Truck'),
+  ('equipment',       'ציוד',              NULL, 11, 'Wrench'),
+  ('my_assignments',  'המשימות שלי',        NULL, 12, 'ClipboardList'),
+  ('reports',         'דוחות',             NULL, 13, 'FileBarChart')
+ON CONFLICT (key) DO NOTHING;
+```
+This migration MUST run before any employee user is granted permissions.
 
 **Warning signs:**
-- New table visible in Supabase dashboard without the green "RLS Enabled" badge
-- `supabase.from('new_table').select('*')` returns data for any anon user in test
+- `requirePermission('fleet', 1)` throws for all users
+- Admin user (is_admin = true) is also blocked because `get_user_permissions()` returns ALL modules but only those in the `modules` table (admin shortcut uses `FROM modules m` in the RPC)
+- Checking `user_permissions` table shows rows with module_key values that don't exist in `modules`
 
-**Prevention:**
-- Add this to every migration file:
-```sql
-ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
--- Then immediately add policies
-```
-- Add a CI test: query every table with the anon key and assert that it returns no rows (or specific expected rows)
-- Establish a checklist: "RLS enabled + policies written" before any table goes to production
-
-**Phase:** Phase 1 (DB Schema). Non-negotiable standard for all migrations.
+**Phase to address:** Phase 1 of v2.0, migration 00016 as the very first v2.0 migration.
 
 ---
 
-### Pitfall 15: Composite Key Excel Matching — Silent Mismatches
+### Pitfall 5: is_admin Bypass in get_user_permissions() Includes Admin Module Keys
 
 **What goes wrong:**
-The Excel import matches employees by `employee_number + company_id`. The `company_id` must be resolved from a company name or company number in the Excel file. If the company name in Excel doesn't exactly match the company name in the database (trailing space, different casing, Hebrew vs English company name), the match fails silently — the employee is created as a duplicate instead of updated.
+The current `get_user_permissions()` RPC (from migration 00012) returns ALL modules from the `modules` table with level 2 for admin users:
+```sql
+SELECT m.key::TEXT AS module_key, 2::SMALLINT AS level
+FROM modules m
+WHERE EXISTS (SELECT 1 FROM users u WHERE u.auth_user_id = p_user_id AND u.is_admin = true ...)
+```
+When ChemoSys module keys are added to the `modules` table, admin users will automatically receive level 2 on ALL of them (fleet, equipment, etc.) — which is correct. However, if Sharon tests the employee app while logged into the admin session, the permission checks will pass for every ChemoSys module. This is the intended behavior. The pitfall is the opposite assumption: developers might assume admin users do NOT have app-level permissions and write special-case code to block them. Do not do this.
+
+**How to avoid:**
+Accept that is_admin = true means full access to both admin and app modules. This is a deliberate architectural choice. Document it clearly in the (app) layout's header comment so future developers don't add "block admin from app" logic.
+
+**Warning signs:**
+- Code like `if (isAdmin) return null` in (app) pages
+- Separate permission check functions that explicitly exclude admin users from app access
+
+**Phase to address:** Phase 1 of v2.0 — document the intent in (app) layout.
+
+---
+
+### Pitfall 6: Two Layouts Calling verifySession() + getNavPermissions() — N+1 DB Calls Per Page
+
+**What goes wrong:**
+The `(app)` layout calls `verifySession()`, then `getAppNavPermissions()` (which calls `get_user_permissions()` RPC). A page inside the layout also calls `verifySession()` and `checkPagePermission()` (which calls `get_user_permissions()` again). On one page load: 3+ DB calls for auth/permissions. At scale with 50 concurrent employees, this is 150+ RPC calls per second for permission checks alone.
 
 **Why it happens:**
-Israeli payroll exports often include company codes (not names). The mapping from Excel company code to `company_id` is not defined early enough, and no validation step shows mismatches to the user before import.
+Each Server Component calls what it needs independently. Without memoization, the same RPC is called multiple times per render tree.
 
-**Consequences:**
-- Duplicate employee records with the same `employee_number` but different (wrong) `company_id`
-- Import appears to succeed but creates new records instead of updating
-- The original (correct) employee record remains outdated
+**How to avoid:**
+`verifySession()` is already wrapped in `React.cache()` — it runs once per request regardless of how many times it is called. Do the same for `get_user_permissions()` data:
 
-**Warning signs:**
-- After import, employees appear duplicated in the list
-- Import "success" count doesn't match expected update count
-
-**Prevention:**
-1. Show a preview step before committing: "Found 487 matches, 13 new records — is this correct?"
-2. Map Excel company codes to `company_id` explicitly in a configuration table or import wizard
-3. Add a post-import validation query: count employees where `employee_number` is not unique per company and alert if > 0
-4. Log every match/no-match decision in the import result report
-
-**Phase:** Excel import phase. Design the matching and preview UI before writing any import logic.
-
----
-
-## Minor Pitfalls
-
----
-
-### Pitfall 16: Vercel Environment Variables Not Available at Build Time
-
-**What goes wrong:**
-Some Supabase configuration (like the database URL for Prisma or direct DB connections) is needed at build time. Vercel only injects `NEXT_PUBLIC_` variables at build time by default. Server-only variables are available at runtime, not build time.
-
-**Prevention:**
-- Know which variables are build-time vs runtime
-- Use `NEXT_PUBLIC_` prefix only for anon key and Supabase URL
-- Never reference server-only env vars in `next.config.js` or static generation functions without `NEXT_PHASE` guards
-
-**Phase:** Phase 1 (Infrastructure). Document in a `.env.example` file.
-
----
-
-### Pitfall 17: `updated_by` and `created_by` Not Set Automatically
-
-**What goes wrong:**
-The schema requires `created_by` and `updated_by` on every table (pointing to the user who made the change). If this is handled application-side, every developer must remember to set it. Someone forgets, and records are created with `null` in `created_by`.
-
-**Prevention:**
-Use a PostgreSQL trigger to set `created_by` and `updated_by` from `auth.uid()`:
-```sql
-CREATE OR REPLACE FUNCTION set_audit_fields()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF TG_OP = 'INSERT' THEN
-    NEW.created_by = auth.uid();
-  END IF;
-  NEW.updated_by = auth.uid();
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-```
-Apply to every table. This removes human error from the equation.
-
-**Phase:** Phase 1 (DB Schema). Part of the standard migration template.
-
----
-
-### Pitfall 18: Infinite Re-renders from Supabase Realtime Subscriptions
-
-**What goes wrong:**
-If Supabase Realtime subscriptions are set up inside a `useEffect` without proper cleanup, or if the subscription callback triggers a state update that re-renders the component and re-runs the effect, it creates an infinite subscription loop. Memory leaks and duplicate event handling result.
-
-**Prevention:**
-Always return a cleanup function from `useEffect`:
 ```typescript
-useEffect(() => {
-  const channel = supabase
-    .channel('employees')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' },
-      (payload) => handleChange(payload))
-    .subscribe()
+// In dal.ts — add a cached version of the RPC call
+const getUserPermissionsRaw = cache(async (userId: string) => {
+  const supabase = await createClient()
+  const { data } = await supabase.rpc('get_user_permissions', { p_user_id: userId })
+  return data ?? []
+})
 
-  return () => { supabase.removeChannel(channel) }
-}, []) // Empty dependency array — subscribe once
-```
-For the current scale (500 employees, 50 users), Realtime is not needed. Avoid it until there is a specific requirement.
+// All permission functions use this cached call
+export async function getAppNavPermissions() {
+  const session = await verifySession()
+  const perms = await getUserPermissionsRaw(session.userId)
+  // ... filter for app modules
+}
 
-**Phase:** Any phase that introduces live data requirements.
-
----
-
-### Pitfall 19: `next/image` Not Configured for External Domains
-
-**What goes wrong:**
-If logos (e.g., CA.png, Heb-ChemoIT.png) are served from cPanel (ch-ah.info) and displayed via `<Image>` (next/image), Next.js will throw a configuration error unless `ch-ah.info` is in the `images.remotePatterns` config.
-
-**Prevention:**
-```typescript
-// next.config.ts
-const nextConfig = {
-  images: {
-    remotePatterns: [
-      { protocol: 'https', hostname: 'ch-ah.info' },
-    ],
-  },
+export async function checkPagePermission(moduleKey: string, minLevel: PermissionLevel) {
+  const session = await verifySession()
+  const perms = await getUserPermissionsRaw(session.userId)
+  // ... check
 }
 ```
-Or serve static assets from `/public/` folder in the Next.js project itself — simpler and avoids cross-origin issues.
 
-**Phase:** Phase 1 (UI foundation).
+`React.cache()` deduplicates within a single request's render tree. The RPC fires once; all callers get the same result.
 
----
+**Warning signs:**
+- Supabase dashboard shows high RPC call volume per minute relative to active users
+- Page load time increases linearly with the number of permission checks on the page
+- Database connection pool exhaustion under moderate load
 
-## Phase-Specific Warnings
-
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| DB Schema creation | Forgetting to enable RLS on every table (Pitfall 14) | Template migration with RLS enabled + policy placeholder |
-| DB Schema creation | Unique constraints broken by soft delete (Pitfall 5) | Use partial unique indexes from the start |
-| DB Schema creation | Missing `created_by`/`updated_by` automation (Pitfall 17) | Trigger-based audit fields |
-| Auth setup | Deprecated `auth-helpers-nextjs` package (Pitfall 3) | Use `@supabase/ssr` only, document in project CLAUDE.md |
-| Auth setup | `getSession()` trusted server-side (Pitfall 10) | Code review rule: `getUser()` in all server contexts |
-| Auth setup | Service role key in client code (Pitfall 2) | CI grep check for `NEXT_PUBLIC_SERVICE_ROLE` |
-| Permissions system | RLS infinite recursion (Pitfall 1) | `SECURITY DEFINER` function for permission lookups |
-| Permissions system | Client-side-only permission checks (Pitfall 8) | `requirePermission()` utility called in every mutation |
-| User management | Auth user not disabled on soft delete (Pitfall 12) | Lifecycle design before coding user management |
-| UI foundation | RTL physical CSS properties (Pitfall 4) | RTL from Day 1, logical Tailwind utilities only |
-| UI foundation | Heebo font CLS (Pitfall 11) | `next/font/google` with `subsets: ['hebrew']` |
-| UI foundation | Server Action errors in English (Pitfall 13) | Standard error pattern with Hebrew messages |
-| Audit logging | Synchronous per-row audit writes (Pitfall 6) | Database trigger for audit, not application code |
-| Excel import | Vercel function timeout (Pitfall 7) | Batch upsert, client-side parse, Pro plan |
-| Excel import | Hebrew date/encoding issues (Pitfall 9) | `cellDates: true`, `codepage: 1255`, test with real files |
-| Excel import | Silent composite key mismatches (Pitfall 15) | Preview step before commit, match report |
-| Vercel deploy | Build-time env var availability (Pitfall 16) | Document in `.env.example` with clear labels |
+**Phase to address:** Phase 1 of v2.0, when refactoring `dal.ts` to add app-specific functions.
 
 ---
 
-## Confidence Assessment
+### Pitfall 7: RTL Assumptions Break in New shadcn/ui Components
 
-| Area | Confidence | Notes |
-|------|------------|-------|
-| RLS pitfalls (1, 10, 14) | HIGH | Well-documented in official Supabase docs and community issues |
-| Auth/SSR pitfalls (2, 3) | HIGH | Official Supabase migration guide from auth-helpers → ssr package |
-| RTL pitfalls (4, 11) | HIGH | Tailwind logical properties are documented; Heebo subset is Next.js docs |
-| Soft delete pitfalls (5) | HIGH | Standard PostgreSQL pattern, well-understood |
-| Audit log pitfalls (6) | HIGH | Standard pattern; PostgreSQL trigger approach is industry standard |
-| Vercel timeout (7) | HIGH | Vercel plan limits are documented and commonly hit |
-| Permission security (8) | HIGH | Classic web security principle, extensively documented |
-| Excel pitfalls (9, 15) | MEDIUM | SheetJS behavior is well-known; composite key matching is project-specific |
-| Auth lifecycle (12) | HIGH | Supabase Auth admin API is documented |
-| Error handling (13) | HIGH | Next.js Server Action error patterns are documented |
+**What goes wrong:**
+The admin panel established RTL using `dir="rtl"` on `<html>` and logical Tailwind utilities (`ps-`, `pe-`, `ms-`, `me-`, `start-`, `end-`). New shadcn/ui components added for ChemoSys (Tabs, Accordion, Sheet, NavigationMenu, Combobox) use physical CSS properties internally (`padding-left`, `margin-right`) and do not automatically flip in RTL. Tables with scroll containers also break — horizontal scroll goes the wrong direction.
+
+**Why it happens:**
+shadcn/ui components use Radix UI primitives. Most Radix components are RTL-aware, but some CSS within the shadcn layer uses physical properties. Also: developers adding new components in rapid development forget the RTL-first rule established in v1.0.
+
+**How to avoid:**
+1. Test every new shadcn/ui component visually in RTL immediately when added — not after the page is built.
+2. Create a `RTLCheck` dev tool: a floating banner visible only in `NODE_ENV=development` that shows "RTL: ON" so developers always know they are in RTL context.
+3. Add a lint rule or code review checklist: no `pl-`, `pr-`, `ml-`, `mr-` in new files.
+4. For components that need LTR internals (e.g., a number input or a file path display), wrap with `dir="ltr"` on the specific element — do not override the global RTL.
+
+**Warning signs:**
+- Icons appear on the wrong side of button labels
+- Dropdown menus open off-screen to the left
+- Table column headers misaligned from data columns
+- Horizontal scroll in data-heavy tables scrolls from the wrong anchor
+
+**Phase to address:** Each phase that introduces new components — verify RTL as part of phase completion criteria.
+
+---
+
+### Pitfall 8: Employee Login Creates Session but User Has No public.users Row
+
+**What goes wrong:**
+Supabase Auth login succeeds (email + password correct). But the employee's `auth.users` record was created without a corresponding `public.users` row (e.g., an old invitation was accepted before the app was set up, or a test account was created manually). The employee hits the (app) layout, `verifySession()` succeeds, `getAppNavPermissions()` runs — it finds no `public.users` row, and depending on implementation, may return the bootstrap admin fallback (all permissions) or an empty set (no nav items).
+
+**Why it happens:**
+The `public.users` row is created by the admin panel's "Create User" flow, which links `auth_user_id` to an employee record. If an auth user exists without that manual step, the system is in an inconsistent state.
+
+**How to avoid:**
+1. The `(app)` layout must explicitly check for a `public.users` row and redirect to a "contact your administrator" page if none exists — do NOT fall through to the bootstrap admin logic.
+2. Add a `verifyAppUser()` function separate from `verifySession()`:
+
+```typescript
+export async function verifyAppUser(): Promise<AppUser> {
+  const session = await verifySession()  // JWT check
+  const supabase = await createClient()
+
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('id, is_blocked, employee_id')
+    .eq('auth_user_id', session.userId)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (!userRow) redirect('/app/no-account')       // No public.users row
+  if (userRow.is_blocked) redirect('/app/blocked') // Blocked user
+
+  return { ...session, internalUserId: userRow.id, employeeId: userRow.employee_id }
+}
+```
+
+3. The `(app)` layout calls `verifyAppUser()`, NOT `verifySession()` directly.
+
+**Warning signs:**
+- Employee logs in, sees the app shell, but all nav items are missing
+- Sharon accidentally gets full employee app access when testing (bootstrap fallback fires)
+- `is_blocked` employees can access the app because only `verifySession()` is checked
+
+**Phase to address:** Phase 1 of v2.0 — `verifyAppUser()` must exist before the first (app) page is created.
+
+---
+
+### Pitfall 9: Shared /login Page — Employees and Admin Sessions Collide
+
+**What goes wrong:**
+Both Sharon (admin) and employees use Supabase Auth. They share the same Supabase project. If an employee visits `/login` (the admin login page), signs in successfully, the `login()` Server Action redirects them to `/admin/companies`. The employee now has a valid session and can potentially access admin pages until the layout's `verifySession()` check fires (it only checks for a valid JWT, not for admin status).
+
+Current `(admin)` layout:
+```typescript
+const session = await verifySession()  // Only checks JWT — not is_admin
+```
+Any authenticated user passes this check.
+
+**How to avoid:**
+Add an admin-only guard to the `(admin)` layout:
+```typescript
+export default async function AdminLayout({ children }) {
+  const session = await verifySession()
+
+  // NEW: verify this user is actually an admin
+  const supabase = await createClient()
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('is_admin')
+    .eq('auth_user_id', session.userId)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  // No public.users row = bootstrap admin (Sharon before first user creation) — allow
+  // Has public.users row but is_admin = false = employee — deny
+  if (userRow && !userRow.is_admin) {
+    redirect('/app/dashboard')  // Send them where they belong
+  }
+
+  // ... rest of layout
+}
+```
+
+**Warning signs:**
+- Employee logs into admin login, lands on admin companies page without error
+- Console shows employee email in admin session
+- An employee can access `/admin/employees` and see personal data of colleagues
+
+**Phase to address:** Phase 1 of v2.0 — patch the (admin) layout BEFORE releasing the employee login.
+
+---
+
+### Pitfall 10: module_key Naming Collision Between Admin and App Modules
+
+**What goes wrong:**
+Admin modules and ChemoSys modules share the same `modules` table and the same `module_key` namespace. If a ChemoSys module is named `dashboard` (same as the admin dashboard key already seeded), the `get_user_permissions()` RPC will conflate them. An employee granted `dashboard` read access (for the app dashboard) will appear to have `dashboard` write access in the admin permission template system as well.
+
+**Why it happens:**
+The `modules` table has no `context` or `group` column. All module keys are global.
+
+**How to avoid:**
+Use a namespace prefix for all ChemoSys module keys:
+```
+Admin modules:    dashboard, companies, departments, employees, ...
+ChemoSys modules: app_fleet, app_equipment, app_reports, app_my_work, ...
+```
+Add the prefix from the start — renaming module keys later requires a data migration across `user_permissions.module_key`, `template_permissions.module_key`, and all `requirePermission()` calls in the codebase.
+
+Alternative (cleaner but requires schema change): Add a `context TEXT` column to `modules` with values `'admin'` and `'app'`, and filter by context in `getNavPermissions()` vs `getAppNavPermissions()`.
+
+**Warning signs:**
+- Employee permission grant for "dashboard" shows up in admin permission templates
+- Admin permission for a module accidentally grants employee access to unrelated app module
+- `checkPagePermission('fleet', 1)` returns `true` for all users because "fleet" was granted to admin users generically
+
+**Phase to address:** Phase 1 of v2.0, before the first migration seeding ChemoSys module keys.
+
+---
+
+### Pitfall 11: (app) Layout Nesting — Forgot to Call verifyAppUser() in Each Nested Layout
+
+**What goes wrong:**
+Next.js App Router allows nested layouts. The `(app)` route group has a root layout that calls `verifyAppUser()`. A sub-feature (e.g., `/app/fleet/vehicles`) has its own nested layout for the fleet section. The nested layout does NOT repeat the guard. If a user bypasses the root layout somehow (deep link, cache issue), they access the page without the guard firing.
+
+**Why it happens:**
+Developers assume the root layout guard propagates down automatically. In Next.js, layouts wrap — the root layout does fire — but if you restructure routes later and move pages outside the protected subtree, the guard is lost silently.
+
+**How to avoid:**
+The root `(app)` layout must call `verifyAppUser()`. Any nested layout that adds its own data-fetching (e.g., fleet-specific data) should call `verifySession()` at minimum (JWT check) to ensure the guard is still active even if the tree is refactored. Do not rely on parent layouts for security — treat each layout as responsible for its own guard.
+
+**Warning signs:**
+- Moving a route to a different position in the file tree causes it to stop being protected
+- A deep link to a nested page works without authentication
+
+**Phase to address:** Each phase that adds nested routes — checklist item: "Guard present in this layout?"
+
+---
+
+## Technical Debt Patterns
+
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Reuse admin `getNavPermissions()` in (app) layout | No new code needed | Admin module keys leak into employee nav; confusing results | Never |
+| Hardcode employee module keys in the sidebar instead of reading from DB | Simpler nav code | Module list diverges from DB; permission grants for non-existent keys | Never — use DB as source of truth |
+| Skip `verifyAppUser()`, use `verifySession()` only in (app) layout | Faster to implement | Blocked/deleted employees can access app; no is_blocked check | Never — security gap |
+| Single login page for both admin and employees | One less page to build | Session collision (Pitfall 9); employees land on admin UI | Never in this system |
+| Use `React.cache()` in `getNavPermissions()` but not in `checkPagePermission()` | Partial caching | Same RPC called twice per page load | Only temporarily — add to all permission functions in Phase 1 |
+
+---
+
+## Integration Gotchas
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| proxy.ts + two login pages | Single redirect target `/login` | Path-aware branching: `/app/*` routes → `/app/login`, others → `/login` |
+| `get_user_permissions()` RPC + ChemoSys modules | Calling RPC before seeding module keys | Seed migration (00016) runs BEFORE first permission check in any app page |
+| Supabase Auth + two user types | Same `login()` Server Action for both | Separate `loginAdmin()` and `loginEmployee()` with separate redirect targets |
+| React.cache() + dal.ts | Cache on outer function, not on the RPC call | Cache the raw RPC call so all wrapper functions share the same cached result |
+| shadcn/ui Sheet component + RTL | Sheet opens from the wrong side | Apply `side="right"` explicitly since RTL inverts default side |
+
+---
+
+## Performance Traps
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Uncached `get_user_permissions()` RPC | Each permission check is a separate DB round-trip | Wrap raw RPC in `React.cache()` | At 20+ concurrent users with navigation-heavy pages |
+| `getNavPermissions()` called in both layout AND page server components | 2x RPC calls per page | Lift data to layout, pass down as props or use cache | From day one — unnecessary cost |
+| Dashboard page awaiting all data before render | Blank screen while fleet + equipment + summary data all load | Use `<Suspense>` with skeleton fallbacks; parallel `Promise.all` for independent queries | When any single data source is slow |
+| No pagination on fleet/equipment lists | List renders thousands of rows | Always implement server-side pagination from the start; never fetch all rows | At 500+ records |
+
+---
+
+## Security Mistakes
+
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| `(admin)` layout only calls `verifySession()` — no is_admin check | Employee with valid session accesses admin panel | Add is_admin check to (admin) layout before v2.0 ships |
+| Employee login action that does not verify a public.users row exists | Auth-only user (no app access row) gets into the app | `verifyAppUser()` checks for `public.users` row before allowing app access |
+| Module key naming collision between admin and app | Employee granted "dashboard" access appears as admin-level module | Prefix all ChemoSys module keys with `app_` |
+| `requirePermission()` not called in employee-facing Server Actions | Employee can call mutations for modules they have no access to | Every mutation Server Action in (app) calls `requirePermission()` — same rule as admin |
+| Shared session means admin logout also logs out employee on same browser | Data integrity issue if Sharon tests employee app while logged as admin | Expected and acceptable — document this behavior; use separate browsers for testing |
+
+---
+
+## UX Pitfalls
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| Greyed-out buttons with no tooltip explaining why | Employee clicks button repeatedly thinking it is broken | Add tooltip: "אין לך הרשאה לפעולה זו" on disabled permission-gated buttons |
+| Module switching clears form state (unsaved data lost) | Employee fills form, navigates away by accident, loses work | Use `useFormStatus` + unsaved-changes warning before navigation |
+| App dashboard loads all widgets sequentially | 3-5 second blank screen on first load | `<Suspense>` wrapper per widget; stagger loading with skeletons |
+| No "contact admin" message when user has zero permissions | Employee sees blank sidebar with no explanation | Detect empty permissions set and show "פנה למנהל המערכת להגדרת הרשאות" |
+| Hebrew number inputs accept English digits but display RTL | Phone numbers, employee numbers appear backwards | Use `dir="ltr"` on number/ID inputs specifically within the RTL shell |
+
+---
+
+## "Looks Done But Isn't" Checklist
+
+- [ ] **proxy.ts:** Changed to path-aware login redirect — verify `/app/fleet` without session lands on `/app/login`, not `/login`
+- [ ] **(admin) layout:** Added is_admin check — verify employee account cannot access `/admin/companies` even with valid session
+- [ ] **verifyAppUser():** Added and used in (app) layout — verify blocked user is redirected to `/app/blocked`, not to the dashboard
+- [ ] **Module seeds:** 00016 migration executed in Supabase — verify `SELECT * FROM modules WHERE key LIKE 'app_%'` returns rows
+- [ ] **requirePermission() in employee Server Actions:** Every mutation in (app) calls it — search codebase for `"use server"` in `/app/` and verify each has `requirePermission()`
+- [ ] **getAppNavPermissions():** Returns ONLY ChemoSys module keys — verify Sharon sees no "ניהול חברות" in employee sidebar
+- [ ] **RTL check for new components:** Every new shadcn/ui component tested visually in RTL — Tabs, Sheet, NavigationMenu open on correct side
+- [ ] **React.cache() on RPC call:** Single RPC call per page load — verify via Supabase dashboard logs (1 RPC call per page, not 3-4)
+- [ ] **loginEmployee action:** Redirects to `/app/dashboard` (not `/admin/companies`) — test with real employee credentials
+
+---
+
+## Recovery Strategies
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| proxy.ts wrong redirect (employees hit admin login) | LOW | Edit `src/proxy.ts`, redeploy — 10 minutes |
+| loginEmployee redirects to wrong destination | LOW | Edit `src/actions/auth-app.ts`, redeploy — 5 minutes |
+| Module keys not seeded, all permission checks fail | LOW | Run `00016_seed_chemosys_modules.sql` in Supabase SQL editor — 2 minutes |
+| getNavPermissions() leaks admin keys into employee sidebar | LOW | Replace call with `getAppNavPermissions()` in (app) layout — 30 minutes |
+| Employee accesses admin panel (no is_admin check) | MEDIUM | Patch (admin) layout, audit logs for unauthorized access, rotate credentials if sensitive data was seen |
+| Module key naming collision (admin + app keys clash) | HIGH | Data migration to rename all module_key values in user_permissions + template_permissions + code changes — plan 4-8 hours |
+
+---
+
+## Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| proxy.ts single redirect target (P1) | Phase 1 — Shell setup | `curl /app/dashboard` without cookie → 302 to `/app/login` |
+| loginEmployee wrong redirect (P2) | Phase 1 — Shell setup | Manual test: employee login → `/app/dashboard` |
+| getNavPermissions() returns admin keys (P3) | Phase 1 — Shell setup | Sharon test account: employee sidebar shows only app modules |
+| Module keys not seeded (P4) | Phase 1 — Shell setup, first migration | `SELECT * FROM modules WHERE key LIKE 'app_%'` returns rows |
+| is_admin bypass includes app modules (P5) | Phase 1 — Architecture decision | Document in (app) layout comment, no code required |
+| N+1 RPC calls per page (P6) | Phase 1 — dal.ts refactor | Supabase logs: 1 RPC call per page render |
+| RTL breaks in new components (P7) | Each phase adding new components | Visual review checklist per component |
+| Employee login without public.users row (P8) | Phase 1 — verifyAppUser() | Test with an auth-only user: redirect to `/app/no-account` |
+| Admin/employee session collision (P9) | Phase 1 — (admin) layout patch | Employee session cannot access `/admin/companies` |
+| module_key namespace collision (P10) | Phase 1, before migration 00016 | All ChemoSys keys use `app_` prefix in modules table |
+| Missing guard in nested layouts (P11) | Each phase adding nested routes | Remove root layout temporarily, verify nested route is also blocked |
 
 ---
 
 ## Sources
 
-Note: All external tools were unavailable in this research session. Findings are based on:
-- Training data through August 2025 covering official Supabase docs, Next.js App Router docs, Tailwind CSS docs, SheetJS docs
-- Community patterns from GitHub issues, Supabase Discord, and Next.js discussions
-- ChemoSys PROJECT.md analyzed for project-specific pitfalls
+Findings are based on:
+- Direct code inspection of the existing ChemoSystem codebase (proxy.ts, dal.ts, all migrations 00001–00015, (admin) layout, (auth) layout, login page, auth Server Action, SidebarNav)
+- Established Next.js 15/16 App Router route group behavior (training data through August 2025)
+- Supabase Auth + Next.js SSR patterns (official Supabase SSR guide)
+- React.cache() deduplication behavior (Next.js documentation)
 
-Key official documentation to verify during implementation:
-- https://supabase.com/docs/guides/auth/server-side/nextjs (Auth + SSR)
-- https://supabase.com/docs/guides/auth/row-level-security (RLS)
-- https://supabase.com/docs/guides/database/postgres/row-level-security (RLS policies)
-- https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations (Server Actions)
-- https://tailwindcss.com/docs/hover-focus-and-other-states (logical properties)
-- https://sheetjs.com/docs/ (SheetJS Excel parsing options)
-- https://vercel.com/docs/functions/runtimes#max-duration (Vercel function limits)
+Key files inspected:
+- `src/proxy.ts` — current middleware, single redirect target confirmed
+- `src/lib/dal.ts` — verifySession, requirePermission, getNavPermissions, checkPagePermission
+- `src/actions/auth.ts` — login() hardcodes redirect to `/admin/companies`
+- `src/app/(admin)/layout.tsx` — only calls verifySession(), no is_admin check
+- `src/app/(auth)/login/page.tsx` — single login page, no user type branching
+- `supabase/migrations/00003_seed_modules.sql` — 9 admin keys, no app keys
+- `supabase/migrations/00012_access_control.sql` — is_admin + get_user_permissions() RPC
+
+---
+*Pitfalls research for: ChemoSys v2.0 — adding (app) route group to existing admin panel*
+*Researched: 2026-03-04*
