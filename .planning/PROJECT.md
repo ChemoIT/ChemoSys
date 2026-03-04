@@ -5,10 +5,23 @@
 מערכת ניהול פנימית מבוססת ווב לחברת חמו אהרון בע"מ (תשתיות אנרגיה). המערכת מחולקת לשני אזורים: **ממשק ניהול** (Admin Panel — שרון בלבד) ו-**ChemoSys** (מערכת ליבה לוגיסטית — מנהלים ועובדי שטח נבחרים). שניהם חיים באותו פרויקט Next.js כ-route groups נפרדים, חולקים DB, auth ותשתית משותפת.
 
 v1.0 שולח: ממשק ניהול מלא — עובדים, חברות, מחלקות, פרויקטים, יוזרים, הרשאות, audit log, dashboard, הגדרות אינטגרציה.
+v2.0 בונה: שלד ChemoSys — דף כניסה חדש + 2 דפי בית למודולי רכב וצמ"ה + חיווט הרשאות.
 
 ## Core Value
 
 ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים. אם האדמין לא עובד, שום דבר לא עובד.
+
+## Current Milestone: v2.0 שלד ChemoSys
+
+**Goal:** בניית שלד מערכת ChemoSys — דף כניסה חדש עם בחירת מודול, ושני דפי בית (צי רכב + צמ"ה) עם דשבורד ותפריטי תתי-מודולים. מהווה בסיס לכל הפיתוח העתידי של מודולי התפעול.
+
+**Target features:**
+- דף כניסה ChemoSys (מייל + סיסמה + זכור אותי + כפתורי מודולים לפי הרשאות)
+- דף בית מודול צי רכב (דשבורד + 16 תתי-מודולים כתפריט)
+- דף בית מודול צמ"ה (דשבורד + placeholder — יאופיין בהמשך)
+- תשתית (app) route group + layout + ניווט + מעבר בין מודולים
+- הגדרת מודולים חדשים ב-DB (fleet, equipment + sub-module keys)
+- חיווט מערכת ההרשאות הקיימת לכל דפי ChemoSys
 
 ## Requirements
 
@@ -30,23 +43,26 @@ v1.0 שולח: ממשק ניהול מלא — עובדים, חברות, מחלק
 
 ### Active
 
-(יוגדר ב-milestone v2.0 — שיחת אפיון ChemoSys)
+- [ ] שלד ChemoSys: (app) route group + layout + ניווט + module switching
+- [ ] דף כניסה ChemoSys עם בחירת מודול לפי הרשאות
+- [ ] דף בית מודול צי רכב (דשבורד + 16 תתי-מודולים)
+- [ ] דף בית מודול צמ"ה (דשבורד + placeholder)
+- [ ] חיווט מערכת הרשאות קיימת לדפי ChemoSys
+- [ ] הגדרת מודולים חדשים (fleet, equipment) ב-DB
 
 ### Out of Scope
 
 - Dark mode — הכנה בלבד, לא בשלב זה
 - אנגלית — מבנה i18n מוכן, תרגום בעתיד
 - אפליקציה מובייל native — רספונסיבי מספיק
+- פונקציונליות תתי-מודולים (CRUD, טפסים, דוחות) — כל מודול יאופיין בנפרד ב-milestones עתידיים
+- מודול משאבי אנוש — לא ב-v2.0
+- רכיבי AI (צ'אטבוט, אוטומציה) — יידון בהמשך
 
-## Current State (v1.0 Shipped)
+## Current State
 
-- **Codebase:** 106 TypeScript files, 17,440 LOC + 1,558 SQL lines
-- **DB:** 18 tables, 15 migrations applied, all RLS enforced
-- **Components:** 62 React components (19 UI + 8 shared + 35 admin)
-- **Server Actions:** 9 action files covering all entities
-- **Security:** CSP, HSTS, X-Frame-Options, rate limiting, server-only guard
-- **Commits:** 102
-- **Next milestone:** v2.0 ChemoSys — מערכת ליבה לוגיסטית
+- **v1.0 Shipped:** 106 TypeScript files, 17,440 LOC + 1,558 SQL, 18 tables, 102 commits
+- **v2.0 In Progress:** שלד ChemoSys — login + 2 module home pages
 
 ## Context
 
@@ -81,12 +97,14 @@ src/app/
 └── layout.tsx   ← Root (Heebo, RTL, Toaster)
 ```
 
-### מודולים עתידיים (ChemoSys v2.0)
-יוגדרו בשיחת אפיון — צפי ראשוני:
-1. ניהול צי רכב — כרטיס נהג, כרטיס רכב, מעקב טיפולים/ק"מ/דלק/אגרה/בטיחות/תאונות/חשבוניות
-2. ניהול צמ"ה — כרטיס צמ"ה, שעות מנוע, יומן שימוש, צריכת דלק, מפעיל, טפסי בטיחות
-3. משאבי אנוש — מבוסס על טבלת עובדים הקיימת
-4. רכיבי AI — צ'אטבוט, אוטומציה חכמה (יידון בהמשך)
+### מודולי ChemoSys
+**v2.0 (שלד):** צי רכב + צמ"ה — דפי בית עם תפריט, ללא פונקציונליות פנימית
+**עתידי:** משאבי אנוש, רכיבי AI — יאופיינו בנפרד
+
+**תתי-מודולים צי רכב (16):**
+כרטיס נהג, כרטיס רכב, סל הוצאות, ניהול ק"מ, דלק, כבישי אגרה, דוחות תעבורה/משטרה/נזקים, טבלאות חריגים, טעינת רכב חשמלי, הזמנת רכב שכור, טפסי בטיחות, אישורי חשבוניות ספקים, ספר טיפולים מכניים, חלקי חילוף/צמיגים, רכבי מחנה+QR, הפקת דוחות
+
+**תתי-מודולים צמ"ה:** יאופיינו בהמשך
 
 ## Constraints
 
@@ -115,6 +133,9 @@ src/app/
 | Rate limiting in-memory | Free tier constraint — no Upstash/Redis | ✓ Good (switch at production scale) |
 | Admin shell = no permission checks | Sharon-only — requirePermission() saved for ChemoSys | ✓ Good |
 | ChemoSys in same project | Shared DB, auth, components — route groups for separation | — Pending (v2.0) |
+| ChemoSys login נפרד מ-admin | UI נפרד, אותו Supabase Auth backend | — Pending (v2.0) |
+| כפתורי מודול בדף כניסה | יוזר בוחר מודול בלוגין, כפתור אפור אם אין הרשאה | — Pending (v2.0) |
+| מודולים כ-route groups מקוננים | /app/fleet/, /app/equipment/ — כל מודול תיקייה עצמאית | — Pending (v2.0) |
 
 ---
-*Last updated: 2026-03-04 after v1.0 milestone*
+*Last updated: 2026-03-04 after v2.0 milestone started*

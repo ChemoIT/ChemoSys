@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** v1.0 SHIPPED ✅ — Planning v2.0 ChemoSys (characterization pending)
+**Current focus:** v2.0 שלד ChemoSys — Defining requirements
 
 ## Current Position
 
-Phase: v1.0 complete — transitioning to v2.0
-Plan: N/A — awaiting `/gsd:new-milestone`
-Status: Milestone v1.0 archived. Next: characterization session for ChemoSys modules.
-Last activity: 2026-03-04 — v1.0 milestone archived, PROJECT.md evolved, ROADMAP.md reorganized.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-04 — Milestone v2.0 started
 
-Progress: v1.0 [████████████████████] 100% SHIPPED | v2.0 [                    ] 0% PLANNED
+Progress: v2.0 [░░░░░░░░░░░░░░░░░░░░] 0%
 
 ## v1.0 Summary
 
@@ -27,16 +27,17 @@ Progress: v1.0 [████████████████████] 10
 
 ## Accumulated Context
 
-### Key Decisions (v1.0)
-
-All decisions archived in STATE.md are preserved in `.planning/milestones/v1.0-ROADMAP.md`.
-Key architectural decisions carrying forward to v2.0:
+### Key Decisions (v1.0 → v2.0)
 
 - Admin interface (ChemoSystem) ≠ ChemoSys application — route group separation: (admin) vs (app)
 - Permission enforcement (requirePermission, modules table) ready for ChemoSys — NOT used in admin shell
 - proxy.ts handles auth guard for all routes — will add (app) routes
 - Soft delete everywhere — all tables, partial indexes, RPC-based
 - verifySession() is fast local JWT check — getClaims() in DAL, getUser() in proxy
+- ChemoSys replaces 10-year-old Liberty Basic system
+- ChemoSys login separate UI from admin, same Supabase Auth backend
+- Module selection on login page — buttons grayed if no permission
+- v2.0 scope: skeleton only (login + 2 home pages), modules characterized incrementally
 
 ### Pending Todos
 
@@ -49,5 +50,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: v1.0 milestone archived. Ready for `/gsd:new-milestone` to start v2.0 characterization.
+Stopped at: v2.0 milestone started. Defining requirements.
 Resume file: None
