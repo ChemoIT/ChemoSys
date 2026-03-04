@@ -41,3 +41,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# claude code config
+.claude/
+
+# data files (work files, not source code)
+/*.pdf
+/*.xlsx
+/*.png

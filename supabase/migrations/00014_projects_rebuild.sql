@@ -97,6 +97,7 @@ CREATE TRIGGER trigger_projects_updated_at
 -- ---------------------------------------------------------------------------
 -- Project number auto-generation trigger (PR26XXXXXX format)
 -- ---------------------------------------------------------------------------
+DROP FUNCTION IF EXISTS generate_project_number() CASCADE;
 CREATE OR REPLACE FUNCTION generate_project_number()
 RETURNS TRIGGER
 LANGUAGE plpgsql
