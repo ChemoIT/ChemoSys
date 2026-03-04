@@ -1,12 +1,15 @@
 "use server";
 
 // Authentication Server Actions.
-// login(): Validates credentials via Supabase Auth, redirects to admin on success.
+// login(): Validates admin credentials via Supabase Auth, redirects to /admin/dashboard on success.
+// loginApp(): Validates ChemoSys credentials via Supabase Auth, redirects to /app on success.
 // logout(): Signs out and redirects to login.
 //
 // Rate limiting: in-memory Map persisted in Node.js runtime.
 // Max 5 attempts per IP per 60 seconds. NOT suitable for multi-instance
 // production (use Redis/Upstash then). Acceptable for single-admin deployment.
+// loginAttempts and loginAppAttempts are SEPARATE Maps — different attack surfaces
+// must not share rate limit counters.
 
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
@@ -14,14 +17,16 @@ import { createClient } from "@/lib/supabase/server";
 
 // Shape returned to the client on login error.
 type LoginState = { error: string } | null;
+type LoginAppState = { error: string } | null;
 
 // --- Rate limiting (in-memory, Node.js runtime) ---
-// Module-level Map persists across requests within the same serverless instance.
+// Module-level Maps persist across requests within the same serverless instance.
 // Resets on cold start — acceptable for single-admin deployment.
 // NOT suitable for multi-instance production (use Redis/Upstash then).
 
 type RateLimitEntry = { count: number; resetAt: number };
 const loginAttempts = new Map<string, RateLimitEntry>();
+const loginAppAttempts = new Map<string, RateLimitEntry>();
 const RATE_LIMIT_MAX = 5; // max attempts per window
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 
@@ -33,13 +38,18 @@ function getClientIp(headersList: Headers): string {
   );
 }
 
-function checkLoginRateLimit(ip: string): boolean {
+/**
+ * checkRateLimit — generic rate limiter for any in-memory store.
+ * Returns true if the IP is within the allowed rate, false if blocked.
+ * Takes the rate limit Map as a parameter so admin and app logins are independent.
+ */
+function checkRateLimit(ip: string, store: Map<string, RateLimitEntry>): boolean {
   const now = Date.now();
-  const entry = loginAttempts.get(ip);
+  const entry = store.get(ip);
 
   // First attempt or window expired — reset
   if (!entry || now > entry.resetAt) {
-    loginAttempts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    store.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
     return true;
   }
 
@@ -54,7 +64,7 @@ function checkLoginRateLimit(ip: string): boolean {
 }
 
 /**
- * login — called by the login form via useActionState.
+ * login — called by the admin login form via useActionState.
  * On success: redirects to /admin/dashboard (redirect throws, does not return).
  * On failure: returns { error: "..." } displayed in the form.
  */
@@ -66,7 +76,7 @@ export async function login(
   const headersList = await headers();
   const ip = getClientIp(headersList);
 
-  if (!checkLoginRateLimit(ip)) {
+  if (!checkRateLimit(ip, loginAttempts)) {
     return { error: "יותר מדי ניסיונות התחברות. נסה שוב בעוד דקה." };
   }
 
@@ -90,6 +100,51 @@ export async function login(
 
   // Redirect throws internally — never returns a value.
   redirect("/admin/dashboard");
+}
+
+/**
+ * loginApp — called by the ChemoSys login form via useActionState.
+ * Mirrors login() exactly but uses a separate rate limit counter and
+ * redirects to /app instead of /admin/dashboard.
+ *
+ * On success: redirects to /app (redirect throws, does not return).
+ * On failure: returns { error: "..." } displayed in the form.
+ *
+ * NOTE: verifyAppUser() is NOT called here — the session cookie propagates on
+ * the next request where /app/page.tsx will call verifyAppUser() itself.
+ */
+export async function loginApp(
+  _prevState: LoginAppState,
+  formData: FormData
+): Promise<LoginAppState> {
+  // Rate limit check — separate counter from admin login
+  const headersList = await headers();
+  const ip = getClientIp(headersList);
+
+  if (!checkRateLimit(ip, loginAppAttempts)) {
+    return { error: "יותר מדי ניסיונות התחברות. נסה שוב בעוד דקה." };
+  }
+
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+
+  // Basic guard — form fields are required but JS can be disabled.
+  if (!email || !password) {
+    return { error: "נא למלא מייל וסיסמה" };
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    // Log for server-side diagnostics without exposing auth details to client.
+    console.warn("[auth] loginApp failed:", error.message);
+    return { error: "מייל או סיסמה שגויים" };
+  }
+
+  // Redirect throws internally — never returns a value.
+  redirect("/app");
 }
 
 /**
