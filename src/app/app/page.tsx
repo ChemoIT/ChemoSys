@@ -1,4 +1,4 @@
-// Module selection page — post-login landing for ChemoSys users.
+// Module selection page — post-login landing for ChemoSys users with 2+ modules.
 // Server component: reads permissions server-side, no client bundle bloat.
 //
 // Flow:
@@ -7,9 +7,9 @@
 //   3. Auto-redirect if only one top-level module accessible (UX: skip the selection screen)
 //   4. Show two module cards (always both visible; disabled = grayed + "אין גישה")
 //
-// Phase 8 will wrap this page inside (app)/layout.tsx with AppHeader.
+// Wrapped by (app)/layout.tsx which provides auth guard, header, and dark background.
 // The standalone placement at src/app/app/page.tsx is intentional —
-// Next.js App Router allows adding a route group around a page without moving it.
+// Next.js App Router applies the (app) route group layout without moving this file.
 
 import { verifyAppUser, getAppNavPermissions } from "@/lib/dal";
 import { redirect } from "next/navigation";
@@ -101,16 +101,11 @@ export default async function AppHomePage() {
   // without the parent module key — send them to fleet as the safer default.
   if (!hasFleet && !hasEquipment) redirect("/chemosys");
 
-  // Both modules accessible → show the selection screen
+  // Both modules accessible → show the selection screen.
+  // (app)/layout.tsx provides the dark background and header — this page
+  // only needs to center its card within the layout's <main>.
   return (
-    <main
-      className="min-h-screen bg-sidebar-bg flex items-center justify-center p-4"
-      dir="rtl"
-      style={{
-        background:
-          "radial-gradient(ellipse at 50% 30%, rgba(78,205,196,0.07) 0%, transparent 70%), #1B3A4B",
-      }}
-    >
+    <div className="flex-1 flex items-center justify-center p-4">
       {/* Selection card */}
       <div className="bg-brand-card rounded-2xl shadow-2xl p-10 w-full max-w-md">
 
@@ -145,6 +140,6 @@ export default async function AppHomePage() {
           למעבר למודול אחר — פנה לאחראי המערכת
         </p>
       </div>
-    </main>
+    </div>
   );
 }
