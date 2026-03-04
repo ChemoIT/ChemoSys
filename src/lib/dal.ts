@@ -5,6 +5,8 @@ import 'server-only'
 // requirePermission() guards every mutation Server Action.
 // getNavPermissions() drives sidebar nav filtering.
 // checkPagePermission() drives page-level access denied rendering.
+// verifyAppUser() guards ChemoSys (app) pages and layouts.
+// getAppNavPermissions() drives ChemoSys top-header module switching.
 // Wrapped in React cache() to deduplicate multiple calls in one render tree.
 
 import { cache } from "react";
@@ -15,6 +17,21 @@ export type SessionUser = {
   userId: string;
   email: string;
 };
+
+// ============================================================
+// INTERNAL: cached RPC call — deduplicated per HTTP request.
+// All DAL functions that need permissions call this instead of
+// calling supabase.rpc() directly. Module-level constant ensures
+// a stable function reference for React.cache().
+// ============================================================
+const getPermissionsRpc = cache(async (userId: string) => {
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('get_user_permissions', {
+    p_user_id: userId,
+  })
+  if (error) throw new Error('שגיאת הרשאות — לא ניתן לבדוק גישה')
+  return (data ?? []) as Array<{ module_key: string; level: number }>
+})
 
 /**
  * verifySession — fast local JWT verification using getClaims().
@@ -64,15 +81,10 @@ export async function requirePermission(
   minLevel: PermissionLevel
 ): Promise<void> {
   const session = await verifySession() // throws if unauthenticated
-  const supabase = await createClient()
 
-  const { data: perms, error } = await supabase.rpc('get_user_permissions', {
-    p_user_id: session.userId,
-  })
+  const perms = await getPermissionsRpc(session.userId)
 
-  if (error) throw new Error('שגיאת הרשאות — לא ניתן לבדוק גישה')
-
-  const perm = perms?.find((p: { module_key: string; level: number }) => p.module_key === moduleKey)
+  const perm = perms.find((p) => p.module_key === moduleKey)
   const level = (perm?.level ?? 0) as PermissionLevel
 
   if (level < minLevel) {
@@ -107,14 +119,12 @@ export async function getNavPermissions(): Promise<string[]> {
     return ['dashboard', 'companies', 'departments', 'role_tags', 'employees', 'users', 'templates', 'projects', 'settings']
   }
 
-  const { data: perms } = await supabase.rpc('get_user_permissions', {
-    p_user_id: session.userId,
-  })
+  const perms = await getPermissionsRpc(session.userId)
 
   // Always include dashboard
   const allowed = new Set<string>(['dashboard'])
 
-  for (const p of (perms ?? []) as Array<{ module_key: string; level: number }>) {
+  for (const p of perms) {
     if (p.level >= 1) {
       allowed.add(p.module_key)
     }
@@ -148,10 +158,74 @@ export async function checkPagePermission(
   // No public.users row = bootstrap admin → allow everything
   if (!userRow) return true
 
-  const { data: perms } = await supabase.rpc('get_user_permissions', {
-    p_user_id: session.userId,
-  })
+  const perms = await getPermissionsRpc(session.userId)
 
-  const perm = perms?.find((p: { module_key: string; level: number }) => p.module_key === moduleKey)
+  const perm = perms.find((p) => p.module_key === moduleKey)
   return (perm?.level ?? 0) >= minLevel
+}
+
+// ============================================================
+// APP (ChemoSys): verifyAppUser, getAppNavPermissions
+// Used by (app)/layout.tsx and ChemoSys pages (Phase 8+).
+// ============================================================
+
+export type AppUser = {
+  userId: string
+  email: string
+}
+
+/**
+ * verifyAppUser — verifies the user is a valid, unblocked ChemoSys app user.
+ * Checks: valid session, active public.users row (not blocked, not deleted),
+ * at least one app_* permission with level >= 1.
+ *
+ * If any check fails: redirects to /chemosys (throws — does not return).
+ *
+ * Wrapped in React.cache() for deduplication: (app)/layout.tsx and nested
+ * server components can call this multiple times — only one DB query.
+ */
+export const verifyAppUser = cache(async (): Promise<AppUser> => {
+  const session = await verifySession() // throws → /login if no JWT
+  const supabase = await createClient()
+
+  // Check user exists and is not blocked
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('is_blocked')
+    .eq('auth_user_id', session.userId)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  // No public.users row = not a registered app user → redirect
+  // is_blocked = true → blocked user → redirect
+  if (!userRow || userRow.is_blocked) {
+    redirect('/chemosys')
+  }
+
+  // Check at least one app_* permission
+  const perms = await getPermissionsRpc(session.userId)
+  const hasAnyAppAccess = perms.some(
+    (p) => p.module_key.startsWith('app_') && p.level >= 1
+  )
+
+  if (!hasAnyAppAccess) {
+    redirect('/chemosys')
+  }
+
+  return { userId: session.userId, email: session.email }
+})
+
+/**
+ * getAppNavPermissions — returns app_* module keys the user has READ access to.
+ * Filters get_user_permissions RPC results to only app_* prefix keys with level >= 1.
+ *
+ * Used by (app)/layout.tsx → AppHeader → ModuleSwitcher to filter visible modules.
+ * Returns array of strings like ['app_fleet', 'app_fleet_vehicles', 'app_fleet_drivers', ...].
+ */
+export async function getAppNavPermissions(): Promise<string[]> {
+  const session = await verifySession()
+  const perms = await getPermissionsRpc(session.userId)
+  return perms
+    .filter((p) => p.module_key.startsWith('app_') && p.level >= 1)
+    .map((p) => p.module_key)
 }
