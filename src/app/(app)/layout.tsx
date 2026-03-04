@@ -56,7 +56,7 @@ export default async function AppLayout({
   return (
     <div className="min-h-screen bg-sidebar-bg flex flex-col">
       <AppHeader displayName={displayName} permissions={permissions} />
-      <main className="flex-1 p-4 md:p-6">{children}</main>
+      <main className="flex-1">{children}</main>
     </div>
   );
 }
