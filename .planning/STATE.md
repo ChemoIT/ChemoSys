@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** v2.0 שלד ChemoSys — Defining requirements
+**Current focus:** v2.0 Phase 6 — DB + Auth Foundation
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-04 — Milestone v2.0 started
+Phase: 6 of 10 (DB + Auth Foundation)
+Plan: 0 of 2 in current phase
+Status: Ready to plan
+Last activity: 2026-03-04 — v2.0 roadmap defined (phases 6-10)
 
-Progress: v2.0 [░░░░░░░░░░░░░░░░░░░░] 0%
+Progress: v2.0 [░░░░░░░░░░░░░░░░░░░░] 0% (0/6 plans complete)
 
 ## v1.0 Summary
 
@@ -27,28 +27,26 @@ Progress: v2.0 [░░░░░░░░░░░░░░░░░░░░] 0%
 
 ## Accumulated Context
 
-### Key Decisions (v1.0 → v2.0)
+### Key Decisions (v2.0)
 
-- Admin interface (ChemoSystem) ≠ ChemoSys application — route group separation: (admin) vs (app)
-- Permission enforcement (requirePermission, modules table) ready for ChemoSys — NOT used in admin shell
-- proxy.ts handles auth guard for all routes — will add (app) routes
-- Soft delete everywhere — all tables, partial indexes, RPC-based
-- verifySession() is fast local JWT check — getClaims() in DAL, getUser() in proxy
-- ChemoSys replaces 10-year-old Liberty Basic system
-- ChemoSys login separate UI from admin, same Supabase Auth backend
-- Module selection on login page — buttons grayed if no permission
-- v2.0 scope: skeleton only (login + 2 home pages), modules characterized incrementally
+- ChemoSys login page = `/chemosys` (נפרד מ-`/login` של admin)
+- Module keys prefix = `app_` (e.g., `app_fleet`, `app_equipment`) — מניעת collision עם admin keys
+- Build order: migration → auth.ts routing → (admin) guard → dal.ts → (app) layout → pages
+- Phase 6 must complete before ANY employee-facing page is created — security gate
+- (app) layout = top-header (לא sidebar) — מותאם לעובדי שטח במובייל
+- Equipment sub-modules = TBD — placeholder בלבד ב-v2.0
 
 ### Pending Todos
 
-None — clean slate for v2.0.
+None.
 
 ### Blockers/Concerns
 
-None.
+- Phase 6 (plan 06-01): Migration 00016 חייב לרוץ ב-Supabase לפני deploy של כל קוד (app) — hard dependency
+- Phase 9 (plan 09-01): נדרשת החלטה על pattern להעברת sub-module permissions ל-FleetSubModuleGrid — Set<string> מה-server
 
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: v2.0 milestone started. Defining requirements.
+Stopped at: Roadmap v2.0 created. Phases 6-10 defined. Ready to plan Phase 6.
 Resume file: None
