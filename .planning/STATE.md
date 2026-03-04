@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 6 of 10 (DB + Auth Foundation)
-Plan: 0 of 2 in current phase
-Status: Ready to plan
-Last activity: 2026-03-04 — v2.0 roadmap defined (phases 6-10)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-03-04 — Plan 06-01 complete (migration + admin guard + proxy)
 
-Progress: v2.0 [░░░░░░░░░░░░░░░░░░░░] 0% (0/6 plans complete)
+Progress: v2.0 [██░░░░░░░░░░░░░░░░░░] 17% (1/6 plans complete)
 
 ## v1.0 Summary
 
@@ -35,6 +35,9 @@ Progress: v2.0 [░░░░░░░░░░░░░░░░░░░░] 0%
 - Phase 6 must complete before ANY employee-facing page is created — security gate
 - (app) layout = top-header (לא sidebar) — מותאם לעובדי שטח במובייל
 - Equipment sub-modules = TBD — placeholder בלבד ב-v2.0
+- **[06-01]** maybeSingle() not single() in is_admin query — bootstrap admin (no public.users row) retains access
+- **[06-01]** is_admin guard in (admin)/layout not in proxy — proxy handles unauthenticated only, layout handles role mismatch
+- **[06-01]** Migration 00016 must run manually before Phase 7+ deployment — hard dependency
 
 ### Pending Todos
 
@@ -48,5 +51,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Roadmap v2.0 created. Phases 6-10 defined. Ready to plan Phase 6.
+Stopped at: Completed 06-01-PLAN.md — migration 00016 created, admin guard added, proxy extended. Awaiting Migration 00016 run in Supabase before Phase 7.
 Resume file: None
