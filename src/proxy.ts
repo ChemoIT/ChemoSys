@@ -50,14 +50,20 @@ export async function proxy(request: NextRequest) {
   // It ensures the access token is always fresh for server components and actions.
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Redirect unauthenticated users to /login (except for /login itself)
+  // Redirect unauthenticated users to the correct login page:
+  // - /app/* requests → /chemosys (ChemoSys login for field workers)
+  // - All other protected routes → /login (admin login)
+  // - /login, /chemosys, /auth are public — let through without redirect
   if (
     !user &&
     !request.nextUrl.pathname.startsWith('/login') &&
+    !request.nextUrl.pathname.startsWith('/chemosys') &&
     !request.nextUrl.pathname.startsWith('/auth')
   ) {
     const url = request.nextUrl.clone()
-    url.pathname = '/login'
+    url.pathname = request.nextUrl.pathname.startsWith('/app')
+      ? '/chemosys'
+      : '/login'
     return NextResponse.redirect(url)
   }
 
