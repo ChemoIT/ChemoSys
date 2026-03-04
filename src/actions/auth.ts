@@ -55,7 +55,7 @@ function checkLoginRateLimit(ip: string): boolean {
 
 /**
  * login — called by the login form via useActionState.
- * On success: redirects to /admin/companies (redirect throws, does not return).
+ * On success: redirects to /admin/dashboard (redirect throws, does not return).
  * On failure: returns { error: "..." } displayed in the form.
  */
 export async function login(
@@ -89,7 +89,7 @@ export async function login(
   }
 
   // Redirect throws internally — never returns a value.
-  redirect("/admin/companies");
+  redirect("/admin/dashboard");
 }
 
 /**
