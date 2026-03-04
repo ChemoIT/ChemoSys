@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** v2.0 Phase 7 — ChemoSys Login + User Edit
+**Current focus:** v2.0 Phase 8 — (app) Shell
 
 ## Current Position
 
-Phase: 7 of 10 (ChemoSys Login)
-Plan: 2 of 2 in current phase
-Status: Phase 7 code COMPLETE — awaiting human verification + commit
-Last activity: 2026-03-04 — Session #14
+Phase: 8 of 10 ((app) Shell)
+Plan: 0 of 1 in current phase
+Status: Ready to plan Phase 8
+Last activity: 2026-03-04 — Session #15
 
-Progress: v2.0 [██████░░░░░░░░░░░░░░] 38% (3/8 plans complete)
+Progress: v2.0 [██████████░░░░░░░░░░] 50% (4/8 plans complete)
 
 ## v1.0 Summary
 
@@ -42,36 +42,20 @@ Progress: v2.0 [██████░░░░░░░░░░░░░░] 38
 - **[06-02]** verifyAppUser does NOT block is_admin users — admins can use ChemoSys too
 - **[06-02]** getAppNavPermissions is plain async function (not cached) — delegates to already-cached getPermissionsRpc
 - **[06-02]** Admin login redirect changed to /admin/dashboard (was /admin/companies)
-- **[07-01]** loginApp() does NOT call verifyAppUser() after signInWithPassword — session propagates on next request, /app/page.tsx handles the guard in Phase 8
-- **[07-01]** checkRateLimit(ip, store) generic helper — loginAttempts and loginAppAttempts are separate Maps (different attack surfaces must not share rate limit counters)
-- **[07-01]** (chemosys)/layout.tsx uses bg-sidebar-bg (#1B3A4B) + radial teal CSS gradient — visually distinct from admin (bg-brand-bg #F5F7FA)
-- **[session14]** user_permissions כתיבות חייבות adminClient (service_role) — RLS 00013 חוסם כתיבה עם RLS client גם ל-admin user
-- **[session14]** auth email (מ-auth.users) מוצג בטבלת יוזרים, לא employee email (מ-employees)
-- **[session14]** שרון רוצה בחירת מודול ישירות ממסך הלוגאין של ChemoSys — לא בדף נפרד אחרי login
+- **[07-login]** loginApp() authenticates + checks module permission + redirects to /app/{module} directly
+- **[07-login]** Module selection integrated INTO /chemosys login page (not separate /app page)
+- **[07-login]** loginApp() signs out + returns error if user blocked / not registered / no module access
+- **[07-login]** checkRateLimit(ip, store) generic helper — loginAttempts and loginAppAttempts are separate Maps
+- **[07-login]** (chemosys)/layout.tsx uses bg-sidebar-bg (#1B3A4B) + radial teal CSS gradient
+- **[session14]** user_permissions כתיבות חייבות adminClient (service_role) — RLS 00013 חוסם כתיבה עם RLS client
+- **[session14]** auth email (מ-auth.users) מוצג בטבלת יוזרים, לא employee email
+- **[session15]** Branding: "מערכת ניהול לוגיסטי" + "CHEMO SYSTEM" בלוגאין
 
 ### Hotfixes Applied (2026-03-04, post Phase 7)
 
-- **BUG FIX — שמות מחלקות הפוכים ב-PDF import:** `pdf-parse` מחלץ טקסט עברי RTL בסדר ויזואלי (LTR), כך ש"בקרת איכות" הפכה ל"איכות בקרת". תיקון: `.split(' ').reverse().join(' ')` ב-`parseDepartmentsPdf()` (`src/actions/departments.ts`)
-- **שיפור — מספר מחלקה בכרטיס עובד:** הוספת שדה "מס׳ מחלקה" לסעיף שיוך ארגוני ב-`EmployeeForm.tsx`. אפשר לבחור מחלקה לפי מספר או לפי שם. Dropdowns מציגים `{dept_number} — {name}`.
-- **כלל ברזל חדש — מחלקה 0 = לא פעיל:** עובד במחלקה 0 תמיד `inactive`, ללא תלות בתאריך סיום. מיושם ב-`deriveStatus()` (server-side), `deriveStatusFromEndDate()` (client-side), onChange handlers בטופס, וב-Excel import.
-
-### Session #14 Changes (2026-03-04, NOT committed)
-
-**באגים שתוקנו:**
-1. **באג מייל יוזרים** — הטבלה הציגה employee email במקום auth email. תוקן: `page.tsx` שולף auth emails דרך `adminClient.auth.admin.listUsers()`, מעביר `auth_email` לטבלה.
-2. **באג כתיבת הרשאות (user_permissions)** — RLS policy 00013 חוסם INSERT/UPDATE/DELETE גם ל-admin user דרך RLS client. כל כתיבות ל-`user_permissions` עברו ל-`adminClient` (service_role): `createUser`, `updateUserAuth`, `saveUserPermissions`, `assignTemplateInternal`.
-3. **ניקוי יוזר יתום** — `odelia.m@chemo-aharon.com` נמחק מ-Supabase Auth דרך SQL דינמי שסורק `information_schema` לכל FKs.
-
-**פיצ'רים חדשים:**
-4. **דיאלוג עריכת יוזר** — `UserEditDialog.tsx` חדש: עדכון מייל (auth), סיסמה, הרשאות ChemoSys. לחיצה על שורה בטבלה פותחת את הדיאלוג.
-5. **Server Action `updateUserAuth`** — עדכון auth email/password דרך `adminClient.auth.admin.updateUserById()` + upsert הרשאות ChemoSys.
-
-**קבצים שהשתנו (לא committed):**
-- `src/app/(admin)/admin/users/page.tsx` — import adminClient, fetch auth emails, merge into users
-- `src/actions/users.ts` — `updateUserAuth()` חדש, כל permission writes → adminClient
-- `src/components/admin/users/UsersTable.tsx` — auth_email type, clickable rows, UserEditDialog integration
-- `src/components/admin/users/UserEditDialog.tsx` — קומפוננטה חדשה
-- `src/lib/dal.ts` — debug logs הוסרו
+- **BUG FIX — שמות מחלקות הפוכים ב-PDF import:** `.split(' ').reverse().join(' ')` ב-`parseDepartmentsPdf()`
+- **שיפור — מספר מחלקה בכרטיס עובד:** שדה "מס׳ מחלקה" בסעיף שיוך ארגוני
+- **כלל ברזל — מחלקה 0 = לא פעיל:** `deriveStatus()`, `deriveStatusFromEndDate()`, onChange handlers, Excel import
 
 ### Pending Todos
 
@@ -81,26 +65,30 @@ None.
 
 - Phase 6 (plan 06-01): Migration 00016 חייב לרוץ ב-Supabase לפני deploy של כל קוד (app) — hard dependency
 - Phase 9 (plan 09-01): נדרשת החלטה על pattern להעברת sub-module permissions ל-FleetSubModuleGrid — Set<string> מה-server
-- **ChemoSys login UX change**: שרון רוצה module selection ישירות במסך הלוגאין `/chemosys` (לא בדף `/app` נפרד). צריך לעדכן את ה-login page ואת `loginApp()` — בשיחה הבאה.
 
 ## Session Continuity
 
-Last session: 2026-03-04 (session #14)
-Stopped at: Phase 7 code complete — all changes unstaged, need commit. ChemoSys login works but module selection needs redesign.
+Last session: 2026-03-04 (session #15)
+Stopped at: Phase 7 COMPLETE. Ready to plan and build Phase 8.
 
 ### Context for next session:
 
-**Status:** Phase 7 code COMPLETE + session #14 improvements. All changes are UNSTAGED — need commit first.
+**Status:** Phase 7 DONE — all committed. Phase 8 ready to start.
 
-**Verification pending:**
-1. Login at `/chemosys` → reaches `/app` → module selection screen (currently goes to white screen if only one module — auto-redirect to non-existent `/app/fleet`)
-2. The auto-redirect logic in `/app/page.tsx` (lines 96-102) sends users to `/app/fleet` or `/app/equipment` which don't exist yet — needs UX redesign
+**Commits this session:**
+- `05682a9` — feat(session-14): user edit dialog, auth email fix, permission writes via adminClient
+- `a14684e` — feat(07-chemosys): integrate module selection into /chemosys login page
 
-**Design change (Sharon's request):**
-- Module selection should be integrated INTO the `/chemosys` login page itself
-- After entering email + password, user selects which module to enter (צי רכב / צמ"ה)
-- `loginApp()` should receive the module choice and redirect directly to `/app/fleet` or `/app/equipment`
-- The `/app/page.tsx` module selection page may still exist as a fallback for users with both modules
-- Future: each module will have internal navigation to switch modules
+**What to build in Phase 8:**
+1. `src/app/(app)/layout.tsx` — route group layout, calls `verifyAppUser()`, wraps all `/app/*` pages
+2. `AppHeader` component — logo, user name, ModuleSwitcher dropdown, logout button
+3. `ModuleSwitcher` — shows only modules user has permission for (from `getAppNavPermissions()`)
+4. `/app/page.tsx` update — auto-redirect to first permitted module (fallback for direct /app access)
+
+**Key files to reference:**
+- `src/lib/dal.ts` — `verifyAppUser()`, `getAppNavPermissions()` (already built in Phase 6)
+- `src/actions/auth.ts` — `logout()` server action
+- `src/app/(admin)/layout.tsx` — reference for admin layout pattern (dark sidebar, admin guard)
+- `src/app/(chemosys)/layout.tsx` — reference for dark bg pattern
 
 Resume file: None
