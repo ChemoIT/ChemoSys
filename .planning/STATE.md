@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 9 of 10 (Fleet Home)
-Plan: 0 of 1 in current phase
-Status: Ready to plan Phase 9
-Last activity: 2026-03-04 — Session #16
+Plan: 1 of 2 in current phase
+Status: Phase 9 Plan 01 COMPLETE — ready for Plan 02 (fleet home page)
+Last activity: 2026-03-04 — Session #17
 
-Progress: v2.0 [██████████████░░░░░░] 75% (6/8 plans complete)
+Progress: v2.0 [███████████████░░░░░] 78% (7/9 plans complete)
 
 ## v1.0 Summary
 
@@ -54,6 +54,10 @@ Progress: v2.0 [██████████████░░░░░░] 75
 - **[08-01]** ModuleSwitcher returns null for <=1 module — no dropdown for single-module users
 - **[08-01]** logoutApp() separate from logout() — ChemoSys → /chemosys, admin → /login
 - **[08-01]** Employee display name resolved in layout (not DAL) — display concern belongs in layout
+- **[09-01]** FleetLayout passes string[] to FleetSidebar (not Set) — Sets not JSON-serializable across server→client boundary; client converts via useMemo
+- **[09-01]** SidebarProvider scoped to FleetLayout only — do NOT add to (app)/layout.tsx (nested providers cause state conflicts)
+- **[09-01]** (app)/layout.tsx main element has no padding — moved to FleetLayout content div so sidebar sits flush
+- **[09-01]** Disabled sub-modules use span+aria-disabled+tabIndex=-1 — full keyboard inaccessibility without CSS-only hack
 
 ### Hotfixes Applied (2026-03-04, post Phase 7)
 
@@ -68,33 +72,34 @@ None.
 ### Blockers/Concerns
 
 - Phase 6 (plan 06-01): Migration 00016 חייב לרוץ ב-Supabase לפני deploy של כל קוד (app) — hard dependency
-- Phase 9 (plan 09-01): נדרשת החלטה על pattern להעברת sub-module permissions ל-FleetSubModuleGrid — Set<string> מה-server
+- Phase 9 (plan 09-01): Migration 00017 חייבת לרוץ ב-Supabase לפני test של fleet permissions (מוסיפה app_fleet_charging_stations + app_fleet_forms)
 
 ## Session Continuity
 
-Last session: 2026-03-04 (session #16)
-Stopped at: Phase 8 COMPLETE — verified, ROADMAP updated. Ready to plan Phase 9.
+Last session: 2026-03-04 (session #17)
+Stopped at: Phase 9 Plan 01 COMPLETE — fleet sidebar shell done. Ready for Plan 02 (fleet home page).
 
 ### Context for next session:
 
-**Status:** Phase 8 DONE — all committed and verified (6/6 must-haves). Ready for Phase 9.
+**Status:** Phase 9 Plan 01 DONE — fleet sidebar shell committed + verified. Plan 02 = fleet home page content.
 
-**Commits this session (Phase 8):**
-- `4e838e9` — feat(08-01): logoutApp() + (app)/layout + AppHeader + ModuleSwitcher + AppLogoutButton
-- `618bcc7` — feat(08-01): clean up /app/page.tsx — remove redundant fullscreen styling
-- `be7a749` — docs(08-01): SUMMARY.md + STATE.md
+**Commits this session (Phase 9 Plan 01):**
+- `acfb9cf` — chore(09-01): install shadcn sidebar + tooltip + add migration 00017
+- `749bc7b` — feat(09-01): FleetLayout + FleetSidebar — RTL collapsible fleet sidebar
 
-**What Phase 9 needs to build:**
-1. `/app/fleet` page — FleetSubModuleGrid with permitted sub-modules (16 fleet sub-module cards)
-2. Sub-module cards: Hebrew name + Lucide icon, permission-gated (gray if no access)
-3. Click on permitted sub-module → placeholder "בקרוב" page (not 404)
-4. `/app/fleet` guarded — user without `app_fleet` redirected back
-5. Decision needed: pattern for Set<string> sub-module permissions to FleetSubModuleGrid
+**Phase 9 Plan 02 scope:**
+- Fleet home page (`/app/fleet`) — replace placeholder with real content
+- Dashboard area at top (placeholder "בקרוב")
+- 2 primary CTA buttons: כרטיס נהג + כרטיס רכב (placeholder)
+- 9 sub-module placeholder pages (fuel, tolls, invoices, ev-charging, charging-stations, rentals, forms, exceptions, reports)
 
-**Key files to reference:**
-- `src/lib/dal.ts` — `verifyAppUser()`, `getAppNavPermissions()`
-- `src/app/(app)/layout.tsx` — authenticated shell (Phase 8 output)
-- `src/components/app/AppHeader.tsx` — header pattern reference
-- `src/components/app/ModuleSwitcher.tsx` — module config pattern
+**IMPORTANT — Migration required:**
+- Run `supabase/migrations/00017_fleet_sidebar_modules.sql` in Supabase before testing fleet permissions
+- Adds: `app_fleet_charging_stations` + `app_fleet_forms`
+
+**Key files:**
+- `src/app/(app)/app/fleet/layout.tsx` — FleetLayout (server, nested, auth+permission guard)
+- `src/components/app/fleet/FleetSidebar.tsx` — FleetSidebar (client, 9 sub-modules, RTL)
+- `src/app/(app)/app/fleet/page.tsx` — fleet home page (replace in Plan 02)
 
 Resume file: None
