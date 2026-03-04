@@ -50,11 +50,11 @@
 4. Migration 00016 רץ ב-Supabase — 18 מפתחות מודול עם prefix `app_` קיימים בטבלת `modules`
 5. `get_user_permissions` RPC עטוף ב-`React.cache()` — קריאה אחת בלבד לבקשה, גם אם מופעל ממספר server components
 
-**Plans:** TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 06-01: Migration 00016 + admin layout guard
-- [ ] 06-02: auth.ts post-login routing + dal.ts extensions
+- [ ] 06-01-PLAN.md — Migration 00016 (18 app_* keys) + admin layout is_admin guard + proxy.ts /app/* redirect
+- [ ] 06-02-PLAN.md — auth.ts login redirect fix + dal.ts React.cache() refactor + verifyAppUser + getAppNavPermissions
 
 ---
 
