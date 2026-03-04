@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 6 of 10 (DB + Auth Foundation)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-03-04 — Plan 06-01 complete (migration + admin guard + proxy)
+Plan: 2 of 2 in current phase (Phase 6 COMPLETE)
+Status: Phase complete — ready for Phase 7
+Last activity: 2026-03-04 — Plan 06-02 complete (dal.ts refactor + cached RPC + ChemoSys auth functions)
 
-Progress: v2.0 [██░░░░░░░░░░░░░░░░░░] 17% (1/6 plans complete)
+Progress: v2.0 [████░░░░░░░░░░░░░░░░] 33% (2/6 plans complete)
 
 ## v1.0 Summary
 
@@ -38,6 +38,10 @@ Progress: v2.0 [██░░░░░░░░░░░░░░░░░░] 17
 - **[06-01]** maybeSingle() not single() in is_admin query — bootstrap admin (no public.users row) retains access
 - **[06-01]** is_admin guard in (admin)/layout not in proxy — proxy handles unauthenticated only, layout handles role mismatch
 - **[06-01]** Migration 00016 must run manually before Phase 7+ deployment — hard dependency
+- **[06-02]** getPermissionsRpc must be module-level const (not inside function) — React.cache() requires stable function reference for deduplication
+- **[06-02]** verifyAppUser does NOT block is_admin users — admins can use ChemoSys too
+- **[06-02]** getAppNavPermissions is plain async function (not cached) — delegates to already-cached getPermissionsRpc
+- **[06-02]** Admin login redirect changed to /admin/dashboard (was /admin/companies)
 
 ### Pending Todos
 
@@ -51,5 +55,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 06-01-PLAN.md — migration 00016 created, admin guard added, proxy extended. Awaiting Migration 00016 run in Supabase before Phase 7.
+Stopped at: Completed 06-02-PLAN.md — Phase 6 fully complete. dal.ts refactored with cached RPC helper, verifyAppUser() and getAppNavPermissions() added, admin login redirect fixed. Awaiting Migration 00016 run in Supabase before Phase 7+.
 Resume file: None
