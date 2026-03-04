@@ -8,8 +8,7 @@
 //   4. Show two module cards (always both visible; disabled = grayed + "אין גישה")
 //
 // Wrapped by (app)/layout.tsx which provides auth guard, header, and dark background.
-// The standalone placement at src/app/app/page.tsx is intentional —
-// Next.js App Router applies the (app) route group layout without moving this file.
+// Lives inside src/app/(app)/app/ so the route group layout applies.
 
 import { verifyAppUser, getAppNavPermissions } from "@/lib/dal";
 import { redirect } from "next/navigation";

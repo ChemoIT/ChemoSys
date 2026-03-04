@@ -9,8 +9,8 @@
 //
 // RTL: inherited from root <html dir="rtl"> in layout.tsx — NOT duplicated here.
 //
-// Route group behavior: (app) is URL-transparent — pages at src/app/app/ are
-// wrapped by this layout automatically. No need to move page.tsx files.
+// Route group behavior: (app) is URL-transparent — pages must be physically
+// inside src/app/(app)/ to be wrapped. The /app segment lives at (app)/app/.
 
 import { verifyAppUser, getAppNavPermissions } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
