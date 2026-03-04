@@ -103,22 +103,23 @@ Plans:
 
 ### Phase 9: Fleet Home
 
-**Goal:** מנהל שנכנס למודול "צי רכב" רואה לוח בית מלא — 16 תתי-מודולים מסודרים ב-grid, עם חיווי ברור אילו זמינים לו ואילו לא.
+**Goal:** מנהל שנכנס למודול "צי רכב" רואה sidebar ימני (RTL) עם 9 תתי-מודולים, דשבורד placeholder, ו-2 כפתורי CTA — עיצוב מודרני 2026 עם אנימציות וחיווי הרשאות ברור.
 
 **Depends on:** Phase 8
 
 **Requirements:** FLEET-01, FLEET-02, FLEET-03, FLEET-04
 
 **Success Criteria** (what must be TRUE):
-1. דף `/app/fleet` מציג grid עם 16 כרטיסי תתי-מודול בשמות עברית ואייקוני Lucide — ללא scroll מיותר ב-desktop
+1. דף `/app/fleet` מציג sidebar ימני עם 9 תתי-מודולים — מכווץ לאייקונים בברירת מחדל, נפתח בריחוף/לחיצה
 2. תת-מודול שאין ליוזר הרשאה אליו מוצג אפור ולא לחיץ — לא נעלם ולא זורק שגיאה
 3. לחיצה על תת-מודול פעיל פותחת דף עם הודעת "בקרוב" — לא 404 ולא שגיאת server
 4. יוזר ללא הרשאת `app_fleet` שמנסה לגשת ישירות ל-`/app/fleet` מועבר חזרה — לא נכנס לדף
 
-**Plans:** TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 09-01: Fleet home page + FleetSubModuleGrid component
+- [ ] 09-01-PLAN.md — Install shadcn sidebar + tooltip, create FleetLayout with auth guard, FleetSidebar with 9 sub-modules, migration for 2 missing module keys
+- [ ] 09-02-PLAN.md — Fleet home page (dashboard placeholder + 2 CTA), ComingSoon component, 9 sub-module placeholder pages, visual verification
 
 ---
 
