@@ -25,7 +25,7 @@
 
 **Milestone Goal:** שלד מערכת ChemoSys — תשתית כניסה, ניווט והרשאות שעליה ייבנו כל מודולי התפעול. מנהלים ועובדי שטח יכולים להתחבר, לבחור מודול, ולנווט בין דפי הבית של צי רכב וצמ"ה.
 
-- [ ] **Phase 6: DB + Auth Foundation** — מיגרציה, תיקון ניתוב auth, הרחבת dal.ts
+- [x] **Phase 6: DB + Auth Foundation** — מיגרציה, תיקון ניתוב auth, הרחבת dal.ts — completed 2026-03-04
 - [ ] **Phase 7: ChemoSys Login** — דף כניסה ייעודי עם בחירת מודול לפי הרשאות
 - [ ] **Phase 8: (app) Shell** — route group + layout + header + module switcher
 - [ ] **Phase 9: Fleet Home** — דף בית צי רכב עם grid של 16 תתי-מודולים
@@ -53,8 +53,8 @@
 **Plans:** 2 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Migration 00016 (18 app_* keys) + admin layout is_admin guard + proxy.ts /app/* redirect
-- [ ] 06-02-PLAN.md — auth.ts login redirect fix + dal.ts React.cache() refactor + verifyAppUser + getAppNavPermissions
+- [x] 06-01-PLAN.md — Migration 00016 (18 app_* keys) + admin layout is_admin guard + proxy.ts /app/* redirect
+- [x] 06-02-PLAN.md — auth.ts login redirect fix + dal.ts React.cache() refactor + verifyAppUser + getAppNavPermissions
 
 ---
 
@@ -152,7 +152,7 @@ Plans:
 | 03.1. Security Hardening | v1.0 | 3/3 | Complete | 2026-03-03 |
 | 4. Projects | v1.0 | 4/4 | Complete | 2026-03-03 |
 | 5. Settings and Observability | v1.0 | 4/4 | Complete | 2026-03-04 |
-| 6. DB + Auth Foundation | v2.0 | 0/2 | Not started | - |
+| 6. DB + Auth Foundation | v2.0 | 2/2 | Complete | 2026-03-04 |
 | 7. ChemoSys Login | v2.0 | 0/1 | Not started | - |
 | 8. (app) Shell | v2.0 | 0/1 | Not started | - |
 | 9. Fleet Home | v2.0 | 0/1 | Not started | - |
@@ -167,4 +167,4 @@ v2.0: 23/23 requirements mapped. See [REQUIREMENTS.md](REQUIREMENTS.md).
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-04 — v2.0 phases 6-10 defined*
+*Last updated: 2026-03-04 — Phase 6 complete*
