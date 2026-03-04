@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 8 of 10 ((app) Shell)
-Plan: 0 of 1 in current phase
-Status: Ready to plan Phase 8
-Last activity: 2026-03-04 — Session #15
+Plan: 1 of 1 in current phase
+Status: Phase 8 COMPLETE
+Last activity: 2026-03-04 — Session #16
 
-Progress: v2.0 [██████████░░░░░░░░░░] 50% (4/8 plans complete)
+Progress: v2.0 [████████████░░░░░░░░] 63% (5/8 plans complete)
 
 ## v1.0 Summary
 
@@ -50,6 +50,10 @@ Progress: v2.0 [██████████░░░░░░░░░░] 50
 - **[session14]** user_permissions כתיבות חייבות adminClient (service_role) — RLS 00013 חוסם כתיבה עם RLS client
 - **[session14]** auth email (מ-auth.users) מוצג בטבלת יוזרים, לא employee email
 - **[session15]** Branding: "מערכת ניהול לוגיסטי" + "CHEMO SYSTEM" בלוגאין
+- **[08-01]** (app)/layout.tsx does NOT set dir=rtl — inherited from root <html dir="rtl">
+- **[08-01]** ModuleSwitcher returns null for <=1 module — no dropdown for single-module users
+- **[08-01]** logoutApp() separate from logout() — ChemoSys → /chemosys, admin → /login
+- **[08-01]** Employee display name resolved in layout (not DAL) — display concern belongs in layout
 
 ### Hotfixes Applied (2026-03-04, post Phase 7)
 
@@ -68,27 +72,26 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-04 (session #15)
-Stopped at: Phase 7 COMPLETE. Ready to plan and build Phase 8.
+Last session: 2026-03-04 (session #16)
+Stopped at: Phase 8 COMPLETE — 08-01-PLAN.md executed fully.
 
 ### Context for next session:
 
-**Status:** Phase 7 DONE — all committed. Phase 8 ready to start.
+**Status:** Phase 8 DONE — all committed. Ready for Phase 9 (fleet module pages).
 
 **Commits this session:**
-- `05682a9` — feat(session-14): user edit dialog, auth email fix, permission writes via adminClient
-- `a14684e` — feat(07-chemosys): integrate module selection into /chemosys login page
+- `4e838e9` — feat(08-01): add logoutApp() action + (app)/layout shell + AppHeader + ModuleSwitcher + AppLogoutButton
+- `618bcc7` — feat(08-01): clean up /app/page.tsx — remove redundant fullscreen styling
 
-**What to build in Phase 8:**
-1. `src/app/(app)/layout.tsx` — route group layout, calls `verifyAppUser()`, wraps all `/app/*` pages
-2. `AppHeader` component — logo, user name, ModuleSwitcher dropdown, logout button
-3. `ModuleSwitcher` — shows only modules user has permission for (from `getAppNavPermissions()`)
-4. `/app/page.tsx` update — auto-redirect to first permitted module (fallback for direct /app access)
+**What Phase 9 needs to build:**
+1. `/app/fleet` page — FleetSubModuleGrid with permitted sub-modules (app_fleet_vehicles, app_fleet_drivers, etc.)
+2. Sub-module navigation pattern — how to pass sub-module permissions server→client
+3. Decision needed: pattern for Set<string> sub-module permissions to FleetSubModuleGrid
 
 **Key files to reference:**
-- `src/lib/dal.ts` — `verifyAppUser()`, `getAppNavPermissions()` (already built in Phase 6)
-- `src/actions/auth.ts` — `logout()` server action
-- `src/app/(admin)/layout.tsx` — reference for admin layout pattern (dark sidebar, admin guard)
-- `src/app/(chemosys)/layout.tsx` — reference for dark bg pattern
+- `src/lib/dal.ts` — `verifyAppUser()`, `getAppNavPermissions()`
+- `src/app/(app)/layout.tsx` — new authenticated shell (Phase 8 output)
+- `src/components/app/AppHeader.tsx` — header pattern reference
+- `src/actions/auth.ts` — `logoutApp()` server action
 
 Resume file: None
