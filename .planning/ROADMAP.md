@@ -94,10 +94,10 @@ Plans:
 3. יוזר שלוחץ על ModuleSwitcher רואה רק את המודולים שיש לו הרשאה אליהם — ועובר לדף הבית שלהם בלחיצה אחת
 4. ביקור ב-`/app` ללא מודול ספציפי מפנה אוטומטית למודול הראשון המורשה
 
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 08-01: (app) layout + AppHeader + ModuleSwitcher + /app redirect
+- [ ] 08-01-PLAN.md — (app)/layout.tsx + AppHeader + ModuleSwitcher + logoutApp() + /app page cleanup
 
 ---
 
@@ -155,7 +155,7 @@ Plans:
 | 5. Settings and Observability | v1.0 | 4/4 | Complete | 2026-03-04 |
 | 6. DB + Auth Foundation | v2.0 | 2/2 | Complete | 2026-03-04 |
 | 7. ChemoSys Login | v2.0 | 2/2 | Complete | 2026-03-04 |
-| 8. (app) Shell | v2.0 | 0/1 | Not started | - |
+| 8. (app) Shell | v2.0 | 0/1 | Planned | - |
 | 9. Fleet Home | v2.0 | 0/1 | Not started | - |
 | 10. Equipment + Mobile Polish | v2.0 | 0/1 | Not started | - |
 
