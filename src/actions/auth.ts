@@ -2,7 +2,7 @@
 
 // Authentication Server Actions.
 // login(): Validates admin credentials via Supabase Auth, redirects to /admin/dashboard on success.
-// loginApp(): Validates ChemoSys credentials via Supabase Auth, redirects to /app on success.
+// loginApp(): Validates ChemoSys credentials, checks module permission, redirects to /app/{module}.
 // logout(): Signs out and redirects to login.
 //
 // Rate limiting: in-memory Map persisted in Node.js runtime.
@@ -104,14 +104,17 @@ export async function login(
 
 /**
  * loginApp — called by the ChemoSys login form via useActionState.
- * Mirrors login() exactly but uses a separate rate limit counter and
- * redirects to /app instead of /admin/dashboard.
+ * Authenticates, checks module permission, and redirects to /app/{module}.
  *
- * On success: redirects to /app (redirect throws, does not return).
+ * Flow:
+ *   1. Rate limit check
+ *   2. Validate form fields (email, password, module)
+ *   3. signInWithPassword() — authenticate
+ *   4. Check public.users row (not blocked)
+ *   5. Check get_user_permissions RPC for app_{module}
+ *   6. Redirect to /app/{module} on success
+ *
  * On failure: returns { error: "..." } displayed in the form.
- *
- * NOTE: verifyAppUser() is NOT called here — the session cookie propagates on
- * the next request where /app/page.tsx will call verifyAppUser() itself.
  */
 export async function loginApp(
   _prevState: LoginAppState,
@@ -127,24 +130,69 @@ export async function loginApp(
 
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
+  const module = formData.get("module") as string;
 
   // Basic guard — form fields are required but JS can be disabled.
   if (!email || !password) {
     return { error: "נא למלא מייל וסיסמה" };
   }
 
+  // Validate module choice (default to fleet if missing/invalid)
+  const validModules = ["fleet", "equipment"] as const;
+  const selectedModule = validModules.includes(module as typeof validModules[number])
+    ? module
+    : "fleet";
+
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data: authData, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
 
   if (error) {
-    // Log for server-side diagnostics without exposing auth details to client.
     console.warn("[auth] loginApp failed:", error.message);
     return { error: "מייל או סיסמה שגויים" };
   }
 
-  // Redirect throws internally — never returns a value.
-  redirect("/app");
+  const authUserId = authData.user.id;
+
+  // Check user is registered and not blocked
+  const { data: userRow } = await supabase
+    .from("users")
+    .select("is_blocked")
+    .eq("auth_user_id", authUserId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!userRow) {
+    await supabase.auth.signOut();
+    return { error: "המשתמש אינו רשום במערכת" };
+  }
+
+  if (userRow.is_blocked) {
+    await supabase.auth.signOut();
+    return { error: "המשתמש חסום — פנה לאחראי המערכת" };
+  }
+
+  // Check module permission via RPC
+  const { data: perms } = await supabase.rpc("get_user_permissions", {
+    p_user_id: authUserId,
+  });
+
+  const moduleKey = `app_${selectedModule}`;
+  const hasAccess = perms?.some(
+    (p: { module_key: string; level: number }) =>
+      p.module_key === moduleKey && p.level >= 1
+  );
+
+  if (!hasAccess) {
+    await supabase.auth.signOut();
+    return { error: "אין לך גישה למודול זה — פנה לאחראי המערכת" };
+  }
+
+  // Redirect to the selected module
+  redirect(`/app/${selectedModule}`);
 }
 
 /**
