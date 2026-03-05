@@ -172,7 +172,7 @@ export function FleetSidebar({ permissions, children }: FleetSidebarProps) {
 
         <SidebarSeparator />
 
-        <SidebarContent>
+        <SidebarContent className="[&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-sidebar-border">
           {/* ── Dashboard + CTAs ─────────────────────────────── */}
           <SidebarGroup>
             <SidebarMenu>
@@ -186,7 +186,7 @@ export function FleetSidebar({ permissions, children }: FleetSidebarProps) {
                 >
                   <Link href="/app/fleet">
                     <LayoutDashboard />
-                    <span>דשבורד</span>
+                    <span className="group-data-[collapsible=icon]:hidden">דשבורד</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -203,7 +203,7 @@ export function FleetSidebar({ permissions, children }: FleetSidebarProps) {
                 >
                   <Link href="/app/fleet/driver-card">
                     <UserCheck />
-                    <span>כרטיס נהג</span>
+                    <span className="group-data-[collapsible=icon]:hidden">כרטיס נהג</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -220,7 +220,7 @@ export function FleetSidebar({ permissions, children }: FleetSidebarProps) {
                 >
                   <Link href="/app/fleet/vehicle-card">
                     <Car />
-                    <span>כרטיס רכב</span>
+                    <span className="group-data-[collapsible=icon]:hidden">כרטיס רכב</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -255,7 +255,7 @@ export function FleetSidebar({ permissions, children }: FleetSidebarProps) {
                       >
                         <Link href={item.href}>
                           <Icon />
-                          <span>{item.label}</span>
+                          <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -277,7 +277,7 @@ export function FleetSidebar({ permissions, children }: FleetSidebarProps) {
                       <span aria-hidden="true">
                         <Icon />
                       </span>
-                      <span>{item.label}</span>
+                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -295,8 +295,8 @@ export function FleetSidebar({ permissions, children }: FleetSidebarProps) {
         <SidebarRail />
       </Sidebar>
 
-      {/* ── Content area — white background (dark mode ready via bg-background) */}
-      <div className="flex-1 overflow-auto bg-background rounded-tr-xl">
+      {/* ── Content area ────────────────────────────────────── */}
+      <div className="flex-1 min-w-0 overflow-auto bg-muted/20">
         {/* Mobile sidebar trigger — visible only on small screens */}
         <div className="sticky top-0 z-10 flex items-center gap-2 bg-background/80 backdrop-blur-sm border-b border-border/50 px-4 py-2 md:hidden">
           <SidebarTrigger className="text-muted-foreground" />
@@ -304,7 +304,7 @@ export function FleetSidebar({ permissions, children }: FleetSidebarProps) {
             צי רכב
           </span>
         </div>
-        <div className="p-4 md:p-6">{children}</div>
+        <div className="p-4 md:p-5">{children}</div>
       </div>
     </SidebarProvider>
   );
