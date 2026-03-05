@@ -1,32 +1,41 @@
 "use client";
 
-// FleetSidebar — collapsible RTL sidebar for the fleet module.
-// Renders 9 sub-modules with permission-based enable/disable.
-// Collapsed to icon-only by default (defaultOpen={false}).
-// side="right" positions sidebar on RTL logical start.
+// FleetSidebar — collapsible RTL sidebar shell for the fleet module.
+// Wraps BOTH the sidebar AND the content area in SidebarProvider (required by shadcn).
 //
-// Permission model:
-//   - Server passes string[] (JSON-serializable across server→client boundary)
-//   - Client converts to Set<string> for O(1) lookup per item
-//   - Items missing from permSet: grayed, non-clickable, aria-disabled, tabIndex={-1}
+// Structure (top to bottom):
+//   1. Module header (icon + "צי רכב")
+//   2. דשבורד (dashboard link)
+//   3. כרטיס נהג + כרטיס רכב (2 prominent CTA buttons)
+//   4. 9 sub-module items with permission filtering
+//   5. Toggle button in footer to collapse/expand
 //
-// Styling: uses brand color tokens from globals.css via shadcn --sidebar-* vars
-// (--sidebar = #1B3A4B bg, --sidebar-foreground = #E8EAED text,
-//  --sidebar-accent = #2A4F63 hover, --sidebar-primary = #4ECDC4 active)
+// Expanded by default. Collapsible to icons via footer toggle or SidebarRail.
+// All links use Next.js <Link> for instant client-side navigation.
 
 import { useMemo } from "react";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarProvider,
+  SidebarRail,
+  SidebarSeparator,
+  SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
+  LayoutDashboard,
+  UserCheck,
+  Car,
   Fuel,
   SquareActivity,
   Receipt,
@@ -36,13 +45,12 @@ import {
   ClipboardList,
   AlertTriangle,
   BarChart2,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ─── Sub-module Config ────────────────────────────────────────────────────────
-// Static list of 9 fleet sub-modules (Sharon, session #16 characterization).
-// Keys must match module_key values in the modules table.
-// Order determines sidebar rendering order.
 
 type FleetSubModule = {
   key: string;
@@ -52,12 +60,7 @@ type FleetSubModule = {
 };
 
 const FLEET_SUB_MODULES: FleetSubModule[] = [
-  {
-    key: "app_fleet_fuel",
-    label: "דלק",
-    href: "/app/fleet/fuel",
-    icon: Fuel,
-  },
+  { key: "app_fleet_fuel", label: "דלק", href: "/app/fleet/fuel", icon: Fuel },
   {
     key: "app_fleet_tolls",
     label: "כבישי אגרה",
@@ -78,7 +81,7 @@ const FLEET_SUB_MODULES: FleetSubModule[] = [
   },
   {
     key: "app_fleet_charging_stations",
-    label: "מעקב עמדות טעינה פרטיות",
+    label: "מעקב עמדות טעינה",
     href: "/app/fleet/charging-stations",
     icon: MapPin,
   },
@@ -111,31 +114,124 @@ const FLEET_SUB_MODULES: FleetSubModule[] = [
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 type FleetSidebarProps = {
-  // string[] (not Set) — Sets are not JSON-serializable across server→client boundary.
-  // Server (FleetLayout) filters and passes array; client converts to Set for O(1) lookup.
   permissions: string[];
+  children: React.ReactNode;
 };
+
+// ─── Toggle Button (needs useSidebar context) ─────────────────────────────────
+
+function SidebarToggle() {
+  const { state, toggleSidebar } = useSidebar();
+  // In RTL: ChevronsLeft opens (expands toward left), ChevronsRight closes (collapses toward right)
+  const Icon = state === "expanded" ? ChevronsRight : ChevronsLeft;
+
+  return (
+    <button
+      onClick={toggleSidebar}
+      className="flex items-center justify-center w-full h-8 rounded-md
+                 text-sidebar-foreground/60 hover:text-sidebar-foreground
+                 hover:bg-sidebar-accent transition-colors duration-200"
+      title={state === "expanded" ? "כווץ תפריט" : "הרחב תפריט"}
+    >
+      <Icon className="w-4 h-4" />
+    </button>
+  );
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function FleetSidebar({ permissions }: FleetSidebarProps) {
-  // Convert to Set once per prop change — O(1) has() for each item render
+export function FleetSidebar({ permissions, children }: FleetSidebarProps) {
   const permSet = useMemo(() => new Set(permissions), [permissions]);
-
   const pathname = usePathname();
 
   return (
-    // SidebarProvider scoped to fleet layout only — NOT in (app)/layout.tsx.
-    // defaultOpen={false} = collapsed to icon-only on initial render (Sharon spec).
-    <SidebarProvider defaultOpen={false}>
-      {/* side="right" = RTL logical start (matches dir="rtl" on <html>) */}
-      {/* collapsible="icon" = collapses to icon-only width, SidebarMenuButton shows tooltip */}
-      <Sidebar side="right" collapsible="icon">
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-sidebar-foreground/60 text-xs font-semibold uppercase tracking-wider px-2 py-1">
+    <SidebarProvider
+      defaultOpen={true}
+      style={{ minHeight: 0 }}
+      className="flex-1"
+    >
+      <Sidebar
+        side="right"
+        collapsible="icon"
+        style={{
+          top: "var(--header-h, 3.5rem)",
+          height: "calc(100svh - var(--header-h, 3.5rem))",
+        }}
+      >
+        {/* ── Module Header ────────────────────────────────────── */}
+        <SidebarHeader className="px-3 py-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-sidebar-primary/20 flex items-center justify-center shrink-0">
+              <Car className="w-4 h-4 text-sidebar-primary" />
+            </div>
+            <span className="font-bold text-sm text-sidebar-foreground tracking-wide truncate">
               צי רכב
-            </SidebarGroupLabel>
+            </span>
+          </div>
+        </SidebarHeader>
+
+        <SidebarSeparator />
+
+        <SidebarContent>
+          {/* ── Dashboard + CTAs ─────────────────────────────── */}
+          <SidebarGroup>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={{ children: "דשבורד", side: "left" as const }}
+                  isActive={pathname === "/app/fleet"}
+                  size="lg"
+                  className="font-semibold"
+                >
+                  <Link href="/app/fleet">
+                    <LayoutDashboard />
+                    <span>דשבורד</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={{
+                    children: "כרטיס נהג",
+                    side: "left" as const,
+                  }}
+                  isActive={pathname.startsWith("/app/fleet/driver-card")}
+                  size="lg"
+                  className="font-semibold"
+                >
+                  <Link href="/app/fleet/driver-card">
+                    <UserCheck />
+                    <span>כרטיס נהג</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={{
+                    children: "כרטיס רכב",
+                    side: "left" as const,
+                  }}
+                  isActive={pathname.startsWith("/app/fleet/vehicle-card")}
+                  size="lg"
+                  className="font-semibold"
+                >
+                  <Link href="/app/fleet/vehicle-card">
+                    <Car />
+                    <span>כרטיס רכב</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+
+          <SidebarSeparator />
+
+          {/* ── Sub-modules (9 items) ──────────────────────────── */}
+          <SidebarGroup>
+            <SidebarGroupLabel>מודולים</SidebarGroupLabel>
             <SidebarMenu>
               {FLEET_SUB_MODULES.map((item) => {
                 const isEnabled = permSet.has(item.key);
@@ -145,37 +241,36 @@ export function FleetSidebar({ permissions }: FleetSidebarProps) {
                 const Icon = item.icon;
 
                 if (isEnabled) {
-                  // Enabled item — full link with active state
                   return (
                     <SidebarMenuItem key={item.key}>
                       <SidebarMenuButton
                         asChild
-                        tooltip={item.label}
+                        tooltip={{
+                          children: item.label,
+                          side: "left" as const,
+                        }}
                         isActive={isActive}
-                        className={cn(
-                          "transition-colors duration-200",
-                          isActive &&
-                            "border-r-2 border-sidebar-primary text-sidebar-primary"
-                        )}
+                        size="lg"
+                        className="font-semibold transition-colors duration-200"
                       >
-                        <a href={item.href}>
+                        <Link href={item.href}>
                           <Icon />
                           <span>{item.label}</span>
-                        </a>
+                        </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
                 }
 
-                // Disabled item — grayed, non-clickable, keyboard-inaccessible
-                // Uses <span> (not <a> or <button>) so keyboard focus is impossible.
-                // aria-disabled="true" communicates disabled state to screen readers.
-                // tabIndex={-1} removes from Tab order entirely.
                 return (
                   <SidebarMenuItem key={item.key}>
                     <SidebarMenuButton
-                      tooltip={`${item.label} — אין גישה`}
-                      className="opacity-40 cursor-not-allowed"
+                      tooltip={{
+                        children: `${item.label} — אין גישה`,
+                        side: "left" as const,
+                      }}
+                      size="lg"
+                      className="opacity-40 cursor-not-allowed font-semibold"
                       aria-disabled="true"
                       tabIndex={-1}
                     >
@@ -190,7 +285,27 @@ export function FleetSidebar({ permissions }: FleetSidebarProps) {
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
+
+        {/* ── Footer — visible toggle button ───────────────────── */}
+        <SidebarFooter className="p-2">
+          <SidebarToggle />
+        </SidebarFooter>
+
+        {/* Rail — invisible edge handle (secondary toggle method) */}
+        <SidebarRail />
       </Sidebar>
+
+      {/* ── Content area — white background (dark mode ready via bg-background) */}
+      <div className="flex-1 overflow-auto bg-background rounded-tr-xl">
+        {/* Mobile sidebar trigger — visible only on small screens */}
+        <div className="sticky top-0 z-10 flex items-center gap-2 bg-background/80 backdrop-blur-sm border-b border-border/50 px-4 py-2 md:hidden">
+          <SidebarTrigger className="text-muted-foreground" />
+          <span className="text-sm font-medium text-muted-foreground">
+            צי רכב
+          </span>
+        </div>
+        <div className="p-4 md:p-6">{children}</div>
+      </div>
     </SidebarProvider>
   );
 }
