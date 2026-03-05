@@ -7,6 +7,7 @@ import { verifySession } from '@/lib/dal'
 import { revalidatePath } from 'next/cache'
 import { readEnvFile, writeEnvValues } from '@/lib/env-settings'
 import * as net from 'net'
+import nodemailer from 'nodemailer'
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -54,12 +55,33 @@ export type LlmSettingsData = {
   hasSavedApiKey: boolean
 }
 
+export type EmailSettingsData = {
+  enabled: boolean
+  host: string
+  port: string
+  username: string
+  password: string
+  fromAddress: string
+  fromName: string
+  hasSavedPassword: boolean
+}
+
+export type FleetSettingsData = {
+  licenseYellowDays: number   // FLEET_LICENSE_YELLOW_DAYS
+  licenseRedDays: number      // FLEET_LICENSE_RED_DAYS
+  documentYellowDays: number  // FLEET_DOCUMENT_YELLOW_DAYS
+  documentRedDays: number     // FLEET_DOCUMENT_RED_DAYS
+  hasSavedAdminPassword: boolean // FLEET_ADMIN_PASSWORD is set
+}
+
 export type IntegrationSettings = {
   sms: SmsSettingsData
   whatsapp: WhatsAppSettingsData
   ftp: FtpSettingsData
   telegram: TelegramSettingsData
   llm: LlmSettingsData
+  email: EmailSettingsData
+  fleet: FleetSettingsData
 }
 
 export type TestResult = {
@@ -128,6 +150,23 @@ export async function getIntegrationSettings(): Promise<IntegrationSettings> {
       baseUrl: env['LLM_BASE_URL'] ?? '',
       hasSavedApiKey: Boolean(env['LLM_API_KEY']),
     },
+    email: {
+      enabled: env['EMAIL_ENABLED'] === 'true',
+      host: env['EMAIL_HOST'] ?? 'smtp.gmail.com',
+      port: env['EMAIL_PORT'] ?? '587',
+      username: env['EMAIL_USERNAME'] ?? '',
+      password: maskValue(env['EMAIL_PASSWORD']),
+      fromAddress: env['EMAIL_FROM_ADDRESS'] ?? '',
+      fromName: env['EMAIL_FROM_NAME'] ?? '',
+      hasSavedPassword: Boolean(env['EMAIL_PASSWORD']),
+    },
+    fleet: {
+      licenseYellowDays: parseInt(env['FLEET_LICENSE_YELLOW_DAYS'] ?? '60', 10),
+      licenseRedDays:    parseInt(env['FLEET_LICENSE_RED_DAYS']    ?? '30', 10),
+      documentYellowDays: parseInt(env['FLEET_DOCUMENT_YELLOW_DAYS'] ?? '60', 10),
+      documentRedDays:    parseInt(env['FLEET_DOCUMENT_RED_DAYS']    ?? '30', 10),
+      hasSavedAdminPassword: Boolean(env['FLEET_ADMIN_PASSWORD']),
+    },
   }
 }
 
@@ -135,7 +174,7 @@ export async function getIntegrationSettings(): Promise<IntegrationSettings> {
 // saveIntegrationSettings
 // ─────────────────────────────────────────────────────────────
 
-const VALID_TYPES = ['sms', 'whatsapp', 'ftp', 'telegram', 'llm'] as const
+const VALID_TYPES = ['sms', 'whatsapp', 'ftp', 'telegram', 'llm', 'email', 'fleet'] as const
 type IntegrationType = (typeof VALID_TYPES)[number]
 
 /** Map from integration type + field name to env key */
@@ -171,6 +210,22 @@ const ENV_KEY_MAP: Record<IntegrationType, Record<string, string>> = {
     modelName: 'LLM_MODEL_NAME',
     apiKey: 'LLM_API_KEY',
     baseUrl: 'LLM_BASE_URL',
+  },
+  email: {
+    enabled: 'EMAIL_ENABLED',
+    host: 'EMAIL_HOST',
+    port: 'EMAIL_PORT',
+    username: 'EMAIL_USERNAME',
+    password: 'EMAIL_PASSWORD',
+    fromAddress: 'EMAIL_FROM_ADDRESS',
+    fromName: 'EMAIL_FROM_NAME',
+  },
+  fleet: {
+    licenseYellowDays:  'FLEET_LICENSE_YELLOW_DAYS',
+    licenseRedDays:     'FLEET_LICENSE_RED_DAYS',
+    documentYellowDays: 'FLEET_DOCUMENT_YELLOW_DAYS',
+    documentRedDays:    'FLEET_DOCUMENT_RED_DAYS',
+    adminPassword:      'FLEET_ADMIN_PASSWORD',
   },
 }
 
@@ -368,4 +423,76 @@ export async function testLlmConnection(): Promise<TestResult> {
   } catch (err) {
     return { ok: false, message: `שגיאת רשת: ${err instanceof Error ? err.message : 'Unknown'}` }
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Test Email (SMTP) connection
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Test Email connection by verifying SMTP credentials and sending a test email.
+ * Uses nodemailer with TLS. Sends to the configured username address.
+ */
+export async function testEmailConnection(): Promise<TestResult> {
+  await verifySession()
+
+  const host = process.env['EMAIL_HOST'] ?? ''
+  const port = parseInt(process.env['EMAIL_PORT'] ?? '587', 10)
+  const username = process.env['EMAIL_USERNAME'] ?? ''
+  const password = process.env['EMAIL_PASSWORD'] ?? ''
+  const fromAddress = process.env['EMAIL_FROM_ADDRESS'] || username
+  const fromName = process.env['EMAIL_FROM_NAME'] || 'ChemoSystem'
+
+  if (!host) return { ok: false, message: 'אין שרת SMTP מוגדר' }
+  if (!username) return { ok: false, message: 'אין כתובת Gmail מוגדרת' }
+  if (!password) return { ok: false, message: 'אין App Password מוגדר' }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user: username, pass: password },
+    })
+
+    // Verify SMTP connection
+    await transporter.verify()
+
+    // Send a test email to self
+    await transporter.sendMail({
+      from: `"${fromName}" <${fromAddress}>`,
+      to: username,
+      subject: 'בדיקת חיבור — ChemoSystem',
+      text: 'מייל בדיקה מ-ChemoSystem. החיבור תקין!',
+      html: '<div dir="rtl" style="font-family:sans-serif"><h3>בדיקת חיבור</h3><p>מייל בדיקה מ-ChemoSystem. החיבור תקין!</p></div>',
+    })
+
+    return { ok: true, message: 'מייל בדיקה נשלח בהצלחה — בדוק את תיבת הדואר' }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown'
+    if (msg.includes('Invalid login') || msg.includes('BadCredentials')) {
+      return { ok: false, message: 'שגיאת אימות — בדוק את כתובת ה-Gmail וה-App Password' }
+    }
+    return { ok: false, message: `שגיאת חיבור: ${msg}` }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// verifyFleetAdminPassword
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Verifies that the provided password matches FLEET_ADMIN_PASSWORD in .env.local.
+ * Used before destructive operations (e.g. driver card deletion) in ChemoSys.
+ * SECURITY: verifyAppUser() guard — app-layer authentication.
+ */
+export async function verifyFleetAdminPassword(
+  password: string
+): Promise<{ ok: boolean; error?: string }> {
+  await verifySession()
+
+  const stored = process.env['FLEET_ADMIN_PASSWORD'] ?? ''
+  if (!stored) return { ok: false, error: 'סיסמת מחיקה לא מוגדרת בהגדרות המערכת' }
+  if (password !== stored) return { ok: false, error: 'סיסמה שגויה' }
+  return { ok: true }
 }

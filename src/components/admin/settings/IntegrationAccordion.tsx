@@ -16,13 +16,15 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import { MessageSquare, Phone, HardDrive, Send, Brain } from 'lucide-react'
+import { MessageSquare, Phone, HardDrive, Send, Brain, Mail, Car } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { SmsSettings } from './SmsSettings'
 import { WhatsAppSettings } from './WhatsAppSettings'
 import { FtpSettings } from './FtpSettings'
 import { TelegramSettings } from './TelegramSettings'
 import { LlmSettings } from './LlmSettings'
+import { EmailSettings } from './EmailSettings'
+import { FleetSettings } from './FleetSettings'
 import type { IntegrationSettings } from '@/actions/settings'
 
 type Props = {
@@ -99,6 +101,33 @@ export function IntegrationAccordion({ settings }: Props) {
         </AccordionTrigger>
         <AccordionContent className="pt-2 pb-4">
           <LlmSettings settings={settings.llm} />
+        </AccordionContent>
+      </AccordionItem>
+
+      {/* 6. Email / Gmail SMTP */}
+      <AccordionItem value="email" className="border rounded-lg px-4">
+        <AccordionTrigger className="hover:no-underline">
+          <div className="flex items-center gap-3">
+            <Mail className="h-5 w-5 text-muted-foreground shrink-0" />
+            <span className="font-medium">Email (Gmail SMTP)</span>
+            <StatusBadge enabled={settings.email.enabled} />
+          </div>
+        </AccordionTrigger>
+        <AccordionContent className="pt-2 pb-4">
+          <EmailSettings settings={settings.email} />
+        </AccordionContent>
+      </AccordionItem>
+
+      {/* 7. Fleet — alert thresholds for driver card */}
+      <AccordionItem value="fleet" className="border rounded-lg px-4">
+        <AccordionTrigger className="hover:no-underline">
+          <div className="flex items-center gap-3">
+            <Car className="h-5 w-5 text-muted-foreground shrink-0" />
+            <span className="font-medium">הגדרות צי רכב</span>
+          </div>
+        </AccordionTrigger>
+        <AccordionContent className="pt-2 pb-4">
+          <FleetSettings settings={settings.fleet} />
         </AccordionContent>
       </AccordionItem>
     </Accordion>
