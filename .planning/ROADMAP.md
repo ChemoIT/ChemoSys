@@ -160,6 +160,7 @@ Plans:
 | 9. Fleet Home | v2.0 | 2/2 | Complete | 2026-03-05 |
 | 10. Equipment + Mobile Polish | v2.0 | 0/1 | Not started | - |
 | 11. Phase 10A — Vehicle Card DB | v2.0 | 2/2 | Complete | 2026-03-07 |
+| 12. Phase 10B — Suppliers + MOT API | v2.0 | 2/2 | Complete | 2026-03-07 |
 
 ## Coverage
 
@@ -184,8 +185,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 12-01-PLAN.md — Vehicle Suppliers Admin CRUD page + Server Actions + sidebar nav link
-- [ ] 12-02-PLAN.md — MOT API Server Action + Fleet Settings extension (vehicle test/insurance thresholds + MOT test button)
+- [x] 12-01-PLAN.md — Vehicle Suppliers Admin CRUD page + Server Actions + sidebar nav link
+- [x] 12-02-PLAN.md — MOT API Server Action + Fleet Settings extension (vehicle test/insurance thresholds + MOT test button)
 
 ### Phase 13: Phase 10C — Vehicle Server Actions + Shared Fleet Components extraction
 
@@ -217,4 +218,4 @@ Plans:
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-07 — Phase 11 complete*
+*Last updated: 2026-03-07 — Phase 12 complete*
