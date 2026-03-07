@@ -6,42 +6,47 @@
  * Features:
  *   - Freetext document name with autocomplete (from driver_document_names)
  *   - PDF/image upload via fleet-documents bucket
- *   - Expiry date with days-remaining indicator
- *   - Soft-delete
+ *   - Expiry date (dd/mm/yyyy) with days-remaining + alert toggle
+ *   - File preview (image inline, PDF opens in new tab)
+ *   - Click row to edit existing document
+ *   - Soft-delete via RPC
  */
 
 import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Plus, Trash2, Upload, FileText, X, AlertCircle, Camera } from 'lucide-react'
+import {
+  Loader2, Plus, Trash2, Upload, FileText, X, AlertCircle, Camera,
+  Eye, Pencil, Bell, Save,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { createClient as createBrowserClient } from '@/lib/supabase/browser'
 import {
   addDriverDocument,
   deleteDriverDocument,
+  updateDriverDocument,
   getDocumentNameSuggestions,
   type DriverDocument,
 } from '@/actions/fleet/drivers'
+import { formatDate, daysUntil } from '@/lib/format'
+import { FleetDateInput } from './FleetDateInput'
 
 type Props = {
   driverId: string
   documents: DriverDocument[]
   docYellowDays: number
+  onEditingChange?: (isEditing: boolean) => void
 }
 
-function daysUntil(dateStr: string | null): number | null {
-  if (!dateStr) return null
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const exp = new Date(dateStr); exp.setHours(0, 0, 0, 0)
-  return Math.ceil((exp.getTime() - today.getTime()) / 86_400_000)
-}
+// formatDate, daysUntil — imported from @/lib/format
 
 function ExpiryIndicator({ expiryDate, yellowDays }: { expiryDate: string | null; yellowDays: number }) {
   if (!expiryDate) return <span className="text-muted-foreground text-xs">ללא תוקף</span>
   const days = daysUntil(expiryDate)
   if (days === null) return null
-  const dateStr = new Date(expiryDate).toLocaleDateString('he-IL')
+  const dateStr = formatDate(expiryDate)
   const color = days < 0 ? 'text-red-600' : days <= yellowDays ? 'text-yellow-600' : 'text-green-600'
   return (
     <div className={`text-xs ${color}`}>
@@ -53,15 +58,163 @@ function ExpiryIndicator({ expiryDate, yellowDays }: { expiryDate: string | null
   )
 }
 
-export function DriverDocumentsSection({ driverId, documents: initialDocs, docYellowDays }: Props) {
+// ── Toggle Switch (same as DriverLicenseSection) ─────────────────────────────
+
+function AlertToggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <div className="flex items-center gap-2.5 shrink-0" dir="ltr">
+      <Switch
+        checked={checked}
+        onCheckedChange={onChange}
+        className="data-[state=checked]:bg-[#4ECDC4]"
+      />
+      <span
+        dir="rtl"
+        className={`text-xs flex items-center gap-1 transition-colors ${checked ? 'text-amber-600 font-medium' : 'text-muted-foreground'}`}
+      >
+        <Bell className="h-3.5 w-3.5" />
+        {label}
+      </span>
+    </div>
+  )
+}
+
+// ── File Preview ─────────────────────────────────────────────────────────────
+
+function FilePreview({ url, onClear }: { url: string; onClear: () => void }) {
+  const isPdf = url.toLowerCase().includes('.pdf')
+
+  return (
+    <div className="relative border rounded-xl overflow-hidden bg-muted/10">
+      {isPdf ? (
+        /* PDF: styled card — iframe blocked by signed URL CSP */
+        <div className="flex flex-col items-center justify-center gap-3 py-8">
+          <div
+            className="w-14 h-14 rounded-xl flex items-center justify-center"
+            style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}
+          >
+            <FileText className="h-7 w-7 text-red-500" />
+          </div>
+          <span className="text-xs text-muted-foreground">PDF הועלה בהצלחה</span>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-primary bg-primary/8 hover:bg-primary/15 transition-colors"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            פתח לצפייה
+          </a>
+        </div>
+      ) : (
+        /* Image: show inline */
+        <img src={url} alt="תצוגה מקדימה" className="w-full h-56 object-contain" />
+      )}
+      <div className="absolute top-2 left-2 flex gap-1.5">
+        {!isPdf && (
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-background/90 backdrop-blur-sm rounded-full p-1.5 hover:bg-background shadow-sm transition-colors"
+            title="פתח בחלון חדש"
+          >
+            <Eye className="h-3.5 w-3.5 text-primary" />
+          </a>
+        )}
+        <button
+          onClick={onClear}
+          className="bg-background/90 backdrop-blur-sm rounded-full p-1.5 hover:bg-background shadow-sm transition-colors"
+          title="הסר קובץ"
+        >
+          <X className="h-3.5 w-3.5 text-destructive" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Upload Zone ──────────────────────────────────────────────────────────────
+
+function UploadZone({
+  fileUrl,
+  uploading,
+  dragging,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onFileClick,
+  onCameraClick,
+  onClear,
+}: {
+  fileUrl: string
+  uploading: boolean
+  dragging: boolean
+  onDragOver: (e: React.DragEvent) => void
+  onDragLeave: () => void
+  onDrop: (e: React.DragEvent) => void
+  onFileClick: () => void
+  onCameraClick: () => void
+  onClear: () => void
+}) {
+  if (fileUrl) {
+    return <FilePreview url={fileUrl} onClear={onClear} />
+  }
+
+  return (
+    <div
+      className={`border-2 border-dashed rounded-xl p-4 transition-colors ${
+        dragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+      }`}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+        {uploading ? (
+          <Loader2 className="h-6 w-6 animate-spin" />
+        ) : (
+          <>
+            <FileText className="h-6 w-6" />
+            <span className="text-xs">{dragging ? 'שחרר כאן...' : 'גרור קובץ לכאן'}</span>
+          </>
+        )}
+      </div>
+      {!uploading && (
+        <div className="flex justify-center gap-3 mt-3">
+          <button
+            onClick={onFileClick}
+            className="flex items-center justify-center h-10 w-10 rounded-lg border border-border bg-background hover:bg-muted transition-colors"
+            title="העלה מהמחשב"
+          >
+            <Upload className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <button
+            onClick={onCameraClick}
+            className="flex items-center justify-center h-10 w-10 rounded-lg border border-border bg-background hover:bg-muted transition-colors"
+            title="סרוק / צלם"
+          >
+            <Camera className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Main Component ───────────────────────────────────────────────────────────
+
+export function DriverDocumentsSection({ driverId, documents: initialDocs, docYellowDays, onEditingChange }: Props) {
   const [docs, setDocs] = useState<DriverDocument[]>(initialDocs)
   const [showAddForm, setShowAddForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
-  // Add form state
+  // Form state (shared between add and edit)
   const [docName, setDocName] = useState('')
   const [expiryDate, setExpiryDate] = useState('')
   const [notes, setNotes] = useState('')
   const [fileUrl, setFileUrl] = useState('')
+  const [alertEnabled, setAlertEnabled] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -70,7 +223,25 @@ export function DriverDocumentsSection({ driverId, documents: initialDocs, docYe
   const [dragging, setDragging] = useState(false)
 
   const [isAdding, startAddTransition] = useTransition()
+  const [isSaving, startSaveTransition] = useTransition()
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  // Notify parent of REAL dirty state (actual content changes)
+  const isFormDirty = (() => {
+    if (showAddForm) return docName.trim() !== '' || expiryDate !== '' || notes !== '' || fileUrl !== ''
+    if (editingId) {
+      const orig = docs.find((d) => d.id === editingId)
+      if (!orig) return false
+      return docName !== orig.documentName ||
+        expiryDate !== (orig.expiryDate ?? '') ||
+        notes !== (orig.notes ?? '') ||
+        fileUrl !== (orig.fileUrl ?? '')
+    }
+    return false
+  })()
+  useEffect(() => {
+    onEditingChange?.(isFormDirty)
+  }, [isFormDirty, onEditingChange])
 
   // Fetch autocomplete suggestions
   const fetchSuggestions = useCallback(async (query: string) => {
@@ -95,8 +266,11 @@ export function DriverDocumentsSection({ driverId, documents: initialDocs, docYe
         .from('fleet-documents')
         .upload(fileName, file, { upsert: true })
       if (error) throw error
-      const { data } = supabase.storage.from('fleet-documents').getPublicUrl(fileName)
-      return data.publicUrl
+      const { data: signedData, error: signedError } = await supabase.storage
+        .from('fleet-documents')
+        .createSignedUrl(fileName, 31_536_000)
+      if (signedError) throw signedError
+      return signedData.signedUrl
     } catch (err) {
       toast.error(`שגיאה בהעלאת הקובץ: ${err instanceof Error ? err.message : 'Unknown'}`)
       return null
@@ -127,7 +301,23 @@ export function DriverDocumentsSection({ driverId, documents: initialDocs, docYe
     setExpiryDate('')
     setNotes('')
     setFileUrl('')
+    setAlertEnabled(false)
     setShowSuggestions(false)
+  }
+
+  function startEdit(doc: DriverDocument) {
+    setEditingId(doc.id)
+    setDocName(doc.documentName)
+    setExpiryDate(doc.expiryDate ?? '')
+    setNotes(doc.notes ?? '')
+    setFileUrl(doc.fileUrl ?? '')
+    setAlertEnabled(doc.alertEnabled ?? false)
+    setShowAddForm(false)
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    resetForm()
   }
 
   function handleAdd() {
@@ -141,6 +331,7 @@ export function DriverDocumentsSection({ driverId, documents: initialDocs, docYe
         documentName: docName.trim(),
         fileUrl: fileUrl || null,
         expiryDate: expiryDate || null,
+        alertEnabled,
         notes: notes || null,
       })
       if (result.success && result.id) {
@@ -150,6 +341,7 @@ export function DriverDocumentsSection({ driverId, documents: initialDocs, docYe
           documentName: docName.trim(),
           fileUrl: fileUrl || null,
           expiryDate: expiryDate || null,
+          alertEnabled,
           notes: notes || null,
           createdAt: new Date().toISOString(),
         }
@@ -163,18 +355,208 @@ export function DriverDocumentsSection({ driverId, documents: initialDocs, docYe
     })
   }
 
+  function handleUpdate() {
+    if (!editingId || !docName.trim()) return
+    startSaveTransition(async () => {
+      const result = await updateDriverDocument({
+        docId: editingId,
+        driverId,
+        documentName: docName.trim(),
+        fileUrl: fileUrl || null,
+        expiryDate: expiryDate || null,
+        alertEnabled,
+        notes: notes || null,
+      })
+      if (result.success) {
+        setDocs((prev) =>
+          prev.map((d) =>
+            d.id === editingId
+              ? { ...d, documentName: docName.trim(), fileUrl: fileUrl || null, expiryDate: expiryDate || null, alertEnabled, notes: notes || null }
+              : d
+          )
+        )
+        setEditingId(null)
+        resetForm()
+        toast.success('המסמך עודכן')
+      } else {
+        toast.error(result.error)
+      }
+    })
+  }
+
   async function handleDelete(docId: string) {
     if (!confirm('למחוק את המסמך?')) return
     setDeletingId(docId)
     const result = await deleteDriverDocument(docId, driverId)
     if (result.success) {
       setDocs((prev) => prev.filter((d) => d.id !== docId))
+      if (editingId === docId) {
+        setEditingId(null)
+        resetForm()
+      }
       toast.success('המסמך נמחק')
     } else {
       toast.error(result.error)
     }
     setDeletingId(null)
   }
+
+  // ── Document Form (shared for add + edit) ─────────────────────────────────
+
+  function renderForm(mode: 'add' | 'edit') {
+    const isBusy = mode === 'add' ? isAdding : isSaving
+
+    return (
+      <div className="border rounded-xl p-4 space-y-4 bg-muted/20">
+        {/* Document name with autocomplete */}
+        <div className="space-y-1.5 relative">
+          <Label>שם המסמך</Label>
+          <Input
+            value={docName}
+            onChange={(e) => { setDocName(e.target.value); setShowSuggestions(true) }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            autoFocus
+          />
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="absolute z-10 top-full mt-1 w-full bg-background border rounded-lg shadow-lg overflow-hidden">
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => { setDocName(s); setShowSuggestions(false) }}
+                  className="w-full text-right px-3 py-2 text-sm hover:bg-muted transition-colors block"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Expiry date + quick buttons + alert toggle */}
+        <div className="space-y-2">
+          <Label>תוקף (אופציונלי)</Label>
+          <div className="flex items-center gap-4 flex-wrap">
+            <FleetDateInput value={expiryDate} onChange={(v) => setExpiryDate(v)} />
+            <AlertToggle
+              checked={alertEnabled}
+              onChange={setAlertEnabled}
+              label={alertEnabled ? `התראה פעילה (${docYellowDays} יום)` : 'התראת תפוגה'}
+            />
+          </div>
+          {/* Quick expiry buttons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground">תוקף מהיר:</span>
+            {[
+              { label: '3 חודשים', months: 3 },
+              { label: 'שנה', months: 12 },
+              { label: 'שנתיים', months: 24 },
+            ].map(({ label, months }) => (
+              <button
+                key={months}
+                type="button"
+                onClick={() => {
+                  const d = new Date()
+                  d.setMonth(d.getMonth() + months)
+                  const yyyy = d.getFullYear()
+                  const mm = String(d.getMonth() + 1).padStart(2, '0')
+                  const dd = String(d.getDate()).padStart(2, '0')
+                  setExpiryDate(`${yyyy}-${mm}-${dd}`)
+                }}
+                className="px-2.5 py-1 rounded-md border text-xs font-medium transition-colors hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                style={{ borderColor: '#C8D5E2' }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {/* Days remaining indicator */}
+          {expiryDate && (() => {
+            const days = daysUntil(expiryDate)
+            if (days === null) return null
+            const color = days < 0 ? 'text-red-600 font-semibold' : days <= docYellowDays ? 'text-yellow-600 font-semibold' : 'text-green-600'
+            return (
+              <p className={`text-xs ${color}`}>
+                {days < 0 ? `פג לפני ${Math.abs(days)} ימים` : `${days} ימים עד פקיעה`}
+              </p>
+            )
+          })()}
+        </div>
+
+        {/* File upload with preview */}
+        <div className="space-y-1.5">
+          <Label>קובץ (PDF/תמונה)</Label>
+          <UploadZone
+            fileUrl={fileUrl}
+            uploading={uploading}
+            dragging={dragging}
+            onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={handleDrop}
+            onFileClick={() => fileInputRef.current?.click()}
+            onCameraClick={() => cameraInputRef.current?.click()}
+            onClear={() => setFileUrl('')}
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+        </div>
+
+        {/* Notes */}
+        <div className="space-y-1.5">
+          <Label>הערות (אופציונלי)</Label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            className="w-full border border-border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 resize-y"
+          />
+        </div>
+
+        <div className="flex items-center justify-end gap-3">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => { mode === 'add' ? (resetForm(), setShowAddForm(false)) : cancelEdit() }}
+          >
+            ביטול
+          </Button>
+          <Button
+            size="sm"
+            onClick={mode === 'add' ? handleAdd : handleUpdate}
+            disabled={isBusy || !docName.trim()}
+          >
+            {isBusy && <Loader2 className="h-4 w-4 ms-2 animate-spin" />}
+            {mode === 'add' ? (
+              <>
+                <Plus className="h-4 w-4 ms-1" />
+                הוסף מסמך
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 ms-1" />
+                שמור שינויים
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4">
@@ -185,187 +567,78 @@ export function DriverDocumentsSection({ driverId, documents: initialDocs, docYe
 
       {docs.length > 0 && (
         <div className="space-y-2">
-          {docs.map((doc) => (
-            <div
-              key={doc.id}
-              className="flex items-start justify-between gap-3 p-3 border rounded-lg hover:bg-muted/20 transition-colors"
-            >
-              <div className="flex items-start gap-3 flex-1 min-w-0">
-                <FileText className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium">{doc.documentName}</span>
-                    {doc.expiryDate && daysUntil(doc.expiryDate)! <= docYellowDays && (
-                      <AlertCircle className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
-                    )}
+          {docs.map((doc) => {
+            const isEditing = editingId === doc.id
+
+            if (isEditing) {
+              return <div key={doc.id}>{renderForm('edit')}</div>
+            }
+
+            return (
+              <div
+                key={doc.id}
+                className="flex items-start justify-between gap-3 p-3 border rounded-lg hover:bg-muted/20 transition-colors cursor-pointer group"
+                onClick={() => startEdit(doc)}
+              >
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <FileText className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium">{doc.documentName}</span>
+                      {doc.alertEnabled && (
+                        <Bell className="h-3.5 w-3.5 text-amber-500 shrink-0" aria-label="התראת תפוגה פעילה" />
+                      )}
+                      {doc.expiryDate && daysUntil(doc.expiryDate)! <= docYellowDays && (
+                        <AlertCircle className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
+                      )}
+                    </div>
+                    <ExpiryIndicator expiryDate={doc.expiryDate} yellowDays={docYellowDays} />
+                    {/* Alert toggle — inline with expiry info */}
+                    {doc.notes && <p className="text-xs text-muted-foreground mt-0.5 truncate">{doc.notes}</p>}
                   </div>
-                  <ExpiryIndicator expiryDate={doc.expiryDate} yellowDays={docYellowDays} />
-                  {doc.notes && <p className="text-xs text-muted-foreground mt-0.5 truncate">{doc.notes}</p>}
+                </div>
+              <div className="flex items-center gap-2 shrink-0">
+                  {doc.fileUrl && (
+                    <a
+                      href={doc.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      פתח קובץ
+                    </a>
+                  )}
+                  <Pencil className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDelete(doc.id) }}
+                    disabled={deletingId === doc.id}
+                    className="text-muted-foreground hover:text-destructive transition-colors"
+                    title="מחק"
+                  >
+                    {deletingId === doc.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {doc.fileUrl && (
-                  <a
-                    href={doc.fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline"
-                  >
-                    פתח קובץ
-                  </a>
-                )}
-                <button
-                  onClick={() => handleDelete(doc.id)}
-                  disabled={deletingId === doc.id}
-                  className="text-muted-foreground hover:text-destructive transition-colors"
-                  title="מחק"
-                >
-                  {deletingId === doc.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
       {/* Add form */}
-      {showAddForm && (
-        <div className="border rounded-xl p-4 space-y-4 bg-muted/20">
-          {/* Document name with autocomplete */}
-          <div className="space-y-1.5 relative">
-            <Label>שם המסמך</Label>
-            <Input
-              value={docName}
-              onChange={(e) => { setDocName(e.target.value); setShowSuggestions(true) }}
-              onFocus={() => setShowSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-              placeholder="לדוגמה: כשירות רפואית, אישור נהיגה בגובה..."
-              autoFocus
-            />
-            {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute z-10 top-full mt-1 w-full bg-background border rounded-lg shadow-lg overflow-hidden">
-                {suggestions.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => { setDocName(s); setShowSuggestions(false) }}
-                    className="w-full text-right px-3 py-2 text-sm hover:bg-muted transition-colors block"
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Expiry date */}
-            <div className="space-y-1.5">
-              <Label>תוקף (אופציונלי)</Label>
-              <Input
-                type="date"
-                value={expiryDate}
-                onChange={(e) => setExpiryDate(e.target.value)}
-                dir="ltr"
-              />
-            </div>
-
-            {/* File upload */}
-            <div className="space-y-1.5">
-              <Label>קובץ (PDF/תמונה)</Label>
-              {fileUrl ? (
-                <div className="flex items-center gap-2">
-                  <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
-                    קובץ הועלה ✓
-                  </a>
-                  <button onClick={() => setFileUrl('')}>
-                    <X className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                  </button>
-                </div>
-              ) : (
-                <div
-                  className={`border-2 border-dashed rounded-lg p-3 transition-colors ${dragging ? 'border-primary bg-primary/5' : 'border-border'}`}
-                  onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-                  onDragLeave={() => setDragging(false)}
-                  onDrop={handleDrop}
-                >
-                  <p className="text-xs text-center text-muted-foreground mb-2">
-                    {dragging ? 'שחרר כאן...' : 'גרור קובץ לכאן'}
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 gap-1.5"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                    >
-                      {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                      {uploading ? 'מעלה...' : 'מחשב'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 gap-1.5"
-                      onClick={() => cameraInputRef.current?.click()}
-                      disabled={uploading}
-                    >
-                      <Camera className="h-3.5 w-3.5" />
-                      סרוק
-                    </Button>
-                  </div>
-                </div>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,image/*"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-              <input
-                ref={cameraInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div className="space-y-1.5">
-            <Label>הערות (אופציונלי)</Label>
-            <Input
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="הערות נוספות..."
-            />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button size="sm" onClick={handleAdd} disabled={isAdding || !docName.trim()}>
-              {isAdding && <Loader2 className="h-4 w-4 ms-2 animate-spin" />}
-              הוסף מסמך
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => { resetForm(); setShowAddForm(false) }}>
-              ביטול
-            </Button>
-          </div>
-        </div>
-      )}
+      {showAddForm && renderForm('add')}
 
       {/* Add button */}
-      {!showAddForm && (
+      {!showAddForm && !editingId && (
         <Button
           variant="outline"
           size="sm"
           className="gap-1.5"
-          onClick={() => setShowAddForm(true)}
+          onClick={() => { setShowAddForm(true); resetForm() }}
         >
           <Plus className="h-4 w-4" />
           הוסף מסמך
