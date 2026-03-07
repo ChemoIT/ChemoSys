@@ -1,0 +1,41 @@
+{
+  "name": "ChemoSystem Sandbox",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+
+  // Source code lives in a Docker volume — native ext4 I/O, not a slow Windows bind mount
+  "workspaceMount": "source=chemosystem-src,target=/workspace,type=volume",
+  "workspaceFolder": "/workspace",
+
+  // Read-only mounts: credentials + environment variables from Windows host
+  "mounts": [
+    "source=${localEnv:USERPROFILE}/.claude/.credentials.json,target=/home/dev/.claude/.credentials.json,type=bind,readonly",
+    "source=${localEnv:USERPROFILE}/.claude/settings.json,target=/home/dev/.claude/settings.json,type=bind,readonly",
+    "source=${localEnv:USERPROFILE}/.claude/.mcp.json,target=/home/dev/.claude/.mcp.json,type=bind,readonly",
+    "source=${localEnv:USERPROFILE}/.claude/hooks,target=/home/dev/.claude/hooks,type=bind,readonly",
+    "source=C:/Sharon_ClaudeCode/Apps/ChemoSystem/.env.local,target=/workspace/.env.local,type=bind,readonly"
+  ],
+
+  // VS Code extensions installed inside container
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+
+  // First run: clone repo into the Docker volume + install deps
+  // If volume already has files (from previous build), just pull latest + install
+  "postCreateCommand": "if [ ! -f package.json ]; then git clone https://github.com/ChemoIT/ChemoSys.git . && npm install; else git pull --ff-only 2>/dev/null; npm install; fi",
+
+  // Port forwarding — localhost:3000 accessible from Windows browser
+  "forwardPorts": [3000],
+
+  // Run as non-root user
+  "remoteUser": "dev"
+}
