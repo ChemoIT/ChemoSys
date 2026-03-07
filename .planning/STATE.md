@@ -5,13 +5,13 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** v2.0 — Phase 13 (10C) Plan 01 COMPLETE. Vehicle types + server actions data layer done.
+**Current focus:** v2.0 — Phase 13 (10C) Plan 02 COMPLETE. Shared fleet components extracted + VehicleFitnessLight created.
 
 ## Current Position
 
-Phase: 13 (Phase 10C) — 1/1 plans COMPLETE
-Status: **הושלם** — 13-01 vehicle-types.ts + vehicles.ts (21 server actions) done
-Last activity: 2026-03-07 — Session #31 (execute-phase 13, plan 01)
+Phase: 13 (Phase 10C) — 2/2 plans COMPLETE
+Status: **הושלם** — 13-01 vehicle server actions + 13-02 shared fleet components extraction done
+Last activity: 2026-03-07 — Session #32 (execute-phase 13, plan 02)
 
 Progress: v2.0 [█████████████████████████] Phase 13 complete — Phase 14 (VehicleCard UI) next
 
@@ -92,6 +92,9 @@ Progress: v2.0 [█████████████████████�
 - **[13-01]** getVehicleById uses FK hints for multi-supplier joins: leasing:vehicle_suppliers!leasing_company_id (Supabase disambiguates multiple FKs to same table)
 - **[13-01]** assignDriverToVehicle uses direct .update (not RPC) — vehicles UPDATE policy USING(true) allows it; only SELECT policy blocks soft-deleted rows
 - **[13-01]** 21 vehicle server actions complete: getVehiclesList, getVehicleById, createVehicle, updateVehicleDetails, softDeleteVehicle, deleteVehicleWithPassword + tests (4) + insurance (4) + documents (5+autocomplete) + assignment (2)
+- **[13-02]** VehicleFitnessLight red logic: test expired OR insurance expired = red (vs driver where only license = red — road legality difference)
+- **[13-02]** DriverLicenseSection UploadZone NOT extracted — different signature (image-only, side prop) vs FleetUploadZone (file+PDF+drag) — intentional separation
+- **[13-02]** FleetDateInput moved to shared/ (rename via git, 96% similarity preserved)
 
 ### Roadmap Evolution
 
@@ -119,14 +122,22 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-07 (session #31)
-Stopped at: Phase 13 Plan 01 COMPLETE — vehicle-types.ts + vehicles.ts (21 server actions) done.
+Last session: 2026-03-07 (session #32)
+Stopped at: Phase 13 COMPLETE — shared fleet components extraction + VehicleFitnessLight done.
 
 ### Context for next session:
 
-**מה קיים:** תשתית DB לרכבים (Phase 11) + ספקי רכב admin CRUD + MOT API (Phase 12) + vehicle server actions data layer (Phase 13).
+**מה קיים:** תשתית DB לרכבים (Phase 11) + ספקי רכב admin CRUD + MOT API (Phase 12) + vehicle server actions (13-01) + shared fleet components (13-02).
 
 **מה הבא:** Phase 14 — VehicleCard UI (טאבים: פרטי רכב, טסטים, ביטוח, מסמכים, שיוך נהג).
+
+**Key new files (Phase 13-02):**
+- `src/components/app/fleet/shared/FleetDateInput.tsx` — moved from drivers/ (3-select date picker)
+- `src/components/app/fleet/shared/AlertToggle.tsx` — extracted from DriverDocumentsSection + DriverLicenseSection
+- `src/components/app/fleet/shared/ExpiryIndicator.tsx` — extracted from DriverDocumentsSection
+- `src/components/app/fleet/shared/FleetFilePreview.tsx` — extracted from DriverDocumentsSection + DriverViolationsSection
+- `src/components/app/fleet/shared/FleetUploadZone.tsx` — extracted from DriverDocumentsSection
+- `src/components/app/fleet/shared/VehicleFitnessLight.tsx` — new component for vehicle card/list
 
 **Key new files (Phase 13-01):**
 - `src/lib/fleet/vehicle-types.ts` — VehicleListItem, VehicleFull, VehicleTest, VehicleInsurance, VehicleDocument, DriverOptionForAssignment types + VEHICLE_TYPE_LABELS, OWNERSHIP_TYPE_LABELS, INSURANCE_TYPE_LABELS constants
