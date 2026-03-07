@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS public.vehicles (
   -- Operational / classification fields
   vehicle_type            TEXT        CHECK (vehicle_type IN ('private','minibus','light_commercial','heavy','forklift','equipment','other')),
   ownership_type          TEXT        CHECK (ownership_type IN ('company_owned','leased','rented','employee_owned')),
-  company_id              INT         REFERENCES public.companies(id),
+  company_id              UUID        REFERENCES public.companies(id),
   is_active               BOOLEAN     NOT NULL DEFAULT TRUE,
 
   -- Driver / supplier associations
