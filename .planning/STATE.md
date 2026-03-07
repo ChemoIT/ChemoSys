@@ -5,15 +5,15 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** v2.0 — Phase 9 COMPLETE. הפסקה מכוונת לאיפיון מודול הרכבים.
+**Current focus:** v2.0 — Phase 11 (10A) IN PROGRESS. מיגרציית מסד הנתונים לרכבים הושלמה.
 
 ## Current Position
 
-Phase: 9 COMPLETE (2/2 plans done)
-Status: **עצירה מכוונת** — שרון מאפיין את מודול הרכבים לפני פיתוח
-Last activity: 2026-03-05 — Session #18
+Phase: 11 (Phase 10A) — Plan 1/? COMPLETE
+Status: **בביצוע** — מיגרציה 00025 נוצרה, ממתינה להרצה ב-Supabase (Plan 02)
+Last activity: 2026-03-07 — Session #29 (execute-phase 11-01)
 
-Progress: v2.0 [████████████████████░] Phase 9 complete — Phase 10 deferred
+Progress: v2.0 [█████████████████████░] Phase 11 Plan 01 complete — Plan 02 next
 
 ## Strategic Decision (Session #18)
 
@@ -40,6 +40,10 @@ Progress: v2.0 [████████████████████░]
 
 ### Key Decisions (v2.0)
 
+- **[11-01]** Partial unique index on vehicles.license_plate (WHERE deleted_at IS NULL) — allows soft-delete + plate reuse
+- **[11-01]** driver_computed_status updated in same migration — vehicle assignment WHEN precedes is_occasional_camp_driver
+- **[11-01]** vehicle_insurance uses supplier_id FK (not direct insurer fields) — normalized to vehicle_suppliers
+- **[11-01]** alert_enabled=TRUE default for vehicle_tests/insurance, FALSE for vehicle_documents (mirrors driver pattern)
 - ChemoSys login page = `/chemosys` (נפרד מ-`/login` של admin)
 - Module keys prefix = `app_` (e.g., `app_fleet`, `app_equipment`) — מניעת collision עם admin keys
 - Build order: migration → auth.ts routing → (admin) guard → dal.ts → (app) layout → pages
@@ -75,6 +79,14 @@ Progress: v2.0 [████████████████████░]
 - **[09-02]** Content area bg-background — white in light mode, dark-mode ready
 - **[09-02]** Disabled sub-modules: span+aria-disabled+tabIndex=-1
 
+### Roadmap Evolution
+
+- Phase 11 added: Phase 10A — Vehicle Card Database + Storage + Vehicle Suppliers tables
+- Phase 12 added: Phase 10B — Vehicle Suppliers Admin Settings UI + MOT API integration
+- Phase 13 added: Phase 10C — Vehicle Server Actions + Shared Fleet Components extraction
+- Phase 14 added: Phase 10E — VehicleCard Tabs 4-8 (Assignment, Costs, Documents, Notes, KM placeholder)
+- Phase 15 added: Phase 10F — VehicleList + AddVehicleDialog (MOT API auto-fill) + Pages + Integration
+
 ### Hotfixes Applied (2026-03-04)
 
 - **BUG FIX — שמות מחלקות הפוכים ב-PDF import:** `.split(' ').reverse().join(' ')` ב-`parseDepartmentsPdf()`
@@ -83,7 +95,7 @@ Progress: v2.0 [████████████████████░]
 
 ### Pending Todos
 
-None.
+- הרץ מיגרציה 00025 ב-Supabase SQL Editor (Plan 02)
 
 ### Blockers/Concerns
 
@@ -92,14 +104,14 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-05 (session #18)
-Stopped at: Phase 9 COMPLETE. עצירה לאיפיון מודול הרכבים.
+Last session: 2026-03-07 (session #29)
+Stopped at: Phase 11 Plan 01 COMPLETE — migration 00025_fleet_vehicles.sql created (c5897b1).
 
 ### Context for next session:
 
-**מה קיים:** שלד fleet מלא — FleetSidebar (RTL, collapsible), 11 דפי placeholder, auth guard, permission filtering.
+**מה קיים:** מיגרציה 00025 מוכנה (6 טבלאות, 2 views, 9 RPCs, 18 RLS). טרם הורצה ב-Supabase.
 
-**מה הבא:** שרון יאפיין את מודול הרכבים (vehicle card / fleet management) → `/gsd:new-milestone` או `/gsd:add-phase` לפי היקף האיפיון.
+**מה הבא (Plan 02):** הרצת מיגרציה 00025 ב-Supabase SQL Editor + יצירת storage bucket `fleet-vehicle-documents`.
 
 **Key fleet files:**
 - `src/app/(app)/app/fleet/layout.tsx` — FleetLayout (auth + app_fleet guard)
