@@ -166,6 +166,52 @@ All 65 v1.0 requirements mapped and completed. See [v1.0 Requirements Archive](m
 
 v2.0: 23/23 requirements mapped. See [REQUIREMENTS.md](REQUIREMENTS.md).
 
+### Phase 11: Phase 10A — Vehicle Card Database + Storage + Vehicle Suppliers tables
+
+**Goal:** תשתית DB מלאה למודול כרטיס רכב — 6 טבלאות, views, RPCs, RLS, ו-storage bucket מוכנים ל-Supabase. בסיום הפאזה, כל האובייקטים קיימים ב-DB ומוכנים לפיתוח Server Actions ו-UI בפאזות הבאות.
+**Depends on:** Phase 10
+**Plans:** 2 plans
+
+Plans:
+- [ ] 11-01-PLAN.md — Main migration 00025: 6 tables + views + 9 RPCs + RLS policies + indexes + triggers
+- [ ] 11-02-PLAN.md — Storage policies migration 00026 + human verification of both migrations in Supabase
+
+### Phase 12: Phase 10B — Vehicle Suppliers Admin Settings UI + MOT API integration
+
+**Goal:** [To be planned]
+**Depends on:** Phase 11
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 12 to break down)
+
+### Phase 13: Phase 10C — Vehicle Server Actions + Shared Fleet Components extraction
+
+**Goal:** [To be planned]
+**Depends on:** Phase 12
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 13 to break down)
+
+### Phase 14: Phase 10E — VehicleCard Tabs 4-8 (Assignment, Costs, Documents, Notes, KM placeholder)
+
+**Goal:** [To be planned]
+**Depends on:** Phase 13
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 14 to break down)
+
+### Phase 15: Phase 10F — VehicleList + AddVehicleDialog (MOT API auto-fill) + Pages + Integration
+
+**Goal:** [To be planned]
+**Depends on:** Phase 14
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 15 to break down)
+
 ---
 
 *Roadmap created: 2026-03-01*
