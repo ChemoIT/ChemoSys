@@ -179,12 +179,13 @@ Plans:
 
 ### Phase 12: Phase 10B — Vehicle Suppliers Admin Settings UI + MOT API integration
 
-**Goal:** [To be planned]
+**Goal:** דף אדמין מלא לניהול ספקי רכב (מוסכים, ליסינג, ביטוח, דלק) + Server Action לסנכרון נתוני רכב ממשרד הרישוי (MOT API) + הרחבת הגדרות צי רכב עם ספי התראה לטסט וביטוח. בסיום הפאזה, האדמין יכול לנהל ספקים ולבדוק חיבור API — תשתית מוכנה לכרטיס רכב.
 **Depends on:** Phase 11
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 12 to break down)
+- [ ] 12-01-PLAN.md — Vehicle Suppliers Admin CRUD page + Server Actions + sidebar nav link
+- [ ] 12-02-PLAN.md — MOT API Server Action + Fleet Settings extension (vehicle test/insurance thresholds + MOT test button)
 
 ### Phase 13: Phase 10C — Vehicle Server Actions + Shared Fleet Components extraction
 
