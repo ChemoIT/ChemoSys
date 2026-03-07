@@ -190,12 +190,13 @@ Plans:
 
 ### Phase 13: Phase 10C — Vehicle Server Actions + Shared Fleet Components extraction
 
-**Goal:** [To be planned]
+**Goal:** שכבת הנתונים המלאה למודול כרטיס רכב — 21 Server Actions ב-vehicles.ts + קובץ טיפוסים vehicle-types.ts + 6 רכיבי UI משותפים ב-shared/ (מועברים מדרייברים + VehicleFitnessLight חדש). בסיום הפאזה, כל הקוד שפאזות 14-15 צריכות קיים — אפס מיגרציות.
 **Depends on:** Phase 12
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 13 to break down)
+- [ ] 13-01-PLAN.md — Vehicle types file (vehicle-types.ts) + complete vehicle CRUD server actions (vehicles.ts — 21 functions)
+- [ ] 13-02-PLAN.md — Shared fleet component extraction (FleetDateInput, AlertToggle, ExpiryIndicator, FleetFilePreview, FleetUploadZone) + VehicleFitnessLight
 
 ### Phase 14: Phase 10E — VehicleCard Tabs 4-8 (Assignment, Costs, Documents, Notes, KM placeholder)
 
