@@ -1,0 +1,629 @@
+'use client'
+
+/**
+ * VehicleInsuranceSection — Tab 3 of VehicleCard.
+ *
+ * Shows insurance policies list + add/edit/delete with supplier dropdown.
+ * Mirrors VehicleTestsSection pattern.
+ *
+ * Features:
+ *   - List: insurance type label, policy number, supplier name, expiry (ExpiryIndicator), cost, file, alert bell
+ *   - Add/Edit form: insurance_type select, policy_number, supplier_id dropdown, start/expiry dates, cost, file, alert, notes
+ *   - Quick expiry buttons: 3m / 1y / 2y
+ *   - Supplier dropdown: fetched via getActiveSuppliersByType('insurance') on mount
+ *   - Dirty tracking via onEditingChange prop
+ */
+
+import { useState, useTransition, useRef, useEffect } from 'react'
+import { toast } from 'sonner'
+import {
+  Loader2, Plus, Trash2, Shield,
+  Bell, Pencil, Save,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { createClient as createBrowserClient } from '@/lib/supabase/browser'
+import {
+  addVehicleInsurance,
+  deleteVehicleInsurance,
+  updateVehicleInsurance,
+  getActiveSuppliersByType,
+} from '@/actions/fleet/vehicles'
+import { formatDate, daysUntil } from '@/lib/format'
+import { FleetDateInput } from '../shared/FleetDateInput'
+import { AlertToggle } from '../shared/AlertToggle'
+import { ExpiryIndicator } from '../shared/ExpiryIndicator'
+import { FleetUploadZone } from '../shared/FleetUploadZone'
+import { INSURANCE_TYPE_LABELS, type VehicleInsurance } from '@/lib/fleet/vehicle-types'
+
+// ─────────────────────────────────────────────────────────────
+// Props
+// ─────────────────────────────────────────────────────────────
+
+type Props = {
+  vehicleId: string
+  insurance: VehicleInsurance[]
+  docYellowDays: number
+  onEditingChange?: (isDirty: boolean) => void
+}
+
+type SupplierOption = { id: string; name: string }
+
+const INSURANCE_TYPE_OPTIONS: { value: 'mandatory' | 'comprehensive' | 'third_party'; label: string }[] = [
+  { value: 'mandatory', label: INSURANCE_TYPE_LABELS['mandatory'] },
+  { value: 'comprehensive', label: INSURANCE_TYPE_LABELS['comprehensive'] },
+  { value: 'third_party', label: INSURANCE_TYPE_LABELS['third_party'] },
+]
+
+// ─────────────────────────────────────────────────────────────
+// Main Component
+// ─────────────────────────────────────────────────────────────
+
+export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance, docYellowDays, onEditingChange }: Props) {
+  const [policies, setPolicies] = useState<VehicleInsurance[]>(initialInsurance)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+
+  // Supplier options
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([])
+
+  // Form state
+  const [insuranceType, setInsuranceType] = useState<'mandatory' | 'comprehensive' | 'third_party'>('mandatory')
+  const [policyNumber, setPolicyNumber] = useState('')
+  const [supplierId, setSupplierId] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [expiryDate, setExpiryDate] = useState('')
+  const [cost, setCost] = useState('')
+  const [fileUrl, setFileUrl] = useState('')
+  const [alertEnabled, setAlertEnabled] = useState(true)
+  const [notes, setNotes] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [dragging, setDragging] = useState(false)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+
+  const [isAdding, startAddTransition] = useTransition()
+  const [isSaving, startSaveTransition] = useTransition()
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  // Fetch insurance suppliers on mount
+  useEffect(() => {
+    void getActiveSuppliersByType('insurance').then(setSuppliers)
+  }, [])
+
+  // Dirty tracking
+  const isFormDirty = (() => {
+    if (showAddForm) return expiryDate !== '' || policyNumber !== '' || supplierId !== '' || cost !== '' || fileUrl !== '' || notes !== ''
+    if (editingId) {
+      const orig = policies.find((p) => p.id === editingId)
+      if (!orig) return false
+      return (
+        insuranceType !== orig.insuranceType ||
+        policyNumber !== (orig.policyNumber ?? '') ||
+        supplierId !== (orig.supplierId ?? '') ||
+        startDate !== (orig.startDate ?? '') ||
+        expiryDate !== (orig.expiryDate ?? '') ||
+        cost !== (orig.cost?.toString() ?? '') ||
+        fileUrl !== (orig.fileUrl ?? '') ||
+        alertEnabled !== orig.alertEnabled ||
+        notes !== (orig.notes ?? '')
+      )
+    }
+    return false
+  })()
+
+  useEffect(() => {
+    onEditingChange?.(isFormDirty)
+  }, [isFormDirty, onEditingChange])
+
+  // ─────────────────────────────────────────────────────────
+  // File upload
+  // ─────────────────────────────────────────────────────────
+
+  async function uploadFile(file: File): Promise<string | null> {
+    setUploading(true)
+    try {
+      const supabase = createBrowserClient()
+      const ext = file.name.split('.').pop() ?? 'pdf'
+      const fileName = `${vehicleId}_insurance_${crypto.randomUUID()}.${ext}`
+      const { error } = await supabase.storage
+        .from('fleet-vehicle-documents')
+        .upload(fileName, file, { upsert: true })
+      if (error) throw error
+      const { data: signedData, error: signedError } = await supabase.storage
+        .from('fleet-vehicle-documents')
+        .createSignedUrl(fileName, 31_536_000)
+      if (signedError) throw signedError
+      return signedData.signedUrl
+    } catch (err) {
+      toast.error(`שגיאה בהעלאת הקובץ: ${err instanceof Error ? err.message : 'Unknown'}`)
+      return null
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const url = await uploadFile(file)
+    if (url) setFileUrl(url)
+    e.target.value = ''
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragging(false)
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+    void uploadFile(file).then((url) => { if (url) setFileUrl(url) })
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Form helpers
+  // ─────────────────────────────────────────────────────────
+
+  function resetForm() {
+    setInsuranceType('mandatory')
+    setPolicyNumber('')
+    setSupplierId('')
+    setStartDate('')
+    setExpiryDate('')
+    setCost('')
+    setFileUrl('')
+    setAlertEnabled(true)
+    setNotes('')
+  }
+
+  function startEdit(policy: VehicleInsurance) {
+    setEditingId(policy.id)
+    setInsuranceType(policy.insuranceType as 'mandatory' | 'comprehensive' | 'third_party')
+    setPolicyNumber(policy.policyNumber ?? '')
+    setSupplierId(policy.supplierId ?? '')
+    setStartDate(policy.startDate ?? '')
+    setExpiryDate(policy.expiryDate)
+    setCost(policy.cost?.toString() ?? '')
+    setFileUrl(policy.fileUrl ?? '')
+    setAlertEnabled(policy.alertEnabled)
+    setNotes(policy.notes ?? '')
+    setShowAddForm(false)
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    resetForm()
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Quick expiry helper
+  // ─────────────────────────────────────────────────────────
+
+  function setQuickExpiry(months: number) {
+    const d = new Date()
+    d.setMonth(d.getMonth() + months)
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    setExpiryDate(`${yyyy}-${mm}-${dd}`)
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // CRUD
+  // ─────────────────────────────────────────────────────────
+
+  function handleAdd() {
+    if (!expiryDate) {
+      toast.error('יש לבחור תאריך תפוגה')
+      return
+    }
+    startAddTransition(async () => {
+      const result = await addVehicleInsurance({
+        vehicleId,
+        insuranceType,
+        policyNumber: policyNumber || null,
+        supplierId: supplierId || null,
+        startDate: startDate || null,
+        expiryDate,
+        cost: cost ? parseFloat(cost) : null,
+        notes: notes || null,
+        fileUrl: fileUrl || null,
+        alertEnabled,
+      })
+      if (result.success && result.id) {
+        const supplierName = suppliers.find((s) => s.id === supplierId)?.name ?? null
+        const newPolicy: VehicleInsurance = {
+          id: result.id,
+          vehicleId,
+          insuranceType,
+          policyNumber: policyNumber || null,
+          supplierId: supplierId || null,
+          supplierName,
+          startDate: startDate || null,
+          expiryDate,
+          cost: cost ? parseFloat(cost) : null,
+          notes: notes || null,
+          fileUrl: fileUrl || null,
+          alertEnabled,
+          createdAt: new Date().toISOString(),
+        }
+        setPolicies((prev) => [newPolicy, ...prev])
+        resetForm()
+        setShowAddForm(false)
+        toast.success('הביטוח נוסף')
+      } else {
+        toast.error(result.error)
+      }
+    })
+  }
+
+  function handleUpdate() {
+    if (!editingId || !expiryDate) return
+    startSaveTransition(async () => {
+      const result = await updateVehicleInsurance({
+        insuranceId: editingId,
+        vehicleId,
+        insuranceType,
+        policyNumber: policyNumber || null,
+        supplierId: supplierId || null,
+        startDate: startDate || null,
+        expiryDate,
+        cost: cost ? parseFloat(cost) : null,
+        notes: notes || null,
+        fileUrl: fileUrl || null,
+        alertEnabled,
+      })
+      if (result.success) {
+        const supplierName = suppliers.find((s) => s.id === supplierId)?.name ?? null
+        setPolicies((prev) =>
+          prev.map((p) =>
+            p.id === editingId
+              ? {
+                  ...p,
+                  insuranceType,
+                  policyNumber: policyNumber || null,
+                  supplierId: supplierId || null,
+                  supplierName,
+                  startDate: startDate || null,
+                  expiryDate,
+                  cost: cost ? parseFloat(cost) : null,
+                  notes: notes || null,
+                  fileUrl: fileUrl || null,
+                  alertEnabled,
+                }
+              : p
+          )
+        )
+        setEditingId(null)
+        resetForm()
+        toast.success('הביטוח עודכן')
+      } else {
+        toast.error(result.error)
+      }
+    })
+  }
+
+  async function handleDelete(policyId: string) {
+    if (!confirm('למחוק את הביטוח?')) return
+    setDeletingId(policyId)
+    const result = await deleteVehicleInsurance(policyId, vehicleId)
+    if (result.success) {
+      setPolicies((prev) => prev.filter((p) => p.id !== policyId))
+      if (editingId === policyId) {
+        setEditingId(null)
+        resetForm()
+      }
+      toast.success('הביטוח נמחק')
+    } else {
+      toast.error(result.error)
+    }
+    setDeletingId(null)
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Form render
+  // ─────────────────────────────────────────────────────────
+
+  const selectClass =
+    'w-full border border-border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right appearance-none cursor-pointer'
+
+  function renderForm(mode: 'add' | 'edit') {
+    const isBusy = mode === 'add' ? isAdding : isSaving
+
+    return (
+      <div className="border rounded-xl p-4 space-y-4 bg-muted/20">
+
+        {/* סוג ביטוח */}
+        <div className="space-y-1.5">
+          <Label>סוג ביטוח *</Label>
+          <select
+            value={insuranceType}
+            onChange={(e) => setInsuranceType(e.target.value as 'mandatory' | 'comprehensive' | 'third_party')}
+            className={selectClass}
+          >
+            {INSURANCE_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* מספר פוליסה */}
+        <div className="space-y-1.5">
+          <Label>מספר פוליסה</Label>
+          <input
+            type="text"
+            value={policyNumber}
+            onChange={(e) => setPolicyNumber(e.target.value)}
+            className="w-full border border-border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right"
+            placeholder="מספר פוליסה..."
+          />
+        </div>
+
+        {/* חברת ביטוח */}
+        <div className="space-y-1.5">
+          <Label>חברת ביטוח</Label>
+          <select
+            value={supplierId}
+            onChange={(e) => setSupplierId(e.target.value)}
+            className={selectClass}
+          >
+            <option value="">— ללא —</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* תאריך התחלה */}
+        <div className="space-y-1.5">
+          <Label>תאריך התחלה</Label>
+          <FleetDateInput value={startDate} onChange={setStartDate} minYear={2000} />
+        </div>
+
+        {/* תאריך תפוגה */}
+        <div className="space-y-2">
+          <Label>תאריך תפוגה *</Label>
+          <div className="flex items-center gap-4 flex-wrap">
+            <FleetDateInput value={expiryDate} onChange={setExpiryDate} />
+            <AlertToggle
+              checked={alertEnabled}
+              onChange={setAlertEnabled}
+              label={alertEnabled ? `התראה פעילה (${docYellowDays} יום)` : 'התראת תפוגה'}
+            />
+          </div>
+          {/* Quick expiry */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground">תוקף מהיר:</span>
+            {[
+              { label: '3 חודשים', months: 3 },
+              { label: 'שנה', months: 12 },
+              { label: 'שנתיים', months: 24 },
+            ].map(({ label, months }) => (
+              <button
+                key={months}
+                type="button"
+                onClick={() => setQuickExpiry(months)}
+                className="px-2.5 py-1 rounded-md border text-xs font-medium transition-colors hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                style={{ borderColor: '#C8D5E2' }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {/* Days remaining */}
+          {expiryDate && (() => {
+            const days = daysUntil(expiryDate)
+            if (days === null) return null
+            const color = days < 0 ? 'text-red-600 font-semibold' : days <= docYellowDays ? 'text-yellow-600 font-semibold' : 'text-green-600'
+            return (
+              <p className={`text-xs ${color}`}>
+                {days < 0 ? `פג לפני ${Math.abs(days)} ימים` : `${days} ימים עד פקיעה`}
+              </p>
+            )
+          })()}
+        </div>
+
+        {/* עלות */}
+        <div className="space-y-1.5">
+          <Label>עלות (₪)</Label>
+          <input
+            type="number"
+            value={cost}
+            onChange={(e) => setCost(e.target.value)}
+            className="w-full border border-border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right"
+            placeholder="0"
+            min="0"
+          />
+        </div>
+
+        {/* File upload */}
+        <div className="space-y-1.5">
+          <Label>קובץ (PDF/תמונה)</Label>
+          <FleetUploadZone
+            fileUrl={fileUrl}
+            uploading={uploading}
+            dragging={dragging}
+            onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={handleDrop}
+            onFileClick={() => fileInputRef.current?.click()}
+            onCameraClick={() => cameraInputRef.current?.click()}
+            onClear={() => setFileUrl('')}
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+        </div>
+
+        {/* הערות */}
+        <div className="space-y-1.5">
+          <Label>הערות (אופציונלי)</Label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            className="w-full border border-border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 resize-y"
+          />
+        </div>
+
+        <div className="flex items-center justify-end gap-3">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              if (mode === 'add') {
+                resetForm()
+                setShowAddForm(false)
+              } else {
+                cancelEdit()
+              }
+            }}
+          >
+            ביטול
+          </Button>
+          <Button
+            size="sm"
+            onClick={mode === 'add' ? handleAdd : handleUpdate}
+            disabled={isBusy || !expiryDate}
+          >
+            {isBusy && <Loader2 className="h-4 w-4 ms-2 animate-spin" />}
+            {mode === 'add' ? (
+              <>
+                <Plus className="h-4 w-4 ms-1" />
+                הוסף פוליסה
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 ms-1" />
+                שמור שינויים
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────
+
+  return (
+    <div className="space-y-4">
+
+      {/* Empty state */}
+      {policies.length === 0 && !showAddForm && (
+        <div className="text-center py-8">
+          <div
+            className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3"
+            style={{ background: '#F0F5FB', border: '1px solid #E2EBF4' }}
+          >
+            <Shield className="h-6 w-6 text-muted-foreground/35" />
+          </div>
+          <p className="text-sm text-muted-foreground">אין פוליסות ביטוח עבור רכב זה</p>
+        </div>
+      )}
+
+      {/* Insurance list */}
+      {policies.length > 0 && (
+        <div className="space-y-2">
+          {policies.map((policy) => {
+            const isEditing = editingId === policy.id
+            if (isEditing) return <div key={policy.id}>{renderForm('edit')}</div>
+
+            const typeLabel = INSURANCE_TYPE_LABELS[policy.insuranceType] ?? policy.insuranceType
+
+            return (
+              <div
+                key={policy.id}
+                className="flex items-start justify-between gap-3 p-3 border rounded-lg hover:bg-muted/20 transition-colors cursor-pointer group"
+                onClick={() => startEdit(policy)}
+              >
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <Shield className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium">{typeLabel}</span>
+                      {policy.alertEnabled && (
+                        <Bell className="h-3.5 w-3.5 text-amber-500 shrink-0" aria-label="התראה פעילה" />
+                      )}
+                      {policy.policyNumber && (
+                        <span className="text-xs text-muted-foreground font-mono">{policy.policyNumber}</span>
+                      )}
+                      {policy.cost != null && (
+                        <span className="text-xs text-muted-foreground">₪{policy.cost.toLocaleString()}</span>
+                      )}
+                    </div>
+                    {policy.supplierName && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{policy.supplierName}</p>
+                    )}
+                    <ExpiryIndicator expiryDate={policy.expiryDate} yellowDays={docYellowDays} />
+                    {policy.startDate && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        מ-{formatDate(policy.startDate)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {policy.fileUrl && (
+                    <a
+                      href={policy.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      פתח קובץ
+                    </a>
+                  )}
+                  <Pencil className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); void handleDelete(policy.id) }}
+                    disabled={deletingId === policy.id}
+                    className="text-muted-foreground hover:text-destructive transition-colors"
+                    title="מחק"
+                  >
+                    {deletingId === policy.id
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : <Trash2 className="h-4 w-4" />
+                    }
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Add form */}
+      {showAddForm && renderForm('add')}
+
+      {/* Add button */}
+      {!showAddForm && !editingId && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+          onClick={() => { setShowAddForm(true); resetForm() }}
+        >
+          <Plus className="h-4 w-4" />
+          הוסף פוליסה
+        </Button>
+      )}
+    </div>
+  )
+}
