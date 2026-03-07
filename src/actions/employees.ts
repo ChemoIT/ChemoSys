@@ -49,6 +49,7 @@ import { createClient } from '@/lib/supabase/server'
 import { verifySession } from '@/lib/dal'
 import { writeAuditLog } from '@/lib/audit'
 import { EmployeeSchema } from '@/lib/schemas'
+import { normalizePhone } from '@/lib/format'
 
 // ---------------------------------------------------------------------------
 // Dynamic Excel column detection — header-based mapping
@@ -337,8 +338,9 @@ async function parseExcelBufferAsync(
       street:                  cellToString(getCell(row, col, 'STREET')),
       house_number:            cellToString(getCell(row, col, 'HOUSE_NUMBER')),
       city:                    cellToString(getCell(row, col, 'CITY')),
-      mobile_phone:            cellToString(getCell(row, col, 'MOBILE_PHONE')),
-      additional_phone:        cellToString(getCell(row, col, 'ADDITIONAL_PHONE')),
+      mobile_phone:            normalizePhone(cellToString(getCell(row, col, 'MOBILE_PHONE')))
+                               ?? normalizePhone(cellToString(getCell(row, col, 'ADDITIONAL_PHONE'))),
+      additional_phone:        normalizePhone(cellToString(getCell(row, col, 'ADDITIONAL_PHONE'))),
       email:                   cellToString(getCell(row, col, 'EMAIL')),
       date_of_birth:           cellToDateString(getCell(row, col, 'DATE_OF_BIRTH')),
       start_date:              cellToDateString(getCell(row, col, 'START_DATE')),

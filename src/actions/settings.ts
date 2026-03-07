@@ -72,6 +72,7 @@ export type FleetSettingsData = {
   documentYellowDays: number  // FLEET_DOCUMENT_YELLOW_DAYS
   documentRedDays: number     // FLEET_DOCUMENT_RED_DAYS
   hasSavedAdminPassword: boolean // FLEET_ADMIN_PASSWORD is set
+  adminPassword: string       // actual value (admin-only page, safe to display)
 }
 
 export type IntegrationSettings = {
@@ -166,6 +167,7 @@ export async function getIntegrationSettings(): Promise<IntegrationSettings> {
       documentYellowDays: parseInt(env['FLEET_DOCUMENT_YELLOW_DAYS'] ?? '60', 10),
       documentRedDays:    parseInt(env['FLEET_DOCUMENT_RED_DAYS']    ?? '30', 10),
       hasSavedAdminPassword: Boolean(env['FLEET_ADMIN_PASSWORD']),
+      adminPassword: env['FLEET_ADMIN_PASSWORD'] ?? '',
     },
   }
 }

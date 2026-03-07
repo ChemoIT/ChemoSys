@@ -2,46 +2,68 @@
 
 /**
  * DriverCard — tabs layout for the driver card page.
- * Tabs: פרטי עובד | רשיון נהיגה | מסמכים | תרבות נהיגה | לוג נסיעות
+ * Tabs: פרטי הנהג | רשיון נהיגה | מסמכים | תרבות נהיגה | לוג נסיעות
+ *
+ * Changes (2026-03-05):
+ *  - Header: replaced global Save button with Back button
+ *  - SMS: opens dialog with phone (read-only) + message textarea + send/cancel + success toast
+ *  - Delete: opens dialog with admin password field — server verifies before delete
+ *  - Driver name: large bold headline
+ *  - Data values: highlighted vs labels
+ *  - Checkboxes: local state only — saved via unified "שמור שינויים" button
+ *  - Phone: always-editable input (no separate save)
+ *  - Notes: framed textarea (always editable)
+ *  - Unified "שמור שינויים" button saves phone + flags + notes together
+ *  - Dates formatted as dd/mm/yyyy
+ *  - Phones formatted as 05x-xxxxxxx
  */
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  ArrowRight,
   FileText,
   MessageSquare,
   Trash2,
-  Save,
-  X,
-  CheckSquare,
-  Square,
+  ArrowRight,
   User,
   CreditCard,
   Paperclip,
   AlertTriangle,
   History,
   Loader2,
+  ChevronLeft,
+  Send,
+  X,
+  Lock,
+  Save,
+  CheckSquare,
+  Square,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { FitnessLight } from './FitnessLight'
 import { DriverLicenseSection } from './DriverLicenseSection'
 import { DriverDocumentsSection } from './DriverDocumentsSection'
 import { DriverViolationsSection } from './DriverViolationsSection'
 import {
-  updateDriverPhone,
-  updateDriverFlags,
-  updateDriverNotes,
-  softDeleteDriver,
+  updateDriverDetails,
+  deleteDriverWithPassword,
+  sendDriverSms,
   type DriverFull,
   type DriverLicense,
   type DriverDocument,
   type DriverViolation,
 } from '@/actions/fleet/drivers'
+import { formatDate, formatPhone, formatId } from '@/lib/format'
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
@@ -70,37 +92,22 @@ function calcSeniority(startDate: string | null): string {
   return m > 0 ? `${y} שנים ו-${m} חודשים` : `${y} שנים`
 }
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  return d.toLocaleDateString('he-IL')
-}
-
-/** Format Israeli mobile phone: 05x-xxxxxxx */
-function formatPhone(phone: string | null | undefined): string {
-  if (!phone) return '—'
-  const digits = phone.replace(/\D/g, '')
-  if (digits.length === 10 && digits.startsWith('05')) {
-    return `${digits.slice(0, 3)}-${digits.slice(3)}`
-  }
-  return phone
-}
-
-/** Format Israeli ID: 9 digits with leading zeros */
-function formatId(id: string | null | undefined): string {
-  if (!id) return '—'
-  return id.replace(/\D/g, '').padStart(9, '0')
-}
+// formatDate, formatPhone, formatId — imported from @/lib/format
 
 // ─────────────────────────────────────────────────────────────
-// InfoRow
+// InfoRow — label + value, RTL aligned
 // ─────────────────────────────────────────────────────────────
 
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+function InfoRow({ label, value, valueBold }: { label: string; value: React.ReactNode; valueBold?: boolean }) {
   return (
-    <div className="flex items-start gap-3 py-2 border-b border-border/40 last:border-0">
-      <span className="text-sm text-muted-foreground w-36 shrink-0 pt-0.5">{label}</span>
-      <span className="text-sm font-medium text-foreground flex-1">{value || '—'}</span>
+    <div
+      className="flex items-start gap-3 py-2.5 border-b last:border-0"
+      style={{ borderColor: '#EEF3F9' }}
+    >
+      <span className="text-sm text-muted-foreground w-32 shrink-0 pt-0.5">{label}</span>
+      <span className={`text-sm flex-1 text-right ${valueBold ? 'font-bold text-foreground' : 'font-medium text-foreground'}`}>
+        {value || '—'}
+      </span>
     </div>
   )
 }
@@ -133,73 +140,123 @@ export function DriverCard({
 }: Props) {
   const router = useRouter()
 
-  // Inline edit states
-  const [editingPhone, setEditingPhone] = useState(false)
+  // ── Active tab (controlled) ──
+  const [activeTab, setActiveTab] = useState('employee')
+
+  // ── Editable fields state ──
   const [phoneValue, setPhoneValue] = useState(driver.effectivePhone ?? '')
   const [campDriver, setCampDriver] = useState(driver.isOccasionalCampDriver)
   const [equipmentOp, setEquipmentOp] = useState(driver.isEquipmentOperator)
   const [notes, setNotes] = useState(driver.notes ?? '')
-  const [editingNotes, setEditingNotes] = useState(false)
 
-  const [isSavingPhone, startPhoneTransition] = useTransition()
-  const [isSavingFlags, startFlagsTransition] = useTransition()
-  const [isSavingNotes, startNotesTransition] = useTransition()
+  // ── Dirty tracking — compare to initial values ──
+  const isDirty =
+    phoneValue !== (driver.effectivePhone ?? '') ||
+    campDriver !== driver.isOccasionalCampDriver ||
+    equipmentOp !== driver.isEquipmentOperator ||
+    notes !== (driver.notes ?? '')
+
+  // ── Sub-tab dirty state (reported by child components — true only when REAL changes exist) ──
+  const dirtyStates = useRef<Record<string, boolean>>({})
+
+  const onLicenseEditingChange = useCallback((dirty: boolean) => {
+    dirtyStates.current.license = dirty
+  }, [])
+  const onDocumentsEditingChange = useCallback((dirty: boolean) => {
+    dirtyStates.current.documents = dirty
+  }, [])
+  const onViolationsEditingChange = useCallback((dirty: boolean) => {
+    dirtyStates.current.violations = dirty
+  }, [])
+
+  /** Check if the current tab has unsaved changes */
+  function isCurrentTabDirty(tab: string): boolean {
+    switch (tab) {
+      case 'employee': return isDirty
+      case 'license': return dirtyStates.current.license ?? false
+      case 'documents': return dirtyStates.current.documents ?? false
+      case 'violations': return dirtyStates.current.violations ?? false
+      default: return false
+    }
+  }
+
+  const TAB_LABELS: Record<string, string> = {
+    employee: 'פרטי הנהג',
+    license: 'רשיון נהיגה',
+    documents: 'מסמכים',
+    violations: 'תרבות נהיגה',
+    log: 'לוג נסיעות',
+  }
+
+  // ── Unsaved changes dialog state ──
+  const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false)
+  const [pendingTab, setPendingTab] = useState<string | null>(null)
+
+  function handleTabChange(newTab: string) {
+    if (newTab === activeTab) return
+    if (isCurrentTabDirty(activeTab)) {
+      setPendingTab(newTab)
+      setUnsavedDialogOpen(true)
+      return
+    }
+    setActiveTab(newTab)
+  }
+
+  function handleDiscardAndSwitch() {
+    setUnsavedDialogOpen(false)
+    if (pendingTab) setActiveTab(pendingTab)
+    setPendingTab(null)
+  }
+
+  function handleSaveAndSwitch() {
+    // For tab 1 (employee) — save directly then switch
+    if (activeTab === 'employee' && isDirty) {
+      startSaveTransition(async () => {
+        const result = await updateDriverDetails(driver.id, {
+          phone: phoneValue || null,
+          isOccasionalCampDriver: campDriver,
+          isEquipmentOperator: equipmentOp,
+          notes,
+        })
+        if (result.success) {
+          toast.success('הפרטים נשמרו בהצלחה')
+          setUnsavedDialogOpen(false)
+          if (pendingTab) setActiveTab(pendingTab)
+          setPendingTab(null)
+        } else {
+          toast.error(result.error ?? 'שגיאה בשמירה')
+        }
+      })
+      return
+    }
+    // For other tabs — go back so user can use the tab's own save button
+    setUnsavedDialogOpen(false)
+    setPendingTab(null)
+  }
+
+  function handleCancelSwitch() {
+    setUnsavedDialogOpen(false)
+    setPendingTab(null)
+  }
+
+  // ── Transitions ──
+  const [isSaving, startSaveTransition] = useTransition()
   const [isDeleting, startDeleteTransition] = useTransition()
+  const [isSendingSms, startSmsTransition] = useTransition()
 
-  // Nearest document expiry for fitness light
+  // ── SMS dialog state ──
+  const [smsOpen, setSmsOpen] = useState(false)
+  const [smsText, setSmsText] = useState('')
+  const [smsSent, setSmsSent] = useState(false)
+
+  // ── Delete dialog state ──
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleteError, setDeleteError] = useState('')
+
+  // ── Computed ──
   const docExpiries = documents.map((d) => d.expiryDate).filter(Boolean) as string[]
   const documentMinExpiry = docExpiries.sort()[0] ?? null
-
-  function handleSavePhone() {
-    startPhoneTransition(async () => {
-      const result = await updateDriverPhone(driver.id, phoneValue)
-      if (result.success) {
-        toast.success('הטלפון עודכן')
-        setEditingPhone(false)
-      } else {
-        toast.error(result.error)
-      }
-    })
-  }
-
-  function handleSaveFlags() {
-    startFlagsTransition(async () => {
-      const result = await updateDriverFlags(driver.id, {
-        isOccasionalCampDriver: campDriver,
-        isEquipmentOperator: equipmentOp,
-      })
-      if (result.success) {
-        toast.success('הסיווג עודכן')
-      } else {
-        toast.error(result.error)
-      }
-    })
-  }
-
-  function handleSaveNotes() {
-    startNotesTransition(async () => {
-      const result = await updateDriverNotes(driver.id, notes)
-      if (result.success) {
-        toast.success('ההערות נשמרו')
-        setEditingNotes(false)
-      } else {
-        toast.error(result.error)
-      }
-    })
-  }
-
-  function handleDelete() {
-    if (!confirm(`האם למחוק את כרטיס הנהג של ${driver.fullName}?`)) return
-    startDeleteTransition(async () => {
-      const result = await softDeleteDriver(driver.id)
-      if (result.success) {
-        toast.success('כרטיס הנהג נמחק')
-        router.push('/app/fleet/driver-card')
-      } else {
-        toast.error(result.error)
-      }
-    })
-  }
 
   const idDisplay =
     driver.citizenship === 'israeli'
@@ -208,121 +265,248 @@ export function DriverCard({
 
   const fullAddress = [driver.street, driver.houseNumber, driver.city].filter(Boolean).join(' ')
 
+  // ─────────────────────────────────────────────────────────
+  // Handlers
+  // ─────────────────────────────────────────────────────────
+
+  function handleSaveAll() {
+    startSaveTransition(async () => {
+      const result = await updateDriverDetails(driver.id, {
+        phone: phoneValue || null,
+        isOccasionalCampDriver: campDriver,
+        isEquipmentOperator: equipmentOp,
+        notes,
+      })
+      if (result.success) {
+        toast.success('הפרטים נשמרו בהצלחה')
+      } else {
+        toast.error(result.error ?? 'שגיאה בשמירה')
+      }
+    })
+  }
+
+  function handleOpenSms() {
+    if (!driver.effectivePhone) {
+      toast.error('אין מספר טלפון רשום לנהג')
+      return
+    }
+    setSmsSent(false)
+    setSmsText('')
+    setSmsOpen(true)
+  }
+
+  function handleSendSms() {
+    if (!smsText.trim()) {
+      toast.error('יש להזין תוכן הודעה')
+      return
+    }
+    startSmsTransition(async () => {
+      const result = await sendDriverSms(driver.id, smsText)
+      if (result.success) {
+        setSmsSent(true)
+      } else {
+        toast.error(result.error ?? 'שגיאה בשליחת SMS')
+      }
+    })
+  }
+
+  function handleOpenDelete() {
+    setDeletePassword('')
+    setDeleteError('')
+    setDeleteOpen(true)
+  }
+
+  function handleDelete() {
+    if (!deletePassword) {
+      setDeleteError('יש להזין סיסמה')
+      return
+    }
+    setDeleteError('')
+    startDeleteTransition(async () => {
+      const result = await deleteDriverWithPassword(driver.id, deletePassword)
+      if (result.success) {
+        toast.success('כרטיס הנהג נמחק')
+        setDeleteOpen(false)
+        router.push('/app/fleet/driver-card')
+      } else {
+        setDeleteError(result.error ?? 'שגיאה במחיקה')
+      }
+    })
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────
+
   return (
-    <div className="w-full" dir="rtl">
-      {/* ── Breadcrumb ──────────────────────────────────────── */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-        <Link href="/app/fleet/driver-card" className="hover:text-foreground transition-colors">
+    <div className="max-w-4xl mx-auto w-full">
+
+      {/* ── Breadcrumb ─────────────────────────────────────── */}
+      <nav className="flex items-center gap-1 text-sm text-muted-foreground mb-4 justify-end">
+        <span className="text-foreground font-semibold">{driver.fullName}</span>
+        <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground/40 rotate-180" />
+        <Link href="/app/fleet/driver-card" className="hover:text-primary transition-colors">
           כרטיסי נהגים
         </Link>
-        <ArrowRight className="h-3.5 w-3.5" />
-        <span className="text-foreground font-medium">{driver.fullName}</span>
-      </div>
+      </nav>
 
       {/* ── Card header ─────────────────────────────────────── */}
-      <div className="bg-card border rounded-2xl overflow-hidden mb-1">
+      <div
+        className="bg-white rounded-t-2xl overflow-hidden"
+        style={{ boxShadow: 'var(--shadow-card)', border: '1px solid #E2EBF4', borderBottom: 'none' }}
+      >
         {/* Accent bar */}
-        <div className="h-1.5 bg-gradient-to-l from-primary/60 via-primary to-primary/40" />
+        <div
+          className="h-1"
+          style={{ background: 'linear-gradient(to right, #4ECDC4, #3BBFB6, #2DAAA1, #4ECDC4)' }}
+        />
 
         <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          {/* Identity */}
-          <div className="flex items-center gap-4 min-w-0">
-            <FitnessLight
-              licenseExpiryDate={license?.expiryDate ?? null}
-              documentMinExpiry={documentMinExpiry}
-              yellowDays={yellowDays}
-              size="lg"
-              showLabel
-            />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-bold text-foreground leading-tight">{driver.fullName}</h1>
-                <Badge
-                  variant={driver.computedStatus === 'active' ? 'default' : 'secondary'}
-                  className={
-                    driver.computedStatus === 'active'
-                      ? 'bg-green-100 text-green-800 hover:bg-green-100 shrink-0'
-                      : 'shrink-0'
-                  }
-                >
-                  {driver.computedStatus === 'active' ? 'פעיל' : 'לא פעיל'}
-                </Badge>
-              </div>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                מ׳ עובד {driver.employeeNumber} | {driver.companyName}
-              </p>
-            </div>
-          </div>
 
-          {/* Action buttons */}
+          {/* Action buttons — right side */}
           <div className="flex items-center gap-2 flex-wrap shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 h-10"
+
+            {/* Back button */}
+            <Link
+              href="/app/fleet/driver-card"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-border bg-white text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+            >
+              <ArrowRight className="h-4 w-4" />
+              חזור
+            </Link>
+
+            {/* PDF */}
+            <button
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-border bg-white text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
               onClick={() => window.open(`/api/fleet/drivers/${driver.id}/pdf`, '_blank')}
             >
               <FileText className="h-4 w-4" />
               PDF
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 h-10"
-              onClick={() => {
-                const phone = driver.effectivePhone
-                if (!phone) { toast.error('אין מספר טלפון לנהג'); return }
-                toast.info(`שולח SMS ל-${formatPhone(phone)}...`)
-              }}
+            </button>
+
+            {/* SMS */}
+            <button
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-border bg-white text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+              onClick={handleOpenSms}
             >
               <MessageSquare className="h-4 w-4" />
               SMS
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 h-10 text-destructive hover:text-destructive"
-              onClick={handleDelete}
+            </button>
+
+            {/* Delete */}
+            <button
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive hover:text-white transition-all"
+              onClick={handleOpenDelete}
               disabled={isDeleting}
             >
               {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
               מחק
-            </Button>
+            </button>
+          </div>
+
+          {/* Identity — left side */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="min-w-0 text-right">
+              <div className="flex items-center gap-2 justify-end flex-wrap">
+                {driver.computedStatus === 'active' ? (
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
+                    style={{ background: '#DCFCE7', color: '#16A34A', border: '1px solid #BBF7D0' }}
+                  >
+                    פעיל
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
+                    style={{ background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0' }}
+                  >
+                    לא פעיל
+                  </span>
+                )}
+                <h1 className="text-2xl font-black text-foreground leading-tight tracking-tight">
+                  {driver.fullName}
+                </h1>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                <span className="font-semibold text-foreground/70">{driver.companyName}</span>
+                <span className="mx-1 text-border">·</span>
+                מ׳ עובד{' '}
+                <span className="font-mono font-bold text-foreground/80">{driver.employeeNumber}</span>
+              </p>
+            </div>
+
+            {/* Avatar */}
+            <div className="relative shrink-0">
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold text-white"
+                style={{ background: 'linear-gradient(135deg, #152D3C 0%, #1E3D50 100%)' }}
+              >
+                {driver.fullName.charAt(0)}
+              </div>
+              <div className="absolute -bottom-1 -left-1">
+                <FitnessLight
+                  licenseExpiryDate={license?.expiryDate ?? null}
+                  documentMinExpiry={documentMinExpiry}
+                  yellowDays={yellowDays}
+                  size="md"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ── Tabs ────────────────────────────────────────────── */}
-      <Tabs defaultValue="employee" className="w-full">
-        <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b rounded-none gap-0 overflow-x-auto">
-          {[
-            { value: 'employee', label: 'פרטי עובד', icon: User },
-            { value: 'license', label: 'רשיון נהיגה', icon: CreditCard },
-            { value: 'documents', label: 'מסמכים', icon: Paperclip },
-            { value: 'violations', label: 'תרבות נהיגה', icon: AlertTriangle },
-            { value: 'log', label: 'לוג נסיעות', icon: History },
-          ].map(({ value, label, icon: Icon }) => (
-            <TabsTrigger
-              key={value}
-              value={value}
-              className="flex items-center gap-2 px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary text-muted-foreground hover:text-foreground transition-colors shrink-0"
-            >
-              <Icon className="h-4 w-4" />
-              <span className="hidden sm:inline">{label}</span>
-              <span className="sm:hidden text-xs">{label.split(' ')[0]}</span>
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      {/* ── Tabs ─────────────────────────────────────────────── */}
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <div dir="rtl" className="bg-white border-x border-b" style={{ borderColor: '#E2EBF4' }}>
+          <TabsList
+            dir="rtl"
+            className="w-full h-auto p-0 bg-transparent rounded-none gap-0 overflow-x-auto flex justify-start"
+          >
+            {[
+              { value: 'employee',   label: 'פרטי הנהג',   icon: User },
+              { value: 'license',    label: 'רשיון נהיגה', icon: CreditCard },
+              { value: 'documents',  label: 'מסמכים',       icon: Paperclip },
+              { value: 'violations', label: 'תרבות נהיגה', icon: AlertTriangle },
+              { value: 'log',        label: 'לוג נסיעות',  icon: History },
+            ].map(({ value, label, icon: Icon }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="flex items-center gap-1.5 px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary text-muted-foreground hover:text-foreground transition-all shrink-0 text-sm font-medium"
+              >
+                <Icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{label}</span>
+                <span className="sm:hidden text-xs">{label.split(' ')[0]}</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
 
-        {/* ══ Tab 1 — פרטי עובד ══════════════════════════════ */}
+        {/* ══ Tab 1 — פרטי הנהג ══════════════════════════════ */}
         <TabsContent value="employee" className="mt-0">
-          <div className="bg-card border border-t-0 rounded-b-2xl p-5">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-0">
-              {/* Right column */}
+          <div
+            dir="rtl"
+            className="bg-white border-x border-b rounded-b-2xl p-5"
+            style={{ borderColor: '#E2EBF4' }}
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-0">
+
+              {/* ── עמודה ימנית — זהות ─────────────────────────── */}
               <div>
-                <InfoRow label="שם מלא" value={driver.fullName} />
-                <InfoRow label="מספר עובד" value={driver.employeeNumber} />
-                <InfoRow label="חברה" value={driver.companyName} />
+                {/* שם מלא — מובלט */}
+                <div className="flex items-start gap-3 py-2.5 border-b" style={{ borderColor: '#EEF3F9' }}>
+                  <span className="text-sm text-muted-foreground w-32 shrink-0 pt-0.5">שם מלא</span>
+                  <span className="text-xl font-black text-foreground flex-1 text-right leading-tight">
+                    {driver.fullName}
+                  </span>
+                </div>
+                <InfoRow
+                  label="מספר עובד"
+                  value={<span className="font-mono">{driver.employeeNumber}</span>}
+                  valueBold
+                />
+                <InfoRow label="חברה" value={driver.companyName} valueBold />
                 <InfoRow label="תחילת עבודה" value={formatDate(driver.startDate)} />
                 <InfoRow label="ותק" value={calcSeniority(driver.startDate)} />
                 <InfoRow label="גיל" value={`${calcAge(driver.dateOfBirth)} שנים`} />
@@ -333,122 +517,113 @@ export function DriverCard({
                     driver.citizenship === 'israeli'
                       ? 'ישראלי'
                       : driver.citizenship === 'foreign'
-                      ? 'זר'
-                      : '—'
+                        ? 'זר'
+                        : '—'
                   }
                 />
-                <InfoRow label="ת.ז. / דרכון" value={idDisplay} />
+                <InfoRow
+                  label="ת.ז. / דרכון"
+                  value={<span className="font-mono">{idDisplay}</span>}
+                />
               </div>
 
-              {/* Left column */}
+              {/* ── עמודה שמאלית — כתובת, טלפון, פרטים, הגדרות ── */}
               <div>
                 <InfoRow label="כתובת" value={fullAddress || '—'} />
 
-                {/* Phone — editable inline */}
-                <div className="flex items-start gap-3 py-2 border-b border-border/40">
-                  <span className="text-sm text-muted-foreground w-36 shrink-0 pt-0.5">טלפון</span>
-                  {editingPhone ? (
-                    <div className="flex items-center gap-2 flex-1">
-                      <input
-                        value={phoneValue}
-                        onChange={(e) => setPhoneValue(e.target.value)}
-                        className="border rounded px-2 py-1 text-base w-40 bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                        dir="ltr"
-                        autoFocus
-                        placeholder="052-6804680"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSavePhone()
-                          if (e.key === 'Escape') setEditingPhone(false)
-                        }}
-                      />
-                      <button onClick={handleSavePhone} disabled={isSavingPhone} title="שמור">
-                        <Save className="h-4 w-4 text-green-600 hover:text-green-700" />
-                      </button>
-                      <button
-                        onClick={() => { setPhoneValue(driver.effectivePhone ?? ''); setEditingPhone(false) }}
-                        title="ביטול"
+                {/* Phone — always editable */}
+                <div className="flex items-start gap-3 py-2.5 border-b" style={{ borderColor: '#EEF3F9' }}>
+                  <span className="text-sm text-muted-foreground w-32 shrink-0 pt-1.5">טלפון</span>
+                  <div className="flex-1 flex items-center gap-2 justify-end flex-wrap">
+                    {driver.phoneOverride && (
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded-full"
+                        style={{ background: '#EEF2F8', color: '#4A6FA5', border: '1px solid #C8D5E8' }}
                       >
-                        <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 flex-1">
-                      <span className="text-sm font-medium" dir="ltr">{formatPhone(driver.effectivePhone)}</span>
-                      {driver.phoneOverride && (
-                        <Badge variant="outline" className="text-[10px] py-0 h-4">עודכן בכרטיס</Badge>
-                      )}
-                      <button
-                        onClick={() => setEditingPhone(true)}
-                        className="text-[11px] text-primary hover:underline"
-                      >
-                        ערוך
-                      </button>
-                    </div>
-                  )}
+                        עודכן בכרטיס
+                      </span>
+                    )}
+                    <input
+                      value={phoneValue}
+                      onChange={(e) => setPhoneValue(e.target.value)}
+                      className="border border-border rounded-lg px-2.5 py-1.5 text-base sm:text-sm w-36 bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right font-mono"
+                      dir="ltr"
+                      placeholder="052-6804680"
+                    />
+                  </div>
                 </div>
 
                 <InfoRow label="תאריך פתיחת תיק" value={formatDate(driver.openedAt)} />
 
-                {/* Flags — checkboxes */}
-                <div className="py-2 border-b border-border/40 space-y-2">
+                {/* Flags — local only, saved via unified button */}
+                <div className="py-3 border-b space-y-3" style={{ borderColor: '#EEF3F9' }}>
                   <button
-                    onClick={() => { setCampDriver((v) => !v); setTimeout(handleSaveFlags, 0) }}
-                    className="flex items-center gap-2 text-sm hover:text-foreground text-foreground/80 transition-colors w-full text-right"
-                    disabled={isSavingFlags}
+                    onClick={() => setCampDriver((v) => !v)}
+                    className="flex items-center gap-2 text-sm text-foreground/80 hover:text-foreground transition-colors w-full justify-end"
                   >
-                    {campDriver ? (
-                      <CheckSquare className="h-4 w-4 text-primary shrink-0" />
-                    ) : (
-                      <Square className="h-4 w-4 text-muted-foreground shrink-0" />
-                    )}
-                    נהג מזדמן על רכב מחנה
+                    <span>נהג מזדמן על רכב מחנה</span>
+                    {campDriver
+                      ? <CheckSquare className="h-4 w-4 text-primary shrink-0" />
+                      : <Square className="h-4 w-4 text-muted-foreground shrink-0" />
+                    }
                   </button>
                   <button
-                    onClick={() => { setEquipmentOp((v) => !v); setTimeout(handleSaveFlags, 0) }}
-                    className="flex items-center gap-2 text-sm hover:text-foreground text-foreground/80 transition-colors w-full text-right"
-                    disabled={isSavingFlags}
+                    onClick={() => setEquipmentOp((v) => !v)}
+                    className="flex items-center gap-2 text-sm text-foreground/80 hover:text-foreground transition-colors w-full justify-end"
                   >
-                    {equipmentOp ? (
-                      <CheckSquare className="h-4 w-4 text-primary shrink-0" />
-                    ) : (
-                      <Square className="h-4 w-4 text-muted-foreground shrink-0" />
-                    )}
-                    מפעיל צמ&quot;ה
+                    <span>מפעיל צמ&quot;ה</span>
+                    {equipmentOp
+                      ? <CheckSquare className="h-4 w-4 text-primary shrink-0" />
+                      : <Square className="h-4 w-4 text-muted-foreground shrink-0" />
+                    }
                   </button>
                 </div>
 
-                {/* Notes */}
-                <div className="py-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-muted-foreground">הערות</span>
-                    {!editingNotes && (
-                      <button onClick={() => setEditingNotes(true)} className="text-[11px] text-primary hover:underline">
-                        ערוך
-                      </button>
-                    )}
+                {/* Notes — framed, always editable */}
+                <div className="py-3">
+                  <p className="text-sm text-muted-foreground text-right mb-2">הערות</p>
+                  <div
+                    className="rounded-xl p-3"
+                    style={{ border: '1.5px solid #C8D5E2', background: '#F8FAFB' }}
+                  >
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      rows={3}
+                      className="w-full bg-transparent text-sm text-foreground focus:outline-none resize-none text-right leading-relaxed placeholder:text-muted-foreground/50"
+                      placeholder="הוסף הערות על הנהג..."
+                    />
                   </div>
-                  {editingNotes ? (
-                    <div className="space-y-2">
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        rows={3}
-                        className="w-full border rounded px-2 py-1 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                        autoFocus
-                      />
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={handleSaveNotes} disabled={isSavingNotes}>
-                          {isSavingNotes && <Loader2 className="h-3.5 w-3.5 ms-1 animate-spin" />}
-                          שמור
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => { setNotes(driver.notes ?? ''); setEditingNotes(false) }}>
-                          ביטול
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-foreground/80 whitespace-pre-wrap">{notes || '—'}</p>
-                  )}
+                </div>
+
+                {/* Unified save button */}
+                <div className="pt-1 flex justify-start">
+                  <button
+                    onClick={handleSaveAll}
+                    disabled={isSaving || !isDirty}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all"
+                    style={
+                      isDirty
+                        ? {
+                            background: 'linear-gradient(135deg, #4ECDC4, #3ABFB6)',
+                            color: '#fff',
+                            border: '1px solid #3ABFB6',
+                            boxShadow: '0 2px 6px rgb(78 205 196 / 0.35)',
+                          }
+                        : {
+                            background: '#F0F5FB',
+                            color: '#637381',
+                            border: '1px solid #C8D5E2',
+                            cursor: 'not-allowed',
+                          }
+                    }
+                  >
+                    {isSaving
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : <Save className="h-4 w-4" />
+                    }
+                    שמור שינויים
+                  </button>
                 </div>
               </div>
             </div>
@@ -457,42 +632,254 @@ export function DriverCard({
 
         {/* ══ Tab 2 — רשיון נהיגה ════════════════════════════ */}
         <TabsContent value="license" className="mt-0">
-          <div className="bg-card border border-t-0 rounded-b-2xl p-5">
-            <DriverLicenseSection
-              driverId={driver.id}
-              license={license}
-              yellowDays={yellowDays}
-            />
+          <div dir="rtl" className="bg-white border-x border-b rounded-b-2xl p-5" style={{ borderColor: '#E2EBF4' }}>
+            <DriverLicenseSection driverId={driver.id} license={license} yellowDays={yellowDays} onEditingChange={onLicenseEditingChange} />
           </div>
         </TabsContent>
 
         {/* ══ Tab 3 — מסמכים ══════════════════════════════════ */}
         <TabsContent value="documents" className="mt-0">
-          <div className="bg-card border border-t-0 rounded-b-2xl p-5">
-            <DriverDocumentsSection
-              driverId={driver.id}
-              documents={documents}
-              docYellowDays={docYellowDays}
-            />
+          <div dir="rtl" className="bg-white border-x border-b rounded-b-2xl p-5" style={{ borderColor: '#E2EBF4' }}>
+            <DriverDocumentsSection driverId={driver.id} documents={documents} docYellowDays={docYellowDays} onEditingChange={onDocumentsEditingChange} />
           </div>
         </TabsContent>
 
         {/* ══ Tab 4 — תרבות נהיגה ════════════════════════════ */}
         <TabsContent value="violations" className="mt-0">
-          <div className="bg-card border border-t-0 rounded-b-2xl p-5">
-            <DriverViolationsSection driverId={driver.id} violations={violations} />
+          <div dir="rtl" className="bg-white border-x border-b rounded-b-2xl p-5" style={{ borderColor: '#E2EBF4' }}>
+            <DriverViolationsSection driverId={driver.id} violations={violations} onEditingChange={onViolationsEditingChange} />
           </div>
         </TabsContent>
 
         {/* ══ Tab 5 — לוג נסיעות ══════════════════════════════ */}
         <TabsContent value="log" className="mt-0">
-          <div className="bg-card border border-t-0 rounded-b-2xl p-8 text-center">
-            <History className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-            <p className="text-sm font-medium text-muted-foreground">פיתוח עתידי</p>
-            <p className="text-xs text-muted-foreground mt-1">לוג נסיעות ייפתח בשלב מאוחר יותר</p>
+          <div className="bg-white border-x border-b rounded-b-2xl py-12 text-center" style={{ borderColor: '#E2EBF4' }}>
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3"
+              style={{ background: '#F0F5FB', border: '1px solid #E2EBF4' }}
+            >
+              <History className="h-6 w-6 text-muted-foreground/35" />
+            </div>
+            <p className="text-sm font-semibold text-muted-foreground">פיתוח עתידי</p>
+            <p className="text-xs text-muted-foreground/50 mt-0.5">לוג נסיעות ייפתח בשלב מאוחר יותר</p>
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* ══ SMS Dialog ════════════════════════════════════════ */}
+      <Dialog open={smsOpen} onOpenChange={(v) => { if (!isSendingSms) setSmsOpen(v) }}>
+        <DialogContent dir="rtl" className="max-w-md" style={{ borderRadius: '1rem' }}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-right">
+              <MessageSquare className="h-5 w-5 text-primary" />
+              שליחת SMS לנהג
+            </DialogTitle>
+          </DialogHeader>
+
+          {smsSent ? (
+            /* Success state */
+            <div className="py-6 text-center space-y-3">
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center mx-auto"
+                style={{ background: '#DCFCE7', border: '2px solid #BBF7D0' }}
+              >
+                <Send className="h-6 w-6 text-green-600" />
+              </div>
+              <p className="text-base font-bold text-foreground">ההודעה נשלחה בהצלחה!</p>
+              <p className="text-sm text-muted-foreground">
+                ל-<span className="font-mono font-semibold" dir="ltr">{formatPhone(driver.effectivePhone)}</span>
+              </p>
+              <Button
+                onClick={() => { setSmsOpen(false); setSmsSent(false) }}
+                className="mt-2"
+                size="sm"
+              >
+                סגור
+              </Button>
+            </div>
+          ) : (
+            /* Compose state */
+            <div className="space-y-4 py-2">
+              {/* Phone (read-only) */}
+              <div className="space-y-1">
+                <label className="text-sm text-muted-foreground">מספר טלפון</label>
+                <div
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-mono font-semibold"
+                  style={{ background: '#F0F5FB', border: '1px solid #C8D5E2', direction: 'ltr' }}
+                >
+                  <span>{formatPhone(driver.effectivePhone)}</span>
+                </div>
+              </div>
+
+              {/* Message textarea */}
+              <div className="space-y-1">
+                <label className="text-sm text-muted-foreground">תוכן ההודעה</label>
+                <div
+                  className="rounded-xl overflow-hidden"
+                  style={{ border: '1.5px solid #C8D5E2', background: '#FAFCFF' }}
+                >
+                  <textarea
+                    value={smsText}
+                    onChange={(e) => setSmsText(e.target.value)}
+                    rows={5}
+                    className="w-full bg-transparent text-sm text-foreground focus:outline-none resize-none p-3 text-right leading-relaxed placeholder:text-muted-foreground/50"
+                    placeholder="כתוב כאן את ההודעה..."
+                    autoFocus
+                    maxLength={160}
+                  />
+                  <div
+                    className="px-3 pb-2 text-left text-xs text-muted-foreground/60"
+                    style={{ borderTop: '1px solid #EEF3F9' }}
+                  >
+                    {smsText.length}/160
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!smsSent && (
+            <DialogFooter className="gap-2 flex-row-reverse sm:flex-row-reverse">
+              <Button
+                onClick={handleSendSms}
+                disabled={isSendingSms || !smsText.trim()}
+                className="gap-2 flex-1 sm:flex-initial"
+                style={{ background: 'linear-gradient(135deg, #4ECDC4, #3ABFB6)', border: 'none' }}
+              >
+                {isSendingSms
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <Send className="h-4 w-4" />
+                }
+                שלח
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setSmsOpen(false)}
+                disabled={isSendingSms}
+                className="gap-1"
+              >
+                <X className="h-4 w-4" />
+                ביטול
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ══ Unsaved Changes Dialog ═════════════════════════════ */}
+      <Dialog open={unsavedDialogOpen} onOpenChange={(v) => { if (!v) handleCancelSwitch() }}>
+        <DialogContent dir="rtl" className="max-w-sm" style={{ borderRadius: '1rem' }}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-right text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              שינויים שלא נשמרו
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="py-2">
+            <p className="text-sm text-muted-foreground">
+              ביצעת שינויים בטאב{' '}
+              <span className="font-bold text-foreground">&quot;{TAB_LABELS[activeTab]}&quot;</span>{' '}
+              שלא נשמרו.
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">מה ברצונך לעשות?</p>
+          </div>
+
+          <DialogFooter className="gap-2 flex-col sm:flex-col">
+            {activeTab === 'employee' ? (
+              <Button
+                onClick={handleSaveAndSwitch}
+                disabled={isSaving}
+                className="gap-2 w-full"
+                style={{ background: 'linear-gradient(135deg, #4ECDC4, #3ABFB6)', border: 'none' }}
+              >
+                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                שמור ועבור
+              </Button>
+            ) : (
+              <Button
+                onClick={handleCancelSwitch}
+                className="gap-2 w-full"
+                style={{ background: 'linear-gradient(135deg, #4ECDC4, #3ABFB6)', border: 'none' }}
+              >
+                <Save className="h-4 w-4" />
+                חזור לשמור
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={handleDiscardAndSwitch}
+              className="gap-2 w-full text-destructive hover:text-destructive"
+            >
+              <X className="h-4 w-4" />
+              עבור ללא שמירה
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ══ Delete Dialog ══════════════════════════════════════ */}
+      <Dialog open={deleteOpen} onOpenChange={(v) => { if (!isDeleting) setDeleteOpen(v) }}>
+        <DialogContent dir="rtl" className="max-w-sm" style={{ borderRadius: '1rem' }}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-right text-destructive">
+              <Trash2 className="h-5 w-5" />
+              מחיקת כרטיס נהג
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              פעולה זו תמחק את כרטיס הנהג של{' '}
+              <span className="font-bold text-foreground">{driver.fullName}</span>.
+              <br />
+              להמשך — הזן את סיסמת המחיקה.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-sm text-muted-foreground flex items-center gap-1.5">
+                <Lock className="h-3.5 w-3.5" />
+                סיסמת אדמין
+              </label>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => { setDeletePassword(e.target.value); setDeleteError('') }}
+                className="w-full border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-destructive/30 text-right"
+                style={{ borderColor: deleteError ? '#EF4444' : '#C8D5E2' }}
+                placeholder="הקלד סיסמה..."
+                autoFocus
+                onKeyDown={(e) => { if (e.key === 'Enter') handleDelete() }}
+              />
+              {deleteError && (
+                <p className="text-xs text-destructive text-right">{deleteError}</p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 flex-row-reverse sm:flex-row-reverse">
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting || !deletePassword}
+              className="gap-2 flex-1 sm:flex-initial"
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              מחק כרטיס
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+              disabled={isDeleting}
+              className="gap-1"
+            >
+              <X className="h-4 w-4" />
+              ביטול
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   )
 }

@@ -8,6 +8,20 @@
 
 import { z } from 'zod'
 
+/** Zod field for optional Israeli mobile phone — normalizes + validates 05X format */
+const optionalPhone = () => z.string().optional().or(z.literal(''))
+  .transform(v => {
+    if (!v) return v
+    let d = v.replace(/\D/g, '')
+    if (d.startsWith('00972')) d = d.slice(5)
+    else if (d.startsWith('972')) d = d.slice(3)
+    if (d.startsWith('5') && d.length === 9) d = '0' + d
+    return (d.length === 10 && d.startsWith('05')) ? d : v
+  })
+  .refine(v => !v || /^05\d{8}$/.test(v), {
+    message: 'מספר טלפון לא תקין — נדרש פורמט 05X-XXXXXXX',
+  })
+
 // ---------------------------------------------------------------------------
 // Company
 // ---------------------------------------------------------------------------
@@ -63,8 +77,8 @@ export const EmployeeSchema = z.object({
   street:                  z.string().optional().or(z.literal('')),
   house_number:            z.string().optional().or(z.literal('')),
   city:                    z.string().optional().or(z.literal('')),
-  mobile_phone:            z.string().optional().or(z.literal('')),
-  additional_phone:        z.string().optional().or(z.literal('')),
+  mobile_phone:            optionalPhone(),
+  additional_phone:        optionalPhone(),
   email:                   z.string().optional().or(z.literal('')),
   date_of_birth:           z.string().optional().or(z.literal('')),
   start_date:              z.string().optional().or(z.literal('')),
@@ -110,20 +124,20 @@ export const ProjectSchema = z
     // Project Manager
     project_manager_id: z.string().uuid('מנהל פרויקט לא תקין').optional().or(z.literal('')),
     pm_email:           z.string().optional().or(z.literal('')),
-    pm_phone:           z.string().optional().or(z.literal('')),
+    pm_phone:           optionalPhone(),
     pm_notifications:   z.boolean().default(true),
 
     // Site Manager
     site_manager_id:  z.string().uuid('מנהל אתר לא תקין').optional().or(z.literal('')),
     sm_email:         z.string().optional().or(z.literal('')),
-    sm_phone:         z.string().optional().or(z.literal('')),
+    sm_phone:         optionalPhone(),
     sm_notifications: z.boolean().default(true),
 
     // Camp/Vehicle Coordinator
     camp_vehicle_coordinator_id: z.string().uuid('רכז מחנה/רכב לא תקין').optional().or(z.literal('')),
     cvc_is_employee:             z.boolean().default(true),
     cvc_name:                    z.string().optional().or(z.literal('')),
-    cvc_phone:                   z.string().optional().or(z.literal('')),
+    cvc_phone:                   optionalPhone(),
 
     // Client
     client_name:      z.string().optional().or(z.literal('')),
@@ -133,7 +147,7 @@ export const ProjectSchema = z
     supervision_company:         z.string().optional().or(z.literal('')),
     supervision_contact:         z.string().optional().or(z.literal('')),
     supervision_email:           z.string().optional().or(z.literal('')),
-    supervision_phone:           z.string().optional().or(z.literal('')),
+    supervision_phone:           optionalPhone(),
     supervision_notifications:   z.boolean().default(false),
     supervision_attach_reports:  z.boolean().default(false),
 
@@ -162,17 +176,8 @@ export const ProjectSchema = z
           path:    ['cvc_phone'],
           message: 'טלפון אחראי רכב/מחנה הוא שדה חובה כאשר הרכז אינו עובד',
         })
-      } else {
-        // Israeli mobile: 05X-XXXXXXX format (050-059), allow dashes
-        const israeliMobileRegex = /^0(5[0-9])[0-9]{7}$/
-        if (!israeliMobileRegex.test(data.cvc_phone.replace(/[-\s]/g, ''))) {
-          ctx.addIssue({
-            code:    z.ZodIssueCode.custom,
-            path:    ['cvc_phone'],
-            message: 'מספר טלפון נייד ישראלי לא תקין (דוגמה: 052-1234567)',
-          })
-        }
       }
+      // Format validation handled by optionalPhone() transform+refine
     }
   })
 

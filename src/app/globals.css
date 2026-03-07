@@ -44,87 +44,99 @@
 
   /* Brand colors — Chemo Aharon */
   --color-brand-primary: #4ECDC4;
-  --color-brand-dark: #1B3A4B;
-  --color-brand-bg: #F5F7FA;
+  --color-brand-primary-muted: #E6F9F8;
+  --color-brand-dark: #152D3C;
+  --color-brand-bg: #ECF1F8;
   --color-brand-card: #FFFFFF;
-  --color-brand-success: #27AE60;
-  --color-brand-warning: #F2994A;
-  --color-brand-danger: #EB5757;
-  --color-sidebar-bg: #1B3A4B;
-  --color-sidebar-text: #E8EAED;
-  --color-sidebar-hover: #2A4F63;
+  --color-brand-success: #16A34A;
+  --color-brand-warning: #D97706;
+  --color-brand-danger: #DC2626;
+  --color-sidebar-bg: #152D3C;
+  --color-sidebar-text: #DDE3EA;
+  --color-sidebar-hover: #1E3D50;
   --color-sidebar-active: #4ECDC4;
+
+  /* Surface elevation tokens */
+  --color-surface-1: #FFFFFF;
+  --color-surface-2: #F5F8FC;
+  --color-surface-3: #ECF1F8;
+
+  /* Shadow tokens — elevation system */
+  --shadow-card: 0 1px 3px 0 rgb(21 45 60 / 0.07), 0 1px 2px -1px rgb(21 45 60 / 0.05);
+  --shadow-card-hover: 0 4px 8px -1px rgb(21 45 60 / 0.10), 0 2px 4px -2px rgb(21 45 60 / 0.06);
+  --shadow-elevated: 0 8px 24px -4px rgb(21 45 60 / 0.12), 0 4px 8px -4px rgb(21 45 60 / 0.06);
+  --shadow-modal: 0 20px 40px -8px rgb(21 45 60 / 0.18), 0 8px 16px -8px rgb(21 45 60 / 0.10);
 
   /* Font */
   --font-sans: var(--font-heebo);
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: #F5F7FA;
-  --foreground: oklch(0.145 0 0);
+  --radius: 0.5rem;
+  --background: #ECF1F8;
+  --foreground: #0D1F2D;
   --card: #FFFFFF;
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  --card-foreground: #0D1F2D;
+  --popover: #FFFFFF;
+  --popover-foreground: #0D1F2D;
   --primary: #4ECDC4;
   --primary-foreground: #FFFFFF;
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: #EB5757;
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
+  --secondary: #F0F5FB;
+  --secondary-foreground: #1E3A4C;
+  --muted: #F0F5FB;
+  --muted-foreground: #637381;
+  --accent: #E6F9F8;
+  --accent-foreground: #0B7A74;
+  --destructive: #DC2626;
+  --border: #C8D5E2;
+  --input: #D4DFEA;
   --ring: #4ECDC4;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: #1B3A4B;
-  --sidebar-foreground: #E8EAED;
+  --sidebar: #152D3C;
+  --sidebar-foreground: #DDE3EA;
   --sidebar-primary: #4ECDC4;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #2A4F63;
-  --sidebar-accent-foreground: #E8EAED;
-  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-accent: #1E3D50;
+  --sidebar-accent-foreground: #DDE3EA;
+  --sidebar-border: rgb(255 255 255 / 0.08);
   --sidebar-ring: #4ECDC4;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  --background: #0D1F2D;
+  --foreground: #E8EDF2;
+  --card: #152D3C;
+  --card-foreground: #E8EDF2;
+  --popover: #1A3447;
+  --popover-foreground: #E8EDF2;
   --primary: #4ECDC4;
-  --primary-foreground: #1B3A4B;
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --primary-foreground: #152D3C;
+  --secondary: #1E3D50;
+  --secondary-foreground: #DDE3EA;
+  --muted: #1E3D50;
+  --muted-foreground: #8FA5B5;
+  --accent: #1A4A46;
+  --accent-foreground: #4ECDC4;
+  --destructive: #EF4444;
+  --border: rgb(255 255 255 / 0.10);
+  --input: rgb(255 255 255 / 0.12);
   --ring: #4ECDC4;
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: #1B3A4B;
-  --sidebar-foreground: #E8EAED;
+  --sidebar: #152D3C;
+  --sidebar-foreground: #DDE3EA;
   --sidebar-primary: #4ECDC4;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #2A4F63;
-  --sidebar-accent-foreground: #E8EAED;
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-accent: #1E3D50;
+  --sidebar-accent-foreground: #DDE3EA;
+  --sidebar-border: rgb(255 255 255 / 0.08);
   --sidebar-ring: #4ECDC4;
 }
 
@@ -133,6 +145,25 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+  /* Smooth transitions for interactive elements */
+  button, a, input, select, textarea {
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* ── Utility: elevation shadows ───────────────────────────────── */
+@layer utilities {
+  .card-shadow {
+    box-shadow: var(--shadow-card);
+  }
+  .card-shadow-hover:hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+  .elevated-shadow {
+    box-shadow: var(--shadow-elevated);
   }
 }
