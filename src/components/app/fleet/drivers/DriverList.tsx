@@ -26,7 +26,7 @@ type FitnessFilter = 'all' | 'red' | 'yellow' | 'green'
 export function DriverList({ drivers, yellowDays }: Props) {
   const router = useRouter()
   const [addOpen, setAddOpen] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active')
   const [fitnessFilter, setFitnessFilter] = useState<FitnessFilter>('all')
   const [search, setSearch] = useState('')
 

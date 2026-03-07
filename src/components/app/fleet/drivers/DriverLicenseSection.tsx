@@ -308,57 +308,91 @@ export function DriverLicenseSection({ driverId, license, yellowDays, onEditingC
   // ── Read mode ───────────────────────────────────────────────
   if (!editing) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex flex-wrap gap-1.5">
-            {(license?.licenseCategories ?? []).map((cat) => {
-              const year = license?.categoryIssueYears?.[cat]
-              return (
-                <Badge key={cat} variant="secondary">
-                  {cat}{year ? ` (${year})` : ''}
-                </Badge>
-              )
-            })}
-            {(license?.licenseCategories ?? []).length === 0 && (
-              <span className="text-sm text-muted-foreground">לא הוזנו סוגי רשיון</span>
-            )}
-          </div>
+      <div className="space-y-6">
+        {/* Header — edit button */}
+        <div className="flex items-center justify-end">
           <Button size="sm" variant="outline" onClick={() => setEditing(true)}>ערוך</Button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">מספר רשיון</p>
-            <p className="font-medium" dir="ltr">{license?.licenseNumber || '—'}</p>
+        {/* License details — card style */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {/* License number */}
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">מספר רשיון</p>
+            <p className="text-base font-semibold tabular-nums">
+              {license?.licenseNumber || '—'}
+            </p>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">תוקף עד</p>
-            <p className={`font-medium ${expiryColor}`}>
-              {formatDate(license?.expiryDate ?? null)}
+
+          {/* Expiry date */}
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">תוקף עד</p>
+            <div className="flex items-baseline gap-2">
+              <p className={`text-base font-semibold ${expiryColor}`}>
+                {formatDate(license?.expiryDate ?? null)}
+              </p>
               {days !== null && (
-                <span className="text-xs ms-1">
+                <span className={`text-xs ${expiryColor}`}>
                   ({days < 0 ? `פג לפני ${Math.abs(days)} ימים` : `${days} ימים`})
                 </span>
               )}
-            </p>
+            </div>
           </div>
+        </div>
+
+        {/* License categories */}
+        <div className="space-y-2.5">
+          <p className="text-xs font-medium text-muted-foreground">סוגי רשיון</p>
+          {(license?.licenseCategories ?? []).length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {(license?.licenseCategories ?? []).map((cat) => {
+                const year = license?.categoryIssueYears?.[cat]
+                return (
+                  <Badge
+                    key={cat}
+                    variant="secondary"
+                    className="px-3 py-1.5 text-sm font-medium"
+                  >
+                    {cat}{year ? ` (${year})` : ''}
+                  </Badge>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">לא הוזנו סוגי רשיון</p>
+          )}
         </div>
 
         {/* License images */}
         {(license?.frontImageUrl || license?.backImageUrl) && (
-          <div className="grid grid-cols-2 gap-4 mt-2">
-            {license.frontImageUrl && (
-              <a href={license.frontImageUrl} target="_blank" rel="noopener noreferrer">
-                <img src={license.frontImageUrl} alt="פנים רשיון" className="w-full h-36 object-cover rounded-lg border hover:opacity-90 transition-opacity" />
-                <p className="text-xs text-center text-muted-foreground mt-1">פנים</p>
-              </a>
-            )}
-            {license.backImageUrl && (
-              <a href={license.backImageUrl} target="_blank" rel="noopener noreferrer">
-                <img src={license.backImageUrl} alt="גב רשיון" className="w-full h-36 object-cover rounded-lg border hover:opacity-90 transition-opacity" />
-                <p className="text-xs text-center text-muted-foreground mt-1">גב</p>
-              </a>
-            )}
+          <div className="space-y-2.5">
+            <p className="text-xs font-medium text-muted-foreground">תמונות רשיון</p>
+            <div className="grid grid-cols-2 gap-4">
+              {license.backImageUrl && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-center text-muted-foreground">תמונת גב</p>
+                  <a href={license.backImageUrl} target="_blank" rel="noopener noreferrer" className="block group">
+                    <img
+                      src={license.backImageUrl}
+                      alt="גב רשיון"
+                      className="w-full h-40 object-cover rounded-lg border shadow-sm group-hover:opacity-90 group-hover:shadow-md transition-all"
+                    />
+                  </a>
+                </div>
+              )}
+              {license.frontImageUrl && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-center text-muted-foreground">תמונת פנים</p>
+                  <a href={license.frontImageUrl} target="_blank" rel="noopener noreferrer" className="block group">
+                    <img
+                      src={license.frontImageUrl}
+                      alt="פנים רשיון"
+                      className="w-full h-40 object-cover rounded-lg border shadow-sm group-hover:opacity-90 group-hover:shadow-md transition-all"
+                    />
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
