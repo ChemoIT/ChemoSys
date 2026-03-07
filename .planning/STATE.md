@@ -5,15 +5,15 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** v2.0 — Phase 12 (10B) IN PROGRESS. ספקי רכב admin CRUD + MOT API settings בפיתוח.
+**Current focus:** v2.0 — Phase 12 (10B) COMPLETE. MOT API Server Action + Fleet Settings thresholds הושלמו.
 
 ## Current Position
 
-Phase: 12 (Phase 10B) — Plan 01/02 COMPLETE
-Status: **בפיתוח** — 12-01 vehicle suppliers admin CRUD done; 12-02 MOT API + Fleet Settings pending
-Last activity: 2026-03-07 — Session #30 (execute-phase 12, plan 01)
+Phase: 12 (Phase 10B) — 2/2 plans COMPLETE
+Status: **הושלם** — 12-01 vehicle suppliers admin CRUD + 12-02 MOT API + Fleet Settings thresholds done
+Last activity: 2026-03-07 — Session #30 (execute-phase 12, plan 02)
 
-Progress: v2.0 [██████████████████████░] Phase 11 complete — verification next
+Progress: v2.0 [████████████████████████] Phase 12 complete — Phase 13 (10C) next
 
 ## Strategic Decision (Session #18)
 
@@ -40,6 +40,11 @@ Progress: v2.0 [█████████████████████�
 
 ### Key Decisions (v2.0)
 
+- **[12-02]** MOT API mispar_rechev must be NUMBER not string — Number(digitsOnly) before API call
+- **[12-02]** parseMoedAliya: "YYYY-M" → "YYYY-MM-01" (day=01, MOT only provides year+month)
+- **[12-02]** vehicle_tests INSERT (not upsert) — test history accumulates; no unique constraint on vehicle_id+test_date
+- **[12-02]** use server files cannot export objects/constants — shared types live in @/lib/fleet/*.ts (supplier-types.ts pattern)
+- **[12-02]** Fleet vehicle alert thresholds default: yellow=60 days, red=30 days (same as driver thresholds)
 - **[11-01]** Partial unique index on vehicles.license_plate (WHERE deleted_at IS NULL) — allows soft-delete + plate reuse
 - **[11-01]** driver_computed_status updated in same migration — vehicle assignment WHEN precedes is_occasional_camp_driver
 - **[11-01]** vehicle_insurance uses supplier_id FK (not direct insurer fields) — normalized to vehicle_suppliers
@@ -111,13 +116,18 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-07 (session #30)
-Stopped at: Phase 12, Plan 01 COMPLETE — vehicle suppliers admin CRUD done.
+Stopped at: Phase 12 COMPLETE — MOT API Server Action + Fleet Settings vehicle thresholds done.
 
 ### Context for next session:
 
-**מה קיים:** תשתית DB מלאה לרכבים (Phase 11) + ספקי רכב admin CRUD (Phase 12, Plan 01).
+**מה קיים:** תשתית DB לרכבים (Phase 11) + ספקי רכב admin CRUD (12-01) + MOT API sync + fleet settings מורחב (12-02).
 
-**מה הבא:** Phase 12, Plan 02 — MOT API Server Action + Fleet Settings UI extensions.
+**מה הבא:** Phase 13 (10C) — Vehicle Server Actions + Shared Fleet Components extraction.
+
+**Key new files (Phase 12-02):**
+- `src/actions/fleet/mot-sync.ts` — syncVehicleFromMot(), testMotApiConnection(), parseMoedAliya()
+- `src/lib/fleet/supplier-types.ts` — VehicleSupplier type + SUPPLIER_TYPE_LABELS (shared constants)
+- `src/components/admin/settings/FleetSettings.tsx` — extended: test/insurance thresholds + MOT test button
 
 **Key fleet files:**
 - `src/app/(app)/app/fleet/layout.tsx` — FleetLayout (auth + app_fleet guard)
