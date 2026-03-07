@@ -29,10 +29,6 @@ import {
   type VehicleSupplier,
 } from '@/lib/fleet/supplier-types'
 
-// Re-export for consumers who import from this file
-export type { VehicleSupplier } from '@/lib/fleet/supplier-types'
-export { SUPPLIER_TYPE_LABELS } from '@/lib/fleet/supplier-types'
-
 const VALID_SUPPLIER_TYPES = Object.keys(SUPPLIER_TYPE_LABELS)
 
 // ---------------------------------------------------------------------------

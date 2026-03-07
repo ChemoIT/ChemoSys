@@ -18,14 +18,14 @@ import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
 
-import type { VehicleSupplier } from '@/actions/fleet/vehicle-suppliers'
+import type { VehicleSupplier } from '@/lib/fleet/supplier-types'
+import { SUPPLIER_TYPE_LABELS } from '@/lib/fleet/supplier-types'
 import {
   createVehicleSupplier,
   updateVehicleSupplier,
   deleteVehicleSupplier,
   toggleSupplierActive,
 } from '@/actions/fleet/vehicle-suppliers'
-import { SUPPLIER_TYPE_LABELS } from '@/lib/fleet-constants'
 import { formatPhone } from '@/lib/format'
 
 import { DataTable } from '@/components/shared/DataTable'
