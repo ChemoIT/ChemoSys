@@ -162,6 +162,7 @@ Plans:
 | 11. Phase 10A — Vehicle Card DB | v2.0 | 2/2 | Complete | 2026-03-07 |
 | 12. Phase 10B — Suppliers + MOT API | v2.0 | 2/2 | Complete | 2026-03-07 |
 | 13. Phase 10C — Vehicle Server Actions + Shared Components | v2.0 | 2/2 | Complete | 2026-03-07 |
+| 14. Phase 10E — VehicleCard Full UI (8 Tabs) | v2.0 | 2/2 | Complete | 2026-03-07 |
 
 ## Coverage
 
@@ -206,8 +207,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 14-01-PLAN.md — VehicleCard infrastructure + server page + shell + Tabs 1-3 (Details, Tests, Insurance) + getActiveSuppliersByType action
-- [ ] 14-02-PLAN.md — Tabs 4-8 (Assignment, Costs placeholder, Documents, Notes, KM placeholder) + minimal VehicleList page
+- [x] 14-01-PLAN.md — VehicleCard infrastructure + server page + shell + Tabs 1-3 (Details, Tests, Insurance) + getActiveSuppliersByType action
+- [x] 14-02-PLAN.md — Tabs 4-8 (Assignment, Costs placeholder, Documents, Notes, KM placeholder) + minimal VehicleList page
 
 ### Phase 15: Phase 10F — VehicleList + AddVehicleDialog (MOT API auto-fill) + Pages + Integration
 
@@ -222,4 +223,4 @@ Plans:
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-07 — Phase 15 planned*
+*Last updated: 2026-03-07 — Phase 14 executed*
