@@ -28,7 +28,7 @@
 - [x] **Phase 6: DB + Auth Foundation** — מיגרציה, תיקון ניתוב auth, הרחבת dal.ts — completed 2026-03-04
 - [x] **Phase 7: ChemoSys Login** — דף כניסה ייעודי עם בחירת מודול לפי הרשאות — completed 2026-03-04
 - [x] **Phase 8: (app) Shell** — route group + layout + header + module switcher — completed 2026-03-04
-- [ ] **Phase 9: Fleet Home** — דף בית צי רכב עם grid של 16 תתי-מודולים
+- [x] **Phase 9: Fleet Home** — דף בית צי רכב עם sidebar ו-9 תתי-מודולים — completed 2026-03-05
 - [ ] **Phase 10: Equipment + Mobile Polish** — דף בית צמ"ה + רספונסיביות + וריפיקציה
 
 ---
@@ -157,8 +157,9 @@ Plans:
 | 6. DB + Auth Foundation | v2.0 | 2/2 | Complete | 2026-03-04 |
 | 7. ChemoSys Login | v2.0 | 2/2 | Complete | 2026-03-04 |
 | 8. (app) Shell | v2.0 | 1/1 | Complete | 2026-03-04 |
-| 9. Fleet Home | v2.0 | 0/1 | Not started | - |
+| 9. Fleet Home | v2.0 | 2/2 | Complete | 2026-03-05 |
 | 10. Equipment + Mobile Polish | v2.0 | 0/1 | Not started | - |
+| 11. Phase 10A — Vehicle Card DB | v2.0 | 2/2 | Complete | 2026-03-07 |
 
 ## Coverage
 
@@ -173,8 +174,8 @@ v2.0: 23/23 requirements mapped. See [REQUIREMENTS.md](REQUIREMENTS.md).
 **Plans:** 2 plans
 
 Plans:
-- [ ] 11-01-PLAN.md — Main migration 00025: 6 tables + views + 9 RPCs + RLS policies + indexes + triggers
-- [ ] 11-02-PLAN.md — Storage policies migration 00026 + human verification of both migrations in Supabase
+- [x] 11-01-PLAN.md — Main migration 00025: 6 tables + views + 9 RPCs + RLS policies + indexes + triggers
+- [x] 11-02-PLAN.md — Storage policies migration 00026 + human verification of both migrations in Supabase
 
 ### Phase 12: Phase 10B — Vehicle Suppliers Admin Settings UI + MOT API integration
 
@@ -215,4 +216,4 @@ Plans:
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-04 — Phase 8 complete*
+*Last updated: 2026-03-07 — Phase 11 complete*
