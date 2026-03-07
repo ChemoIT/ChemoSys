@@ -858,6 +858,32 @@ export async function getActiveDriversForAssignment(): Promise<DriverOptionForAs
     })
 }
 
+// ─────────────────────────────────────────────────────────────
+// COMPANIES FOR SELECT (dialog dropdown)
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns active companies for use in the AddVehicleDialog company selector.
+ * Defensive: returns empty array on error so the dialog still renders.
+ */
+export async function getCompaniesForSelect(): Promise<{ id: string; name: string }[]> {
+  await verifyAppUser()
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('companies')
+    .select('id, name')
+    .is('deleted_at', null)
+    .order('name')
+
+  if (error) {
+    console.error('[vehicles] getCompaniesForSelect error:', error.message)
+    return []
+  }
+
+  return (data ?? []).map((c) => ({ id: c.id, name: c.name }))
+}
+
 /**
  * Assigns or unassigns a driver to/from a vehicle.
  * Pass null as driverId to unassign.

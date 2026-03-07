@@ -6,9 +6,10 @@
 //
 // CRITICAL: MOT API requires mispar_rechev as a NUMBER, not a string.
 // Never cache MOT data — always fetch fresh (revalidate: 0).
-// SECURITY: Every action begins with verifySession().
+// SECURITY: syncVehicleFromMot + lookupVehicleFromMot use verifyAppUser (ChemoSys).
+//           testMotApiConnection keeps verifySession (admin-only, called from FleetSettings).
 
-import { verifySession } from '@/lib/dal'
+import { verifySession, verifyAppUser } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { TestResult } from '@/actions/settings'
@@ -94,7 +95,7 @@ export async function syncVehicleFromMot(
   vehicleId: string,
   licensePlate: string
 ): Promise<{ success: boolean; data?: MotVehicleData; error?: string }> {
-  const session = await verifySession()
+  const { userId } = await verifyAppUser()
 
   // Convert plate to number — strip anything non-digit first
   const digitsOnly = licensePlate.replace(/\D/g, '')
@@ -174,8 +175,8 @@ export async function syncVehicleFromMot(
         expiry_date:  v.tokef_dt,
         passed:       true,
         alert_enabled: true,
-        created_by:   session.userId,
-        updated_by:   session.userId,
+        created_by:   userId,
+        updated_by:   userId,
       })
 
     if (testError) {
@@ -186,6 +187,67 @@ export async function syncVehicleFromMot(
 
   revalidatePath('/app/fleet/vehicle-card/' + vehicleId)
 
+  return { success: true, data: v }
+}
+
+// ─────────────────────────────────────────────────────────────
+// lookupVehicleFromMot
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Read-only MOT lookup — fetches vehicle data without writing to DB.
+ * Used by AddVehicleDialog to preview MOT data before creating a vehicle card.
+ *
+ * CRITICAL: MOT API requires mispar_rechev as a NUMBER (not string).
+ * Strip non-digits, convert to Number — reject if NaN or 0.
+ *
+ * Never cache: uses { next: { revalidate: 0 } }
+ */
+export async function lookupVehicleFromMot(
+  licensePlate: string
+): Promise<{ success: boolean; data?: MotVehicleData; error?: string }> {
+  await verifyAppUser()
+
+  // Convert plate to number — strip anything non-digit first
+  const digitsOnly = licensePlate.replace(/\D/g, '')
+  const plateNumber = Number(digitsOnly)
+
+  if (!digitsOnly || isNaN(plateNumber) || plateNumber === 0) {
+    return { success: false, error: 'מספר רישוי לא תקין' }
+  }
+
+  // Build MOT API URL
+  const url = new URL(MOT_API_BASE)
+  url.searchParams.set('resource_id', MOT_RESOURCE_ID)
+  url.searchParams.set('filters', JSON.stringify({ mispar_rechev: plateNumber }))
+  url.searchParams.set('limit', '1')
+  url.searchParams.set('records_format', 'objects')
+  url.searchParams.set('include_total', 'true')
+
+  let json: MotApiResponse
+  try {
+    const res = await fetch(url.toString(), {
+      headers: { 'Accept': 'application/json' },
+      next: { revalidate: 0 }, // never cache MOT data
+    })
+
+    if (!res.ok) {
+      return { success: false, error: `שגיאת רשת: ${res.status} ${res.statusText}` }
+    }
+
+    json = await res.json() as MotApiResponse
+  } catch (err) {
+    return {
+      success: false,
+      error: `שגיאת רשת: ${err instanceof Error ? err.message : 'Unknown'}`,
+    }
+  }
+
+  if (!json.success || json.result.total === 0) {
+    return { success: false, error: 'הרכב לא נמצא ברשומות משרד הרישוי' }
+  }
+
+  const v = json.result.records[0]
   return { success: true, data: v }
 }
 
