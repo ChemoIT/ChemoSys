@@ -230,7 +230,11 @@ Plans:
 **Goal:** מיגרציית DB מלאה לעיצוב מחדש של כרטיס רכב — שדות חדשים ב-vehicles (סטטוס, סוג, תאריך יציאה, קטגוריה, בעלות), טבלאות חדשות (תמונות, רכב חלופי, כרטיסי תדלוק, יומני נהגים/פרויקטים/עלויות), storage bucket לתמונות, וסוג ownership ב-vehicle_suppliers.
 **Depends on:** Phase 15
 **Requirements doc:** [vehicle-card-redesign-requirements.md](vehicle-card-redesign-requirements.md)
-**Plans:** TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 16-01-PLAN.md — Main migration 00027: ALTER TABLE vehicles (9 columns + constraints) + vehicle_suppliers + 6 new tables + views + RPC + RLS
+- [ ] 16-02-PLAN.md — Storage policies migration 00028 (vehicle-images bucket) + human verification of both migrations in Supabase
 
 ### Phase 17: Vehicle Card Redesign — Details Tab + Images + Replacement Vehicle
 
