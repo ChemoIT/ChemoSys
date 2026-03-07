@@ -259,7 +259,9 @@ export async function softDeleteUser(id: string): Promise<SimpleResult> {
   }
 
   // Phase 1: Soft-delete public.users
-  const { error: softDeleteError } = await supabase
+  // Uses adminClient to bypass RLS — the SELECT policy (deleted_at IS NULL)
+  // conflicts with setting deleted_at, same reason all other soft-deletes use SECURITY DEFINER RPCs.
+  const { error: softDeleteError } = await adminClient
     .from('users')
     .update({
       deleted_at: new Date().toISOString(),
