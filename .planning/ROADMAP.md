@@ -201,12 +201,13 @@ Plans:
 
 ### Phase 14: Phase 10E — VehicleCard Tabs 4-8 (Assignment, Costs, Documents, Notes, KM placeholder)
 
-**Goal:** [To be planned]
+**Goal:** דף כרטיס רכב מלא עם 8 טאבים — פרטי הרכב (MOT + שדות תפעוליים), טסטים, ביטוח, שיוך נהג, עלויות (placeholder), מסמכים, הערות, וק"מ (placeholder). כולל dirty tracking, Dialog שינויים לא שמורים, ודף רשימת רכבים מינימלי לניווט.
 **Depends on:** Phase 13
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 14 to break down)
+- [ ] 14-01-PLAN.md — VehicleCard infrastructure + server page + shell + Tabs 1-3 (Details, Tests, Insurance) + getActiveSuppliersByType action
+- [ ] 14-02-PLAN.md — Tabs 4-8 (Assignment, Costs placeholder, Documents, Notes, KM placeholder) + minimal VehicleList page
 
 ### Phase 15: Phase 10F — VehicleList + AddVehicleDialog (MOT API auto-fill) + Pages + Integration
 
