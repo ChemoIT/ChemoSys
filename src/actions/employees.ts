@@ -600,7 +600,7 @@ export async function updateEmployee(
       const adminClient = createAdminClient()
       const { error: authError } = await adminClient.auth.admin.updateUserById(
         linkedUser.auth_user_id,
-        { email: data.email }
+        { email: data.email, email_confirm: true }
       )
       if (authError) {
         console.error('[updateEmployee] Failed to sync auth email:', authError.message)
