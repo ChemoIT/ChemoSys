@@ -5,15 +5,15 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** v2.0 — Phase 13 (10C) Plan 02 COMPLETE. Shared fleet components extracted + VehicleFitnessLight created.
+**Current focus:** v2.0 — Phase 14 (10E) Plan 01 COMPLETE. VehicleCard page + 3 tabs (פרטי הרכב, טסטים, ביטוח) built.
 
 ## Current Position
 
-Phase: 13 (Phase 10C) — 2/2 plans COMPLETE
-Status: **הושלם** — 13-01 vehicle server actions + 13-02 shared fleet components extraction done
-Last activity: 2026-03-07 — Session #32 (execute-phase 13, plan 02)
+Phase: 14 (Phase 10E) — 1/2 plans COMPLETE
+Status: **בביצוע** — 14-01 VehicleCard infrastructure + Tabs 1-3 done; 14-02 Tabs 4-8 next
+Last activity: 2026-03-07 — Session #33 (execute-phase 14, plan 01)
 
-Progress: v2.0 [█████████████████████████] Phase 13 complete — Phase 14 (VehicleCard UI) next
+Progress: v2.0 [█████████████████████████] Phase 14 in progress — Plan 14-02 (Tabs 4-8) next
 
 ## Strategic Decision (Session #18)
 
@@ -95,6 +95,11 @@ Progress: v2.0 [█████████████████████�
 - **[13-02]** VehicleFitnessLight red logic: test expired OR insurance expired = red (vs driver where only license = red — road legality difference)
 - **[13-02]** DriverLicenseSection UploadZone NOT extracted — different signature (image-only, side prop) vs FleetUploadZone (file+PDF+drag) — intentional separation
 - **[13-02]** FleetDateInput moved to shared/ (rename via git, 96% similarity preserved)
+- **[14-01]** getActiveSuppliersByType uses verifyAppUser (not verifySession) — ChemoSys context; filters is_active=true + deleted_at IS NULL
+- **[14-01]** Companies fetched directly via supabase in server page — no dedicated action for simple reference data
+- **[14-01]** syncVehicleFromMot uses verifySession (admin) — intentional, MOT sync is admin-level operation called from ChemoSys
+- **[14-01]** VehicleCard avatar = first 2 chars of plate digits for visual identification
+- **[14-01]** Tabs 4-8 = PlaceholderTab component — clean separation for Plan 14-02
 
 ### Roadmap Evolution
 
@@ -122,14 +127,14 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-07 (session #32)
-Stopped at: Phase 13 COMPLETE — shared fleet components extraction + VehicleFitnessLight done.
+Last session: 2026-03-07 (session #33)
+Stopped at: Phase 14 Plan 01 COMPLETE — VehicleCard page + Tabs 1-3 built.
 
 ### Context for next session:
 
-**מה קיים:** תשתית DB לרכבים (Phase 11) + ספקי רכב admin CRUD + MOT API (Phase 12) + vehicle server actions (13-01) + shared fleet components (13-02).
+**מה קיים:** Phase 14-01 DONE — VehicleCard page at /app/fleet/vehicle-card/[id] עם 8 tabs: פרטי הרכב (MOT + editable), טסטים (CRUD + upload), ביטוח (CRUD + supplier dropdown). Tabs 4-8 = placeholders.
 
-**מה הבא:** Phase 14 — VehicleCard UI (טאבים: פרטי רכב, טסטים, ביטוח, מסמכים, שיוך נהג).
+**מה הבא:** Phase 14 Plan 02 — Tabs 4-8: שיוך נהג, עלויות, מסמכים, הערות, ק"מ placeholder.
 
 **Key new files (Phase 13-02):**
 - `src/components/app/fleet/shared/FleetDateInput.tsx` — moved from drivers/ (3-select date picker)
@@ -142,6 +147,13 @@ Stopped at: Phase 13 COMPLETE — shared fleet components extraction + VehicleFi
 **Key new files (Phase 13-01):**
 - `src/lib/fleet/vehicle-types.ts` — VehicleListItem, VehicleFull, VehicleTest, VehicleInsurance, VehicleDocument, DriverOptionForAssignment types + VEHICLE_TYPE_LABELS, OWNERSHIP_TYPE_LABELS, INSURANCE_TYPE_LABELS constants
 - `src/actions/fleet/vehicles.ts` — 21 complete vehicle CRUD server actions (verifyAppUser guard, RPCs for soft-delete)
+
+**Key new files (Phase 14-01):**
+- `src/app/(app)/app/fleet/vehicle-card/[id]/page.tsx` — server page with parallel data fetch + companies query
+- `src/components/app/fleet/vehicles/VehicleCard.tsx` — 8-tab shell, header, dirty tracking, delete dialog, unsaved dialog
+- `src/components/app/fleet/vehicles/VehicleDetailsSection.tsx` — Tab 1: MOT read-only + operational editable
+- `src/components/app/fleet/vehicles/VehicleTestsSection.tsx` — Tab 2: test history CRUD + file upload
+- `src/components/app/fleet/vehicles/VehicleInsuranceSection.tsx` — Tab 3: insurance policies CRUD + supplier dropdown
 
 **Key fleet files:**
 - `src/actions/fleet/mot-sync.ts` — syncVehicleFromMot(), testMotApiConnection(), parseMoedAliya()
