@@ -210,14 +210,15 @@ Plans:
 
 ### Phase 15: Phase 10F — VehicleList + AddVehicleDialog (MOT API auto-fill) + Pages + Integration
 
-**Goal:** [To be planned]
+**Goal:** דף רשימת רכבים מלא עם טבלה, פילטרים, חיפוש ורמזור כשירות + דיאלוג פתיחת כרטיס רכב חדש עם חיפוש MOT דו-שלבי (הכנסת לוחית -> תצוגה מקדימה -> אישור ויצירה) + ניתוב דפים ושילוב עם VehicleCard.
 **Depends on:** Phase 14
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 15 to break down)
+- [ ] 15-01-PLAN.md — Server action prep (lookupVehicleFromMot + fix mot-sync guards + getCompaniesForSelect) + AddVehicleDialog two-step component
+- [ ] 15-02-PLAN.md — VehicleList component (mirrors DriverList) + page routes (vehicle-card/page.tsx + [id]/page.tsx) + visual verification
 
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-07 — Phase 13 complete*
+*Last updated: 2026-03-07 — Phase 15 planned*
