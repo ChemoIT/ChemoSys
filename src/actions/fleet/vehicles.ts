@@ -786,6 +786,31 @@ export async function getVehicleDocumentNameSuggestions(query: string): Promise<
 }
 
 // ─────────────────────────────────────────────────────────────
+// ACTIVE SUPPLIERS BY TYPE (for dropdowns in VehicleCard tabs)
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns active suppliers of a given type for use in client-side dropdowns.
+ * Uses verifyAppUser() — ChemoSys employee-facing context.
+ * Lighter than admin getVehicleSuppliers() — filters is_active=true, no deleted rows.
+ */
+export async function getActiveSuppliersByType(
+  supplierType: string
+): Promise<{ id: string; name: string }[]> {
+  await verifyAppUser()
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('vehicle_suppliers')
+    .select('id, name')
+    .eq('supplier_type', supplierType)
+    .eq('is_active', true)
+    .is('deleted_at', null)
+    .order('name')
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((row) => ({ id: row.id, name: row.name }))
+}
+
+// ─────────────────────────────────────────────────────────────
 // DRIVER ASSIGNMENT
 // ─────────────────────────────────────────────────────────────
 
