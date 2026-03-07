@@ -46,6 +46,7 @@
 import { revalidatePath } from 'next/cache'
 import ExcelJS from 'exceljs'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { verifySession } from '@/lib/dal'
 import { writeAuditLog } from '@/lib/audit'
 import { EmployeeSchema } from '@/lib/schemas'
@@ -582,8 +583,137 @@ export async function updateEmployee(
     newData:    data as Record<string, unknown>,
   })
 
+  // ── Propagation: sync email/phone changes to related tables ──────────
+  const emailChanged = oldData && data && oldData.email !== data.email
+  const phoneChanged = oldData && data && oldData.mobile_phone !== data.mobile_phone
+
+  if (emailChanged && data.email) {
+    // If employee has a linked user → update auth.users.email
+    const { data: linkedUser } = await supabase
+      .from('users')
+      .select('auth_user_id')
+      .eq('employee_id', id)
+      .is('deleted_at', null)
+      .maybeSingle()
+
+    if (linkedUser?.auth_user_id) {
+      const adminClient = createAdminClient()
+      const { error: authError } = await adminClient.auth.admin.updateUserById(
+        linkedUser.auth_user_id,
+        { email: data.email }
+      )
+      if (authError) {
+        console.error('[updateEmployee] Failed to sync auth email:', authError.message)
+      }
+    }
+  }
+
+  if (emailChanged || phoneChanged) {
+    await propagateEmployeeContactsToProjects(
+      supabase, id, data?.email ?? null, data?.mobile_phone ?? null
+    )
+  }
+
   revalidatePath('/admin/employees')
   return { success: true }
+}
+
+// ---------------------------------------------------------------------------
+// updateLockedFields — toggle lock/unlock per field for a single employee
+// ---------------------------------------------------------------------------
+
+const LOCKABLE_FIELDS = [
+  'gender', 'citizenship', 'mobile_phone', 'additional_phone',
+  'email', 'correspondence_language', 'notes', 'role_tags',
+] as const
+
+export async function updateLockedFields(
+  employeeId: string,
+  lockedFields: string[]
+): Promise<{ success: boolean; error?: string }> {
+  const session = await verifySession()
+  const supabase = await createClient()
+
+  // Whitelist — only lockable fields allowed
+  const sanitized = lockedFields.filter((f) =>
+    (LOCKABLE_FIELDS as readonly string[]).includes(f)
+  )
+
+  const { error } = await supabase
+    .from('employees')
+    .update({
+      locked_fields: sanitized,
+      updated_by: session.userId,
+    })
+    .eq('id', employeeId)
+
+  if (error) return { success: false, error: error.message }
+
+  await writeAuditLog({
+    userId:     session.userId,
+    action:     'UPDATE',
+    entityType: 'employees',
+    entityId:   employeeId,
+    oldData:    null,
+    newData:    { locked_fields: sanitized },
+  })
+
+  revalidatePath('/admin/employees')
+  return { success: true }
+}
+
+// ---------------------------------------------------------------------------
+// propagateEmployeeContactsToProjects — private helper
+// Updates pm_email/pm_phone, sm_email/sm_phone, cvc_phone in projects
+// where this employee is assigned as PM, SM, or CVC (FK only).
+// ---------------------------------------------------------------------------
+
+async function propagateEmployeeContactsToProjects(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  employeeId: string,
+  newEmail: string | null,
+  newPhone: string | null
+) {
+  const { data: projects, error } = await supabase
+    .from('projects')
+    .select('id, project_manager_id, site_manager_id, camp_vehicle_coordinator_id, cvc_is_employee')
+    .is('deleted_at', null)
+    .or(
+      `project_manager_id.eq.${employeeId},` +
+      `site_manager_id.eq.${employeeId},` +
+      `camp_vehicle_coordinator_id.eq.${employeeId}`
+    )
+
+  if (error || !projects?.length) return
+
+  for (const project of projects) {
+    const updates: Record<string, string | null> = {}
+
+    if (project.project_manager_id === employeeId) {
+      if (newEmail !== null) updates.pm_email = newEmail
+      if (newPhone !== null) updates.pm_phone = newPhone
+    }
+
+    if (project.site_manager_id === employeeId) {
+      if (newEmail !== null) updates.sm_email = newEmail
+      if (newPhone !== null) updates.sm_phone = newPhone
+    }
+
+    // CVC: only update if selected from employee list (not free-text)
+    if (
+      project.camp_vehicle_coordinator_id === employeeId &&
+      project.cvc_is_employee
+    ) {
+      if (newPhone !== null) updates.cvc_phone = newPhone
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await supabase
+        .from('projects')
+        .update(updates)
+        .eq('id', project.id)
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -16,11 +16,11 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Camera, CalendarIcon } from 'lucide-react'
+import { Loader2, Camera, CalendarIcon, Lock, LockOpen } from 'lucide-react'
 import { format, parse } from 'date-fns'
 import { he } from 'date-fns/locale'
 import type { Company, Department, Employee, RoleTag } from '@/types/entities'
-import { createEmployee, updateEmployee } from '@/actions/employees'
+import { createEmployee, updateEmployee, updateLockedFields } from '@/actions/employees'
 import { RoleTagMultiSelect } from './RoleTagMultiSelect'
 import { createClient as createBrowserClient } from '@/lib/supabase/browser'
 import {
@@ -119,11 +119,13 @@ function DateInput({
   defaultValue,
   placeholder = 'dd/mm/yyyy',
   onChange,
+  disabled,
 }: {
   name: string
   defaultValue?: string | null
   placeholder?: string
   onChange?: (isoValue: string) => void
+  disabled?: boolean
 }) {
   function isoToDisplay(iso: string | null | undefined): string {
     if (!iso) return ''
@@ -185,11 +187,12 @@ function DateInput({
         placeholder={placeholder}
         maxLength={10}
         dir="ltr"
-        className="text-center flex-1"
+        className={`text-center flex-1 ${disabled ? 'bg-muted/50 text-muted-foreground' : ''}`}
+        disabled={disabled}
       />
       <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
         <PopoverTrigger asChild>
-          <Button type="button" variant="outline" size="icon" className="shrink-0 h-10 w-10">
+          <Button type="button" variant="outline" size="icon" className="shrink-0 h-10 w-10" disabled={disabled}>
             <CalendarIcon className="h-4 w-4" />
           </Button>
         </PopoverTrigger>
@@ -320,6 +323,36 @@ function PhotoUpload({
 }
 
 // ---------------------------------------------------------------------------
+// LockToggle — per-field lock icon for lockable fields
+// ---------------------------------------------------------------------------
+
+function LockToggle({
+  fieldName,
+  lockedFields,
+  onToggle,
+}: {
+  fieldName: string
+  lockedFields: string[]
+  onToggle: (field: string, locked: boolean) => void
+}) {
+  const isLocked = lockedFields.includes(fieldName)
+  return (
+    <button
+      type="button"
+      title={isLocked ? 'שדה נעול — ייבוא לא ידרוס. לחץ לפתיחה' : 'שדה פתוח — ייבוא ידרוס. לחץ לנעילה'}
+      onClick={() => onToggle(fieldName, !isLocked)}
+      className={`p-0.5 rounded transition-colors ${
+        isLocked
+          ? 'text-amber-600 hover:text-amber-800'
+          : 'text-muted-foreground/30 hover:text-muted-foreground/60'
+      }`}
+    >
+      {isLocked ? <Lock className="h-3 w-3" /> : <LockOpen className="h-3 w-3" />}
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // EmployeeForm
 // ---------------------------------------------------------------------------
 
@@ -354,6 +387,11 @@ export function EmployeeForm({
   const [language, setLanguage] = useState('hebrew')
   const [roleTagIds, setRoleTagIds] = useState<string[]>([])
 
+  // Lock state (per-field import protection)
+  const [lockedFields, setLockedFields] = useState<string[]>(
+    (employee as Record<string, unknown>)?.locked_fields as string[] ?? []
+  )
+
   // Photo state
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoUrl, setPhotoUrl] = useState<string>(employee?.photo_url ?? '')
@@ -370,6 +408,7 @@ export function EmployeeForm({
     setRoleTagIds(employee?.role_tags?.map((r) => r.role_tag_id) ?? [])
     setPhotoUrl(employee?.photo_url ?? '')
     setPhotoFile(null)
+    setLockedFields((employee as Record<string, unknown>)?.locked_fields as string[] ?? [])
   }, [employee])
 
   // Close on success + notify parent to refresh data (fixes stale photo_url)
@@ -385,6 +424,21 @@ export function EmployeeForm({
   function handleEndDateChange(iso: string) {
     const currentDeptNumber = filteredDepts.find((d) => d.id === deptId)?.dept_number
     setStatus(deriveStatusFromEndDate(iso, currentDeptNumber))
+  }
+
+  // Toggle field lock — saves immediately to DB
+  async function handleLockToggle(field: string, locked: boolean) {
+    if (!employee) return
+    const prev = lockedFields
+    const next = locked
+      ? [...lockedFields, field]
+      : lockedFields.filter((f) => f !== field)
+    setLockedFields(next) // optimistic
+    const result = await updateLockedFields(employee.id, next)
+    if (!result.success) {
+      toast.error('שגיאה בשמירת נעילה: ' + result.error)
+      setLockedFields(prev) // rollback
+    }
   }
 
   // Department dropdowns:
@@ -481,17 +535,17 @@ export function EmployeeForm({
             <div className="flex-1 grid grid-cols-3 gap-3">
               <div className="space-y-1">
                 <FieldLabel required>מספר עובד</FieldLabel>
-                <Input name="employee_number" placeholder="מספר עובד ייחודי" defaultValue={employee?.employee_number ?? ''} />
+                <Input name="employee_number" placeholder="מספר עובד ייחודי" defaultValue={employee?.employee_number ?? ''} readOnly={isEdit} tabIndex={isEdit ? -1 : undefined} className={isEdit ? 'bg-muted/50 text-muted-foreground pointer-events-none' : ''} />
                 <FieldError errors={errors} field="employee_number" />
               </div>
               <div className="space-y-1">
                 <FieldLabel required>שם פרטי</FieldLabel>
-                <Input name="first_name" placeholder="שם פרטי" defaultValue={employee?.first_name ?? ''} />
+                <Input name="first_name" placeholder="שם פרטי" defaultValue={employee?.first_name ?? ''} readOnly={isEdit} tabIndex={isEdit ? -1 : undefined} className={isEdit ? 'bg-muted/50 text-muted-foreground pointer-events-none' : ''} />
                 <FieldError errors={errors} field="first_name" />
               </div>
               <div className="space-y-1">
                 <FieldLabel required>שם משפחה</FieldLabel>
-                <Input name="last_name" placeholder="שם משפחה" defaultValue={employee?.last_name ?? ''} />
+                <Input name="last_name" placeholder="שם משפחה" defaultValue={employee?.last_name ?? ''} readOnly={isEdit} tabIndex={isEdit ? -1 : undefined} className={isEdit ? 'bg-muted/50 text-muted-foreground pointer-events-none' : ''} />
                 <FieldError errors={errors} field="last_name" />
               </div>
             </div>
@@ -504,17 +558,21 @@ export function EmployeeForm({
             <div className="grid grid-cols-4 gap-3">
               <div className="space-y-1">
                 <FieldLabel>תעודת זהות</FieldLabel>
-                {/* Display padded to 9 digits (Israeli ID standard) */}
                 <Input
                   name="id_number"
                   placeholder="000000000"
                   defaultValue={formatIdNumber(employee?.id_number)}
                   dir="ltr"
-                  className="text-center"
+                  className={`text-center ${isEdit ? 'bg-muted/50 text-muted-foreground pointer-events-none' : ''}`}
+                  readOnly={isEdit}
+                  tabIndex={isEdit ? -1 : undefined}
                 />
               </div>
               <div className="space-y-1">
-                <FieldLabel>מגדר</FieldLabel>
+                <div className="flex items-center justify-between">
+                  <FieldLabel>מגדר</FieldLabel>
+                  {isEdit && <LockToggle fieldName="gender" lockedFields={lockedFields} onToggle={handleLockToggle} />}
+                </div>
                 <select
                   name="gender"
                   value={gender}
@@ -529,10 +587,13 @@ export function EmployeeForm({
               </div>
               <div className="space-y-1">
                 <FieldLabel>תאריך לידה</FieldLabel>
-                <DateInput name="date_of_birth" defaultValue={employee?.date_of_birth} />
+                <DateInput name="date_of_birth" defaultValue={employee?.date_of_birth} disabled={isEdit} />
               </div>
               <div className="space-y-1">
-                <FieldLabel>אזרחות</FieldLabel>
+                <div className="flex items-center justify-between">
+                  <FieldLabel>אזרחות</FieldLabel>
+                  {isEdit && <LockToggle fieldName="citizenship" lockedFields={lockedFields} onToggle={handleLockToggle} />}
+                </div>
                 <select
                   name="citizenship"
                   value={citizenship}
@@ -577,15 +638,24 @@ export function EmployeeForm({
 
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1">
-                <FieldLabel>טלפון נייד</FieldLabel>
+                <div className="flex items-center justify-between">
+                  <FieldLabel>טלפון נייד</FieldLabel>
+                  {isEdit && <LockToggle fieldName="mobile_phone" lockedFields={lockedFields} onToggle={handleLockToggle} />}
+                </div>
                 <Input name="mobile_phone" placeholder="05X-XXXXXXX" defaultValue={employee?.mobile_phone ?? ''} />
               </div>
               <div className="space-y-1">
-                <FieldLabel>טלפון נוסף</FieldLabel>
+                <div className="flex items-center justify-between">
+                  <FieldLabel>טלפון נוסף</FieldLabel>
+                  {isEdit && <LockToggle fieldName="additional_phone" lockedFields={lockedFields} onToggle={handleLockToggle} />}
+                </div>
                 <Input name="additional_phone" placeholder="טלפון נוסף" defaultValue={employee?.additional_phone ?? ''} />
               </div>
               <div className="space-y-1">
-                <FieldLabel>דוא&quot;ל</FieldLabel>
+                <div className="flex items-center justify-between">
+                  <FieldLabel>דוא&quot;ל</FieldLabel>
+                  {isEdit && <LockToggle fieldName="email" lockedFields={lockedFields} onToggle={handleLockToggle} />}
+                </div>
                 <Input name="email" type="email" placeholder="example@company.com" defaultValue={employee?.email ?? ''} />
               </div>
             </div>
@@ -622,28 +692,30 @@ export function EmployeeForm({
                     if (match) {
                       setDeptId(match.id)
                       setSubDeptId('')
-                      // Dept 0 = inactive
                       if (num === '0') setStatus('inactive')
                     }
                   }}
                   placeholder="מס׳"
                   dir="ltr"
-                  className="text-center"
+                  className={`text-center ${isEdit ? 'bg-muted/50 text-muted-foreground pointer-events-none' : ''}`}
+                  readOnly={isEdit}
+                  tabIndex={isEdit ? -1 : undefined}
                 />
               </div>
               <div className="space-y-1">
                 <FieldLabel>מחלקה</FieldLabel>
+                {isEdit && <input type="hidden" name="department_id" value={deptId} />}
                 <select
-                  name="department_id"
+                  name={isEdit ? undefined : 'department_id'}
                   value={deptId}
                   onChange={(e) => {
                     setDeptId(e.target.value)
                     setSubDeptId('')
-                    // Dept 0 = inactive
                     const dept = filteredDepts.find((d) => d.id === e.target.value)
                     if (dept?.dept_number === '0') setStatus('inactive')
                   }}
-                  className={selectClass}
+                  className={`${selectClass} ${isEdit ? 'bg-muted/50 text-muted-foreground' : ''}`}
+                  disabled={isEdit}
                 >
                   <option value="">בחר מחלקה</option>
                   {filteredDepts.map((d) => (
@@ -653,12 +725,13 @@ export function EmployeeForm({
               </div>
               <div className="space-y-1">
                 <FieldLabel>תת-מחלקה</FieldLabel>
+                {isEdit && <input type="hidden" name="sub_department_id" value={subDeptId} />}
                 <select
-                  name="sub_department_id"
+                  name={isEdit ? undefined : 'sub_department_id'}
                   value={subDeptId}
                   onChange={(e) => setSubDeptId(e.target.value)}
-                  disabled={!deptId}
-                  className={selectClass}
+                  disabled={isEdit || !deptId}
+                  className={`${selectClass} ${isEdit ? 'bg-muted/50 text-muted-foreground' : ''}`}
                 >
                   <option value="">{deptId ? 'בחר תת-מחלקה' : 'בחר מחלקה תחילה'}</option>
                   {filteredSubDepts.map((d) => (
@@ -676,29 +749,33 @@ export function EmployeeForm({
             <div className="grid grid-cols-4 gap-3">
               <div className="space-y-1">
                 <FieldLabel>תאריך תחילת עבודה</FieldLabel>
-                <DateInput name="start_date" defaultValue={employee?.start_date} />
+                <DateInput name="start_date" defaultValue={employee?.start_date} disabled={isEdit} />
               </div>
               <div className="space-y-1">
                 <FieldLabel>תאריך סיום עבודה</FieldLabel>
-                {/* Changing end_date auto-calculates status */}
                 <DateInput
                   name="end_date"
                   defaultValue={employee?.end_date}
                   onChange={handleEndDateChange}
+                  disabled={isEdit}
                 />
               </div>
               <div className="space-y-1">
                 <FieldLabel>סטטוס</FieldLabel>
+                {isEdit && <input type="hidden" name="status" value={status} />}
                 <div className="relative">
                   <span className={`absolute start-3 top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full pointer-events-none ${
                     status === 'active'    ? 'bg-green-500'  :
                     status === 'suspended' ? 'bg-yellow-500' : 'bg-red-500'
                   }`} />
                   <select
-                    name="status"
+                    name={isEdit ? undefined : 'status'}
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
+                    disabled={isEdit}
                     className={`${selectClass} ps-8 font-medium ${
+                      isEdit ? 'bg-muted/50' : ''
+                    } ${
                       status === 'active'    ? 'border-green-400 text-green-700'  :
                       status === 'suspended' ? 'border-yellow-400 text-yellow-700' :
                                               'border-red-400 text-red-700'
@@ -711,7 +788,10 @@ export function EmployeeForm({
                 </div>
               </div>
               <div className="space-y-1">
-                <FieldLabel>שפת התכתבות</FieldLabel>
+                <div className="flex items-center justify-between">
+                  <FieldLabel>שפת התכתבות</FieldLabel>
+                  {isEdit && <LockToggle fieldName="correspondence_language" lockedFields={lockedFields} onToggle={handleLockToggle} />}
+                </div>
                 <select
                   name="correspondence_language"
                   value={language}
@@ -737,10 +817,16 @@ export function EmployeeForm({
                   name="salary_system_license"
                   placeholder="קוד רישוי רכב"
                   defaultValue={employee?.salary_system_license ?? ''}
+                  readOnly={isEdit}
+                  tabIndex={isEdit ? -1 : undefined}
+                  className={isEdit ? 'bg-muted/50 text-muted-foreground pointer-events-none' : ''}
                 />
               </div>
               <div className="space-y-1">
-                <FieldLabel>תגיות תפקיד</FieldLabel>
+                <div className="flex items-center justify-between">
+                  <FieldLabel>תגיות תפקיד</FieldLabel>
+                  {isEdit && <LockToggle fieldName="role_tags" lockedFields={lockedFields} onToggle={handleLockToggle} />}
+                </div>
                 <RoleTagMultiSelect
                   roleTags={roleTags}
                   selectedIds={roleTagIds}
@@ -751,7 +837,10 @@ export function EmployeeForm({
           </div>
 
           {/* ── Section 5: הערות ── */}
-          <SectionHeading title="הערות" />
+          <div className="flex items-center gap-2 pt-3 pb-2">
+            <h3 className="text-sm font-semibold text-brand-dark border-r-4 border-brand-primary pr-3 py-1">הערות</h3>
+            {isEdit && <LockToggle fieldName="notes" lockedFields={lockedFields} onToggle={handleLockToggle} />}
+          </div>
 
           <div className="bg-muted/10 rounded-lg p-4">
             <textarea

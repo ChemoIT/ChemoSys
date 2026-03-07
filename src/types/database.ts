@@ -202,6 +202,7 @@ export interface Database {
           notes: string | null
           photo_url: string | null
           salary_system_license: string | null
+          locked_fields: string[]
           created_at: string
           updated_at: string
           created_by: string | null
@@ -235,6 +236,7 @@ export interface Database {
           notes?: string | null
           photo_url?: string | null
           salary_system_license?: string | null
+          locked_fields?: string[]
           created_at?: string
           updated_at?: string
           created_by?: string | null

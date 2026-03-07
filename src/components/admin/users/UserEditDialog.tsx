@@ -13,7 +13,7 @@
 
 import * as React from 'react'
 import { useTransition } from 'react'
-import { Loader2, Pencil, Truck, HardHat } from 'lucide-react'
+import { Loader2, Pencil, Truck, HardHat, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { updateUserAuth } from '@/actions/users'
 import {
@@ -99,18 +99,24 @@ export function UserEditDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Email */}
+          {/* Email — read-only, sourced from employee card */}
           <div className="space-y-2">
             <Label htmlFor="edit-email">כתובת מייל (להתחברות)</Label>
-            <Input
-              id="edit-email"
-              name="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              dir="ltr"
-              disabled={isPending}
-            />
+            <div className="relative">
+              <Input
+                id="edit-email"
+                name="email"
+                type="email"
+                value={email}
+                readOnly
+                dir="ltr"
+                className="bg-muted/50 text-muted-foreground cursor-not-allowed pe-9"
+              />
+              <Lock className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              המייל מגיע מכרטיס העובד. לשינוי — ערוך את העובד ברשימת עובדים.
+            </p>
           </div>
 
           {/* Password (optional reset) */}
