@@ -161,6 +161,7 @@ Plans:
 | 10. Equipment + Mobile Polish | v2.0 | 0/1 | Not started | - |
 | 11. Phase 10A — Vehicle Card DB | v2.0 | 2/2 | Complete | 2026-03-07 |
 | 12. Phase 10B — Suppliers + MOT API | v2.0 | 2/2 | Complete | 2026-03-07 |
+| 13. Phase 10C — Vehicle Server Actions + Shared Components | v2.0 | 2/2 | Complete | 2026-03-07 |
 
 ## Coverage
 
@@ -195,8 +196,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 13-01-PLAN.md — Vehicle types file (vehicle-types.ts) + complete vehicle CRUD server actions (vehicles.ts — 21 functions)
-- [ ] 13-02-PLAN.md — Shared fleet component extraction (FleetDateInput, AlertToggle, ExpiryIndicator, FleetFilePreview, FleetUploadZone) + VehicleFitnessLight
+- [x] 13-01-PLAN.md — Vehicle types file (vehicle-types.ts) + complete vehicle CRUD server actions (vehicles.ts — 21 functions)
+- [x] 13-02-PLAN.md — Shared fleet component extraction (FleetDateInput, AlertToggle, ExpiryIndicator, FleetFilePreview, FleetUploadZone) + VehicleFitnessLight
 
 ### Phase 14: Phase 10E — VehicleCard Tabs 4-8 (Assignment, Costs, Documents, Notes, KM placeholder)
 
@@ -219,4 +220,4 @@ Plans:
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-07 — Phase 12 complete*
+*Last updated: 2026-03-07 — Phase 13 complete*
