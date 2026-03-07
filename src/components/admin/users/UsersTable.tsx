@@ -18,6 +18,8 @@ import { useTransition } from 'react'
 import { Shield, Ban, CheckCircle, Trash2, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { softDeleteUser, blockUser, unblockUser } from '@/actions/users'
+import type { ActionWarning } from '@/lib/action-types'
+import { ErrorDetailDialog } from '@/components/ui/error-detail-dialog'
 import { UserForm } from '@/components/admin/users/UserForm'
 import { UserEditDialog } from '@/components/admin/users/UserEditDialog'
 import { UserPermissionMatrix } from '@/components/admin/users/UserPermissionMatrix'
@@ -99,6 +101,7 @@ export function UsersTable({ users, employees, linkedEmployeeIds, templates }: U
   const [blockTarget, setBlockTarget] = React.useState<UserWithDetails | null>(null)
   const [blocking, setBlocking] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState('')
+  const [pendingWarnings, setPendingWarnings] = React.useState<{ label: string; warnings: ActionWarning[] } | null>(null)
   const [, startTransition] = useTransition()
 
   // Client-side search filter
@@ -126,6 +129,9 @@ export function UsersTable({ users, employees, linkedEmployeeIds, templates }: U
       const result = await softDeleteUser(deleteTarget.id)
       if (result.success) {
         toast.success('היוזר נמחק בהצלחה')
+        if (result.warnings?.length) {
+          setPendingWarnings({ label: 'מחיקת יוזר', warnings: result.warnings })
+        }
       } else {
         toast.error(result.error ?? 'שגיאה במחיקת יוזר')
       }
@@ -353,6 +359,14 @@ export function UsersTable({ users, employees, linkedEmployeeIds, templates }: U
             ? `האם לבטל את חסימת "${blockTarget ? userName(blockTarget) : ''}"? היוזר יוכל להתחבר מחדש.`
             : `האם לחסום את "${blockTarget ? userName(blockTarget) : ''}"? היוזר לא יוכל להתחבר למערכת.`
         }
+      />
+
+      {/* Warnings dialog — surfaces non-fatal side-effect failures */}
+      <ErrorDetailDialog
+        open={!!pendingWarnings}
+        onOpenChange={(open) => { if (!open) setPendingWarnings(null) }}
+        actionLabel={pendingWarnings?.label ?? ''}
+        warnings={pendingWarnings?.warnings ?? []}
       />
     </div>
   )

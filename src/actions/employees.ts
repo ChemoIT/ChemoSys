@@ -359,9 +359,12 @@ async function parseExcelBufferAsync(
   return { rows, skippedRows }
 }
 
+import type { ActionWarning } from '@/lib/action-types'
+
 type ActionState = {
   success: boolean
   error?: Record<string, string[]>
+  warnings?: ActionWarning[]
 } | null
 
 // ---------------------------------------------------------------------------
@@ -586,9 +589,11 @@ export async function updateEmployee(
   // ── Propagation: sync email/phone changes to related tables ──────────
   const emailChanged = oldData && data && oldData.email !== data.email
   const phoneChanged = oldData && data && oldData.mobile_phone !== data.mobile_phone
+  const warnings: ActionWarning[] = []
 
-  if (emailChanged && data.email) {
-    // If employee has a linked user → update auth.users.email
+  if (data?.email) {
+    // Always sync email to auth.users when employee has a linked user.
+    // Not just on emailChanged — covers mismatches from previous failed syncs.
     const { data: linkedUser } = await supabase
       .from('users')
       .select('auth_user_id')
@@ -604,6 +609,11 @@ export async function updateEmployee(
       )
       if (authError) {
         console.error('[updateEmployee] Failed to sync auth email:', authError.message)
+        warnings.push({
+          context: 'סנכרון מייל ל-auth.users (יוזר מקושר)',
+          message: authError.message,
+          code: authError.code,
+        })
       }
     }
   }
@@ -615,7 +625,7 @@ export async function updateEmployee(
   }
 
   revalidatePath('/admin/employees')
-  return { success: true }
+  return { success: true, ...(warnings.length > 0 ? { warnings } : {}) }
 }
 
 // ---------------------------------------------------------------------------

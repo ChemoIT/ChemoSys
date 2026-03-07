@@ -23,6 +23,8 @@ import { useActionState, useEffect, useTransition } from 'react'
 import { Loader2, UserPlus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { createUser } from '@/actions/users'
+import type { ActionWarning } from '@/lib/action-types'
+import { ErrorDetailDialog } from '@/components/ui/error-detail-dialog'
 import { EmployeeSearchDialog } from '@/components/admin/users/EmployeeSearchDialog'
 import {
   Dialog,
@@ -39,7 +41,7 @@ import { Badge } from '@/components/ui/badge'
 // Types
 // ---------------------------------------------------------------------------
 
-type ActionState = { success: boolean; error?: Record<string, string[]> } | null
+type ActionState = { success: boolean; error?: Record<string, string[]>; warnings?: ActionWarning[] } | null
 
 type SelectedEmployee = {
   id: string
@@ -83,6 +85,7 @@ export function UserForm({
   const [email, setEmail] = React.useState('')
   const [templateId, setTemplateId] = React.useState('')
   const [, startTransition] = useTransition()
+  const [pendingWarnings, setPendingWarnings] = React.useState<ActionWarning[]>([])
 
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(
     createUser,
@@ -103,6 +106,9 @@ export function UserForm({
   useEffect(() => {
     if (state?.success) {
       toast.success('יוזר נוצר בהצלחה')
+      if (state.warnings?.length) {
+        setPendingWarnings(state.warnings)
+      }
       onOpenChange(false)
     }
   }, [state, onOpenChange])
@@ -321,6 +327,13 @@ export function UserForm({
         onSelect={handleEmployeeSelect}
         employees={employees}
         linkedEmployeeIds={linkedEmployeeIds}
+      />
+
+      <ErrorDetailDialog
+        open={pendingWarnings.length > 0}
+        onOpenChange={(open) => { if (!open) setPendingWarnings([]) }}
+        actionLabel="יצירת יוזר"
+        warnings={pendingWarnings}
       />
     </>
   )

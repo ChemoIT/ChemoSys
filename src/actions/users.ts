@@ -23,8 +23,10 @@ import { writeAuditLog } from '@/lib/audit'
 // Types
 // ---------------------------------------------------------------------------
 
-type ActionResult = { success: boolean; error?: Record<string, string[]> }
-type SimpleResult = { success: boolean; error?: string }
+import type { ActionWarning } from '@/lib/action-types'
+
+type ActionResult = { success: boolean; error?: Record<string, string[]>; warnings?: ActionWarning[] }
+type SimpleResult = { success: boolean; error?: string; warnings?: ActionWarning[] }
 
 // ---------------------------------------------------------------------------
 // createUser
@@ -115,11 +117,15 @@ export async function createUser(
   const appRows: Array<{ user_id: string; module_key: string; level: number; is_override: boolean; template_id: null }> = []
   if (appFleet) appRows.push({ user_id: newUser!.id, module_key: 'app_fleet', level: 1, is_override: true, template_id: null })
   if (appEquipment) appRows.push({ user_id: newUser!.id, module_key: 'app_equipment', level: 1, is_override: true, template_id: null })
+  const warnings: ActionWarning[] = []
   if (appRows.length > 0) {
     // Uses adminClient — permission writes are admin-only (00013 RLS policy)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: permError } = await (adminClient.from('user_permissions') as any).upsert(appRows, { onConflict: 'user_id,module_key' })
-    if (permError) console.error('[createUser] permission upsert failed:', permError.message)
+    if (permError) {
+      console.error('[createUser] permission upsert failed:', permError.message)
+      warnings.push({ context: 'שמירת הרשאות ChemoSys', message: permError.message, code: permError.code })
+    }
   }
 
   await writeAuditLog({
@@ -132,7 +138,7 @@ export async function createUser(
   })
 
   revalidatePath('/admin/users')
-  return { success: true }
+  return { success: true, ...(warnings.length > 0 ? { warnings } : {}) }
 }
 
 // ---------------------------------------------------------------------------
@@ -261,8 +267,8 @@ export async function softDeleteUser(id: string): Promise<SimpleResult> {
   // Phase 1: Soft-delete public.users
   // Uses adminClient to bypass RLS — the SELECT policy (deleted_at IS NULL)
   // conflicts with setting deleted_at, same reason all other soft-deletes use SECURITY DEFINER RPCs.
-  const { error: softDeleteError } = await adminClient
-    .from('users')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: softDeleteError } = await (adminClient.from('users') as any)
     .update({
       deleted_at: new Date().toISOString(),
       updated_by: session.userId,
@@ -275,13 +281,16 @@ export async function softDeleteUser(id: string): Promise<SimpleResult> {
 
   // Phase 2: Hard-delete auth.users to free the email
   const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(user.auth_user_id)
+  const warnings: ActionWarning[] = []
 
   if (authDeleteError) {
     // The soft-delete succeeded — log warning but don't fail.
     // The auth account is orphaned but the user is effectively disabled.
-    console.warn('[softDeleteUser] Failed to hard-delete auth user:', authDeleteError.message, {
-      userId: id,
-      authUserId: user.auth_user_id,
+    console.warn('[softDeleteUser] Failed to hard-delete auth user:', authDeleteError.message)
+    warnings.push({
+      context: 'מחיקת חשבון auth (שחרור מייל לשימוש חוזר)',
+      message: authDeleteError.message,
+      code: authDeleteError.code,
     })
   }
 
@@ -295,7 +304,7 @@ export async function softDeleteUser(id: string): Promise<SimpleResult> {
   })
 
   revalidatePath('/admin/users')
-  return { success: true }
+  return { success: true, ...(warnings.length > 0 ? { warnings } : {}) }
 }
 
 // ---------------------------------------------------------------------------

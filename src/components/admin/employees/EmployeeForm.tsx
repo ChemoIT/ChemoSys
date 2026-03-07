@@ -21,6 +21,8 @@ import { format, parse } from 'date-fns'
 import { he } from 'date-fns/locale'
 import type { Company, Department, Employee, RoleTag } from '@/types/entities'
 import { createEmployee, updateEmployee, updateLockedFields } from '@/actions/employees'
+import type { ActionWarning } from '@/lib/action-types'
+import { ErrorDetailDialog } from '@/components/ui/error-detail-dialog'
 import { RoleTagMultiSelect } from './RoleTagMultiSelect'
 import { createClient as createBrowserClient } from '@/lib/supabase/browser'
 import {
@@ -52,6 +54,7 @@ interface EmployeeFormProps {
 type ActionState = {
   success: boolean
   error?: Record<string, string[]>
+  warnings?: ActionWarning[]
 } | null
 
 // ---------------------------------------------------------------------------
@@ -411,10 +414,16 @@ export function EmployeeForm({
     setLockedFields((employee as Record<string, unknown>)?.locked_fields as string[] ?? [])
   }, [employee])
 
+  // Warnings dialog state
+  const [pendingWarnings, setPendingWarnings] = useState<ActionWarning[]>([])
+
   // Close on success + notify parent to refresh data (fixes stale photo_url)
   useEffect(() => {
     if (state?.success) {
       onSaved?.()
+      if (state.warnings?.length) {
+        setPendingWarnings(state.warnings)
+      }
       onOpenChange(false)
     }
   }, [state, onOpenChange, onSaved])
@@ -488,6 +497,7 @@ export function EmployeeForm({
   }
 
   return (
+  <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col overflow-hidden p-0">
         <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
@@ -860,5 +870,13 @@ export function EmployeeForm({
         </form>
       </DialogContent>
     </Dialog>
+
+    <ErrorDetailDialog
+      open={pendingWarnings.length > 0}
+      onOpenChange={(open) => { if (!open) setPendingWarnings([]) }}
+      actionLabel={employee ? 'עדכון עובד' : 'יצירת עובד'}
+      warnings={pendingWarnings}
+    />
+  </>
   )
 }
