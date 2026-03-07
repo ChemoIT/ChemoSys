@@ -1,0 +1,861 @@
+'use server'
+
+/**
+ * fleet/vehicles.ts — Server Actions for Fleet Vehicle Card module.
+ *
+ * Guard: ALL actions start with verifyAppUser() — ChemoSys employee-facing app.
+ * Pattern: verifyAppUser -> validate -> mutate DB -> revalidate
+ *
+ * Key behaviours:
+ *   - Vehicle card is created with license_plate + company_id (MOT sync fills the rest).
+ *   - Partial unique index on vehicles.license_plate (WHERE deleted_at IS NULL) —
+ *     allows soft-delete + plate reuse.
+ *   - vehicle_tests = INSERT always (not upsert) — test history accumulates over time.
+ *   - vehicle_insurance.supplier_id = FK to vehicle_suppliers — always joined on read.
+ *   - Soft-delete on all vehicle entities MUST use RPCs (never direct .update).
+ *   - MOT fields are READ-ONLY in this file — mot-sync.ts writes them exclusively.
+ *   - Storage bucket for vehicle files = 'fleet-vehicle-documents' (private).
+ *   - Fitness status (light) is computed client-side from expiry dates + threshold env vars.
+ */
+
+import { revalidatePath } from 'next/cache'
+import { createClient } from '@/lib/supabase/server'
+import { verifyAppUser } from '@/lib/dal'
+import type {
+  VehicleListItem,
+  VehicleFull,
+  VehicleTest,
+  VehicleInsurance,
+  VehicleDocument,
+  DriverOptionForAssignment,
+} from '@/lib/fleet/vehicle-types'
+
+// ─────────────────────────────────────────────────────────────
+// Shared result type
+// ─────────────────────────────────────────────────────────────
+
+export type ActionResult = {
+  success: boolean
+  error?: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// VEHICLE LIST
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns all vehicle cards with computed status and nearest expiry dates.
+ * Used by the vehicles list page.
+ */
+export async function getVehiclesList(): Promise<VehicleListItem[]> {
+  await verifyAppUser()
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('vehicles')
+    .select(`
+      id,
+      license_plate,
+      tozeret_nm,
+      degem_nm,
+      shnat_yitzur,
+      is_active,
+      companies ( name ),
+      drivers (
+        employees ( first_name, last_name )
+      ),
+      vehicle_tests ( expiry_date ),
+      vehicle_insurance ( expiry_date ),
+      vehicle_documents ( expiry_date )
+    `)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? []).map((row) => {
+    const company = (row.companies as unknown) as { name: string } | null
+    const driver = (row.drivers as unknown) as {
+      employees: { first_name: string; last_name: string } | null
+    } | null
+    const driverEmployee = driver?.employees ?? null
+
+    const tests = (row.vehicle_tests ?? []) as { expiry_date: string | null }[]
+    const insurance = (row.vehicle_insurance ?? []) as { expiry_date: string | null }[]
+    const docs = (row.vehicle_documents ?? []) as { expiry_date: string | null }[]
+
+    const testExpiries = tests.map((t) => t.expiry_date).filter(Boolean) as string[]
+    const insuranceExpiries = insurance.map((i) => i.expiry_date).filter(Boolean) as string[]
+    const docExpiries = docs.map((d) => d.expiry_date).filter(Boolean) as string[]
+
+    const computedStatus: 'active' | 'inactive' = row.is_active ? 'active' : 'inactive'
+
+    return {
+      id: row.id,
+      licensePlate: row.license_plate,
+      tozeret: row.tozeret_nm,
+      degem: row.degem_nm,
+      shnatYitzur: row.shnat_yitzur,
+      companyName: company?.name ?? null,
+      computedStatus,
+      assignedDriverName: driverEmployee
+        ? `${driverEmployee.first_name} ${driverEmployee.last_name}`
+        : null,
+      testExpiryDate: testExpiries.sort()[0] ?? null,
+      insuranceMinExpiry: insuranceExpiries.sort()[0] ?? null,
+      documentMinExpiry: docExpiries.sort()[0] ?? null,
+    }
+  })
+}
+
+// ─────────────────────────────────────────────────────────────
+// VEHICLE FULL (card)
+// ─────────────────────────────────────────────────────────────
+
+/** Returns full vehicle data including MOT fields + joined relations. */
+export async function getVehicleById(vehicleId: string): Promise<VehicleFull | null> {
+  await verifyAppUser()
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('vehicles')
+    .select(`
+      id,
+      license_plate,
+      tozeret_nm,
+      degem_nm,
+      kinuy_mishari,
+      shnat_yitzur,
+      tzeva_rechev,
+      sug_delek_nm,
+      misgeret,
+      degem_manoa,
+      ramat_gimur,
+      kvutzat_zihum,
+      baalut,
+      moed_aliya_lakvish,
+      mot_last_sync_at,
+      vehicle_type,
+      ownership_type,
+      company_id,
+      is_active,
+      assigned_driver_id,
+      notes,
+      companies ( name ),
+      drivers (
+        employees ( first_name, last_name )
+      ),
+      leasing:vehicle_suppliers!leasing_company_id ( name ),
+      insurance_co:vehicle_suppliers!insurance_company_id ( name ),
+      fuel_card:vehicle_suppliers!fuel_card_supplier_id ( name ),
+      garage:vehicle_suppliers!garage_id ( name ),
+      leasing_company_id,
+      insurance_company_id,
+      fuel_card_supplier_id,
+      garage_id
+    `)
+    .eq('id', vehicleId)
+    .is('deleted_at', null)
+    .single()
+
+  if (error || !data) return null
+
+  const company = (data.companies as unknown) as { name: string } | null
+  const driver = (data.drivers as unknown) as {
+    employees: { first_name: string; last_name: string } | null
+  } | null
+  const driverEmployee = driver?.employees ?? null
+
+  const leasing = (data.leasing as unknown) as { name: string } | null
+  const insuranceCo = (data.insurance_co as unknown) as { name: string } | null
+  const fuelCard = (data.fuel_card as unknown) as { name: string } | null
+  const garage = (data.garage as unknown) as { name: string } | null
+
+  const computedStatus: 'active' | 'inactive' = data.is_active ? 'active' : 'inactive'
+
+  return {
+    id: data.id,
+    licensePlate: data.license_plate,
+    tozoretNm: data.tozeret_nm,
+    degemNm: data.degem_nm,
+    kinuyMishari: data.kinuy_mishari,
+    shnatYitzur: data.shnat_yitzur,
+    tzevaRechev: data.tzeva_rechev,
+    sugDelekNm: data.sug_delek_nm,
+    misgeret: data.misgeret,
+    degemManoa: data.degem_manoa,
+    ramatGimur: data.ramat_gimur,
+    kvutzatZihum: data.kvutzat_zihum,
+    baalut: data.baalut,
+    moedAliyaLakvish: data.moed_aliya_lakvish,
+    motLastSyncAt: data.mot_last_sync_at,
+    vehicleType: data.vehicle_type,
+    ownershipType: data.ownership_type,
+    companyId: data.company_id,
+    companyName: company?.name ?? null,
+    isActive: data.is_active,
+    assignedDriverId: data.assigned_driver_id,
+    assignedDriverName: driverEmployee
+      ? `${driverEmployee.first_name} ${driverEmployee.last_name}`
+      : null,
+    notes: data.notes,
+    computedStatus,
+    leasingCompanyId: data.leasing_company_id,
+    leasingCompanyName: leasing?.name ?? null,
+    insuranceCompanyId: data.insurance_company_id,
+    insuranceCompanyName: insuranceCo?.name ?? null,
+    fuelCardSupplierId: data.fuel_card_supplier_id,
+    fuelCardSupplierName: fuelCard?.name ?? null,
+    garageId: data.garage_id,
+    garageName: garage?.name ?? null,
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// CREATE VEHICLE
+// ─────────────────────────────────────────────────────────────
+
+export async function createVehicle(
+  licensePlate: string,
+  companyId: string
+): Promise<ActionResult & { vehicleId?: string }> {
+  const { userId } = await verifyAppUser()
+  const supabase = await createClient()
+
+  const plate = licensePlate.trim().toUpperCase().replace(/\s+/g, '-')
+
+  if (!plate) return { success: false, error: 'מספר רישוי נדרש' }
+  if (!companyId) return { success: false, error: 'חברה נדרשת' }
+
+  // Guard: no existing active vehicle with this plate
+  const { data: existing } = await supabase
+    .from('vehicles')
+    .select('id')
+    .eq('license_plate', plate)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (existing) {
+    return { success: false, error: 'רכב עם מספר רישוי זה כבר קיים במערכת' }
+  }
+
+  const { data: vehicle, error } = await supabase
+    .from('vehicles')
+    .insert({
+      license_plate: plate,
+      company_id: companyId,
+      created_by: userId,
+      updated_by: userId,
+    })
+    .select('id')
+    .single()
+
+  if (error) return { success: false, error: 'שגיאה ביצירת כרטיס רכב' }
+
+  revalidatePath('/app/fleet/vehicle-card')
+  return { success: true, vehicleId: vehicle.id }
+}
+
+// ─────────────────────────────────────────────────────────────
+// UPDATE VEHICLE DETAILS
+// ─────────────────────────────────────────────────────────────
+
+export type UpdateVehicleInput = {
+  vehicleId: string
+  vehicleType?: string | null
+  ownershipType?: string | null
+  companyId?: string | null
+  isActive?: boolean
+  assignedDriverId?: string | null
+  notes?: string | null
+  leasingCompanyId?: string | null
+  insuranceCompanyId?: string | null
+  fuelCardSupplierId?: string | null
+  garageId?: string | null
+}
+
+/**
+ * Updates operational fields only.
+ * NEVER updates MOT fields — those are managed exclusively by mot-sync.ts.
+ */
+export async function updateVehicleDetails(input: UpdateVehicleInput): Promise<ActionResult> {
+  const { userId } = await verifyAppUser()
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('vehicles')
+    .update({
+      vehicle_type: input.vehicleType ?? null,
+      ownership_type: input.ownershipType ?? null,
+      company_id: input.companyId ?? null,
+      is_active: input.isActive ?? true,
+      assigned_driver_id: input.assignedDriverId ?? null,
+      notes: input.notes || null,
+      leasing_company_id: input.leasingCompanyId ?? null,
+      insurance_company_id: input.insuranceCompanyId ?? null,
+      fuel_card_supplier_id: input.fuelCardSupplierId ?? null,
+      garage_id: input.garageId ?? null,
+      updated_by: userId,
+    })
+    .eq('id', input.vehicleId)
+    .is('deleted_at', null)
+
+  if (error) return { success: false, error: 'שגיאה בשמירת פרטי הרכב' }
+
+  revalidatePath(`/app/fleet/vehicle-card/${input.vehicleId}`)
+  revalidatePath('/app/fleet/vehicle-card')
+  return { success: true }
+}
+
+// ─────────────────────────────────────────────────────────────
+// SOFT DELETE VEHICLE
+// ─────────────────────────────────────────────────────────────
+
+export async function softDeleteVehicle(vehicleId: string): Promise<ActionResult> {
+  const { userId } = await verifyAppUser()
+  const supabase = await createClient()
+
+  // Must use RPC — direct .update({ deleted_at }) fails due to PostgREST + RLS interaction
+  const { error } = await supabase.rpc('soft_delete_vehicle', {
+    p_id: vehicleId,
+    p_user_id: userId,
+  })
+
+  if (error) return { success: false, error: 'שגיאה במחיקת כרטיס הרכב' }
+
+  revalidatePath('/app/fleet/vehicle-card')
+  revalidatePath(`/app/fleet/vehicle-card/${vehicleId}`)
+  return { success: true }
+}
+
+// ─────────────────────────────────────────────────────────────
+// DELETE VEHICLE WITH ADMIN PASSWORD
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Verifies the admin delete password then soft-deletes the vehicle.
+ * Password is compared server-side against FLEET_ADMIN_PASSWORD in .env.local.
+ * SECURITY: verifyAppUser() + env-based password — never exposed to client.
+ */
+export async function deleteVehicleWithPassword(
+  vehicleId: string,
+  password: string
+): Promise<ActionResult> {
+  await verifyAppUser()
+
+  const stored = process.env['FLEET_ADMIN_PASSWORD'] ?? ''
+  if (!stored) return { success: false, error: 'סיסמת מחיקה לא מוגדרת בהגדרות המערכת' }
+  if (password !== stored) return { success: false, error: 'סיסמה שגויה' }
+
+  return softDeleteVehicle(vehicleId)
+}
+
+// ─────────────────────────────────────────────────────────────
+// VEHICLE TESTS (טסטים)
+// ─────────────────────────────────────────────────────────────
+
+export async function getVehicleTests(vehicleId: string): Promise<VehicleTest[]> {
+  await verifyAppUser()
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('vehicle_tests')
+    .select('*')
+    .eq('vehicle_id', vehicleId)
+    .is('deleted_at', null)
+    .order('test_date', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? []).map((t) => ({
+    id: t.id,
+    vehicleId: t.vehicle_id,
+    testDate: t.test_date,
+    expiryDate: t.expiry_date,
+    passed: t.passed,
+    testStation: t.test_station,
+    cost: t.cost,
+    notes: t.notes,
+    fileUrl: t.file_url,
+    alertEnabled: t.alert_enabled ?? true,
+    createdAt: t.created_at,
+  }))
+}
+
+export type AddVehicleTestInput = {
+  vehicleId: string
+  testDate: string
+  expiryDate: string
+  passed?: boolean
+  testStation?: string | null
+  cost?: number | null
+  notes?: string | null
+  fileUrl?: string | null
+  alertEnabled?: boolean
+}
+
+/**
+ * INSERT always — vehicle test history accumulates.
+ * No upsert: each test event is a separate record (no unique constraint on vehicle_id+test_date).
+ */
+export async function addVehicleTest(
+  input: AddVehicleTestInput
+): Promise<ActionResult & { id?: string }> {
+  const { userId } = await verifyAppUser()
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('vehicle_tests')
+    .insert({
+      vehicle_id: input.vehicleId,
+      test_date: input.testDate,
+      expiry_date: input.expiryDate,
+      passed: input.passed ?? true,
+      test_station: input.testStation || null,
+      cost: input.cost ?? null,
+      notes: input.notes || null,
+      file_url: input.fileUrl ?? null,
+      alert_enabled: input.alertEnabled ?? true,
+      created_by: userId,
+      updated_by: userId,
+    })
+    .select('id')
+    .single()
+
+  if (error) return { success: false, error: 'שגיאה בהוספת הטסט' }
+
+  revalidatePath(`/app/fleet/vehicle-card/${input.vehicleId}`)
+  return { success: true, id: data.id }
+}
+
+export type UpdateVehicleTestInput = {
+  testId: string
+  vehicleId: string
+  testDate: string
+  expiryDate: string
+  passed?: boolean
+  testStation?: string | null
+  cost?: number | null
+  notes?: string | null
+  fileUrl?: string | null
+  alertEnabled?: boolean
+}
+
+export async function updateVehicleTest(input: UpdateVehicleTestInput): Promise<ActionResult> {
+  const { userId } = await verifyAppUser()
+  const supabase = await createClient()
+
+  const { error } = await supabase.rpc('update_vehicle_test', {
+    p_id: input.testId,
+    p_user_id: userId,
+    p_test_date: input.testDate,
+    p_expiry_date: input.expiryDate,
+    p_passed: input.passed ?? true,
+    p_test_station: input.testStation ?? null,
+    p_cost: input.cost ?? null,
+    p_notes: input.notes ?? null,
+    p_file_url: input.fileUrl ?? null,
+    p_alert_enabled: input.alertEnabled ?? true,
+  })
+
+  if (error) return { success: false, error: 'שגיאה בעדכון הטסט' }
+
+  revalidatePath(`/app/fleet/vehicle-card/${input.vehicleId}`)
+  return { success: true }
+}
+
+export async function deleteVehicleTest(testId: string, vehicleId: string): Promise<ActionResult> {
+  const { userId } = await verifyAppUser()
+  const supabase = await createClient()
+
+  // Must use RPC — direct .update({ deleted_at }) fails due to PostgREST + RLS interaction
+  const { error } = await supabase.rpc('soft_delete_vehicle_test', {
+    p_id: testId,
+    p_user_id: userId,
+  })
+
+  if (error) return { success: false, error: 'שגיאה במחיקת הטסט' }
+
+  revalidatePath(`/app/fleet/vehicle-card/${vehicleId}`)
+  return { success: true }
+}
+
+// ─────────────────────────────────────────────────────────────
+// VEHICLE INSURANCE (ביטוח)
+// ─────────────────────────────────────────────────────────────
+
+export async function getVehicleInsurance(vehicleId: string): Promise<VehicleInsurance[]> {
+  await verifyAppUser()
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('vehicle_insurance')
+    .select(`
+      id,
+      vehicle_id,
+      insurance_type,
+      policy_number,
+      supplier_id,
+      start_date,
+      expiry_date,
+      cost,
+      notes,
+      file_url,
+      alert_enabled,
+      created_at,
+      vehicle_suppliers ( name )
+    `)
+    .eq('vehicle_id', vehicleId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? []).map((i) => {
+    const supplier = (i.vehicle_suppliers as unknown) as { name: string } | null
+    return {
+      id: i.id,
+      vehicleId: i.vehicle_id,
+      insuranceType: i.insurance_type,
+      policyNumber: i.policy_number,
+      supplierId: i.supplier_id,
+      supplierName: supplier?.name ?? null,
+      startDate: i.start_date,
+      expiryDate: i.expiry_date,
+      cost: i.cost,
+      notes: i.notes,
+      fileUrl: i.file_url,
+      alertEnabled: i.alert_enabled ?? true,
+      createdAt: i.created_at,
+    }
+  })
+}
+
+export type AddVehicleInsuranceInput = {
+  vehicleId: string
+  insuranceType: 'mandatory' | 'comprehensive' | 'third_party'
+  policyNumber?: string | null
+  supplierId?: string | null
+  startDate?: string | null
+  expiryDate: string
+  cost?: number | null
+  notes?: string | null
+  fileUrl?: string | null
+  alertEnabled?: boolean
+}
+
+export async function addVehicleInsurance(
+  input: AddVehicleInsuranceInput
+): Promise<ActionResult & { id?: string }> {
+  const { userId } = await verifyAppUser()
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('vehicle_insurance')
+    .insert({
+      vehicle_id: input.vehicleId,
+      insurance_type: input.insuranceType,
+      policy_number: input.policyNumber || null,
+      supplier_id: input.supplierId ?? null,
+      start_date: input.startDate || null,
+      expiry_date: input.expiryDate,
+      cost: input.cost ?? null,
+      notes: input.notes || null,
+      file_url: input.fileUrl ?? null,
+      alert_enabled: input.alertEnabled ?? true,
+      created_by: userId,
+      updated_by: userId,
+    })
+    .select('id')
+    .single()
+
+  if (error) return { success: false, error: 'שגיאה בהוספת הביטוח' }
+
+  revalidatePath(`/app/fleet/vehicle-card/${input.vehicleId}`)
+  return { success: true, id: data.id }
+}
+
+export type UpdateVehicleInsuranceInput = {
+  insuranceId: string
+  vehicleId: string
+  insuranceType: 'mandatory' | 'comprehensive' | 'third_party'
+  policyNumber?: string | null
+  supplierId?: string | null
+  startDate?: string | null
+  expiryDate: string
+  cost?: number | null
+  notes?: string | null
+  fileUrl?: string | null
+  alertEnabled?: boolean
+}
+
+export async function updateVehicleInsurance(
+  input: UpdateVehicleInsuranceInput
+): Promise<ActionResult> {
+  const { userId } = await verifyAppUser()
+  const supabase = await createClient()
+
+  const { error } = await supabase.rpc('update_vehicle_insurance', {
+    p_id: input.insuranceId,
+    p_user_id: userId,
+    p_insurance_type: input.insuranceType,
+    p_policy_number: input.policyNumber ?? null,
+    p_supplier_id: input.supplierId ?? null,
+    p_start_date: input.startDate ?? null,
+    p_expiry_date: input.expiryDate,
+    p_cost: input.cost ?? null,
+    p_notes: input.notes ?? null,
+    p_file_url: input.fileUrl ?? null,
+    p_alert_enabled: input.alertEnabled ?? true,
+  })
+
+  if (error) return { success: false, error: 'שגיאה בעדכון הביטוח' }
+
+  revalidatePath(`/app/fleet/vehicle-card/${input.vehicleId}`)
+  return { success: true }
+}
+
+export async function deleteVehicleInsurance(
+  insuranceId: string,
+  vehicleId: string
+): Promise<ActionResult> {
+  const { userId } = await verifyAppUser()
+  const supabase = await createClient()
+
+  // Must use RPC — direct .update({ deleted_at }) fails due to PostgREST + RLS interaction
+  const { error } = await supabase.rpc('soft_delete_vehicle_insurance', {
+    p_id: insuranceId,
+    p_user_id: userId,
+  })
+
+  if (error) return { success: false, error: 'שגיאה במחיקת הביטוח' }
+
+  revalidatePath(`/app/fleet/vehicle-card/${vehicleId}`)
+  return { success: true }
+}
+
+// ─────────────────────────────────────────────────────────────
+// VEHICLE DOCUMENTS
+// ─────────────────────────────────────────────────────────────
+
+export async function getVehicleDocuments(vehicleId: string): Promise<VehicleDocument[]> {
+  await verifyAppUser()
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('vehicle_documents')
+    .select('*')
+    .eq('vehicle_id', vehicleId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? []).map((d) => ({
+    id: d.id,
+    vehicleId: d.vehicle_id,
+    documentName: d.document_name,
+    fileUrl: d.file_url,
+    expiryDate: d.expiry_date,
+    alertEnabled: d.alert_enabled ?? false,
+    notes: d.notes,
+    createdAt: d.created_at,
+  }))
+}
+
+export type AddVehicleDocumentInput = {
+  vehicleId: string
+  documentName: string
+  fileUrl?: string | null
+  expiryDate?: string | null
+  alertEnabled?: boolean
+  notes?: string | null
+}
+
+export async function addVehicleDocument(
+  input: AddVehicleDocumentInput
+): Promise<ActionResult & { id?: string }> {
+  const { userId } = await verifyAppUser()
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('vehicle_documents')
+    .insert({
+      vehicle_id: input.vehicleId,
+      document_name: input.documentName.trim(),
+      file_url: input.fileUrl ?? null,
+      expiry_date: input.expiryDate || null,
+      alert_enabled: input.alertEnabled ?? false,
+      notes: input.notes || null,
+      created_by: userId,
+      updated_by: userId,
+    })
+    .select('id')
+    .single()
+
+  if (error) return { success: false, error: 'שגיאה בהוספת המסמך' }
+
+  // Upsert document name for autocomplete suggestions (fire-and-forget)
+  void supabase.rpc('increment_vehicle_document_name_usage', {
+    p_name: input.documentName.trim(),
+  })
+
+  revalidatePath(`/app/fleet/vehicle-card/${input.vehicleId}`)
+  return { success: true, id: data.id }
+}
+
+export type UpdateVehicleDocumentInput = {
+  docId: string
+  vehicleId: string
+  documentName: string
+  fileUrl?: string | null
+  expiryDate?: string | null
+  alertEnabled?: boolean
+  notes?: string | null
+}
+
+export async function updateVehicleDocument(
+  input: UpdateVehicleDocumentInput
+): Promise<ActionResult> {
+  const { userId } = await verifyAppUser()
+  const supabase = await createClient()
+
+  // Use RPC to bypass RLS interaction on UPDATE
+  const { error } = await supabase.rpc('update_vehicle_document', {
+    p_id: input.docId,
+    p_user_id: userId,
+    p_document_name: input.documentName.trim(),
+    p_file_url: input.fileUrl ?? null,
+    p_expiry_date: input.expiryDate || null,
+    p_alert_enabled: input.alertEnabled ?? false,
+    p_notes: input.notes ?? null,
+  })
+
+  if (error) return { success: false, error: 'שגיאה בעדכון המסמך' }
+
+  revalidatePath(`/app/fleet/vehicle-card/${input.vehicleId}`)
+  return { success: true }
+}
+
+export async function deleteVehicleDocument(
+  docId: string,
+  vehicleId: string
+): Promise<ActionResult> {
+  const { userId } = await verifyAppUser()
+  const supabase = await createClient()
+
+  // Must use RPC — direct .update({ deleted_at }) fails due to PostgREST + RLS interaction
+  // Note: storage file is NOT deleted here — deferred cleanup (soft-delete pattern)
+  const { error } = await supabase.rpc('soft_delete_vehicle_document', {
+    p_id: docId,
+    p_user_id: userId,
+  })
+
+  if (error) return { success: false, error: 'שגיאה במחיקת המסמך' }
+
+  revalidatePath(`/app/fleet/vehicle-card/${vehicleId}`)
+  return { success: true }
+}
+
+// ─────────────────────────────────────────────────────────────
+// VEHICLE DOCUMENT NAME AUTOCOMPLETE
+// ─────────────────────────────────────────────────────────────
+
+export async function getVehicleDocumentNameSuggestions(query: string): Promise<string[]> {
+  await verifyAppUser()
+  const supabase = await createClient()
+
+  if (!query.trim()) {
+    // Return most frequently used names when no query
+    const { data } = await supabase
+      .from('vehicle_document_names')
+      .select('name')
+      .order('usage_count', { ascending: false })
+      .limit(10)
+    return (data ?? []).map((d) => d.name)
+  }
+
+  const { data } = await supabase
+    .from('vehicle_document_names')
+    .select('name')
+    .ilike('name', `%${query}%`)
+    .order('usage_count', { ascending: false })
+    .limit(10)
+
+  return (data ?? []).map((d) => d.name)
+}
+
+// ─────────────────────────────────────────────────────────────
+// DRIVER ASSIGNMENT
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns active drivers (with active employees) for the assignment dropdown.
+ * Filters: driver card not deleted + employee status active + employee not deleted.
+ */
+export async function getActiveDriversForAssignment(): Promise<DriverOptionForAssignment[]> {
+  await verifyAppUser()
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('drivers')
+    .select(`
+      id,
+      employees!inner (
+        first_name,
+        last_name,
+        status,
+        deleted_at
+      )
+    `)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? [])
+    .filter((row) => {
+      const emp = (row.employees as unknown) as {
+        status: string
+        deleted_at: string | null
+      }
+      return emp.status === 'active' && emp.deleted_at === null
+    })
+    .map((row) => {
+      const emp = (row.employees as unknown) as {
+        first_name: string
+        last_name: string
+      }
+      return {
+        id: row.id,
+        fullName: `${emp.first_name} ${emp.last_name}`,
+      }
+    })
+}
+
+/**
+ * Assigns or unassigns a driver to/from a vehicle.
+ * Pass null as driverId to unassign.
+ */
+export async function assignDriverToVehicle(
+  vehicleId: string,
+  driverId: string | null
+): Promise<ActionResult> {
+  const { userId } = await verifyAppUser()
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('vehicles')
+    .update({
+      assigned_driver_id: driverId,
+      updated_by: userId,
+    })
+    .eq('id', vehicleId)
+    .is('deleted_at', null)
+
+  if (error) return { success: false, error: 'שגיאה בשיוך הנהג לרכב' }
+
+  revalidatePath(`/app/fleet/vehicle-card/${vehicleId}`)
+  revalidatePath('/app/fleet/vehicle-card')
+  return { success: true }
+}
