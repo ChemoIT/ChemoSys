@@ -5,15 +5,15 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** v2.0 — Phase 15 (10F) IN PROGRESS. Plan 01 (server actions + AddVehicleDialog) complete.
+**Current focus:** v2.0 — Phase 15 partially done. Vehicle Card Redesign planned (Phases 16-19). Full requirements in vehicle-card-redesign-requirements.md.
 
 ## Current Position
 
-Phase: 15 (Phase 10F) — 1/? plans complete
-Status: **בביצוע** — Phase 15 Plan 01 DONE. MOT lookup action + AddVehicleDialog built.
-Last activity: 2026-03-07 — Session #35 (execute-phase 15, plan 01)
+Phase: 15 (Phase 10F) — 1/2 plans complete (15-02 paused — redesign supersedes)
+Status: **Vehicle Card Redesign** — Phases 16-19 added to ROADMAP. Phase 16 (DB migration) is next.
+Last activity: 2026-03-07 — Session #35 (execute-phase 15 partial + redesign requirements gathering)
 
-Progress: v2.0 [█████████████████████████░] Phase 15 Plan 01 DONE — Plan 02 next
+Progress: v2.0 [████████████████████░░░░░] Phase 15 partial — Phases 16-19 planned
 
 ## Strategic Decision (Session #18)
 

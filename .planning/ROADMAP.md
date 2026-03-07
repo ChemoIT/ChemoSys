@@ -163,6 +163,11 @@ Plans:
 | 12. Phase 10B — Suppliers + MOT API | v2.0 | 2/2 | Complete | 2026-03-07 |
 | 13. Phase 10C — Vehicle Server Actions + Shared Components | v2.0 | 2/2 | Complete | 2026-03-07 |
 | 14. Phase 10E — VehicleCard Full UI (8 Tabs) | v2.0 | 2/2 | Complete | 2026-03-07 |
+| 15. Phase 10F — VehicleList + AddVehicleDialog | v2.0 | 1/2 | In progress | - |
+| 16. Vehicle Card Redesign — DB Migration | v2.0 | 0/? | Not started | - |
+| 17. Vehicle Card Redesign — Details + Images + Replacement | v2.0 | 0/? | Not started | - |
+| 18. Vehicle Card Redesign — Ownership + Licensing & Insurance | v2.0 | 0/? | Not started | - |
+| 19. Vehicle Card Redesign — Assignment (צמידות) + Documents | v2.0 | 0/? | Not started | - |
 
 ## Coverage
 
@@ -217,10 +222,38 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 15-01-PLAN.md — Server action prep (lookupVehicleFromMot + fix mot-sync guards + getCompaniesForSelect) + AddVehicleDialog two-step component
+- [x] 15-01-PLAN.md — Server action prep (lookupVehicleFromMot + fix mot-sync guards + getCompaniesForSelect) + AddVehicleDialog two-step component
 - [ ] 15-02-PLAN.md — VehicleList component (mirrors DriverList) + page routes (vehicle-card/page.tsx + [id]/page.tsx) + visual verification
+
+### Phase 16: Vehicle Card Redesign — DB Migration
+
+**Goal:** מיגרציית DB מלאה לעיצוב מחדש של כרטיס רכב — שדות חדשים ב-vehicles (סטטוס, סוג, תאריך יציאה, קטגוריה, בעלות), טבלאות חדשות (תמונות, רכב חלופי, כרטיסי תדלוק, יומני נהגים/פרויקטים/עלויות), storage bucket לתמונות, וסוג ownership ב-vehicle_suppliers.
+**Depends on:** Phase 15
+**Requirements doc:** [vehicle-card-redesign-requirements.md](vehicle-card-redesign-requirements.md)
+**Plans:** TBD
+
+### Phase 17: Vehicle Card Redesign — Details Tab + Images + Replacement Vehicle
+
+**Goal:** טאב פרטי רכב מחודש — גלריית תמונות (עד 5), סוג רכב, סטטוס רכב עם נעילת כרטיס אוטומטית, תאריך יציאה מהצי, דיאלוג ניהול רכב חלופי מלא (כניסה/יציאה/כרטיסי תדלוק/סיבה). תיקון AddVehicleDialog (הסרת בחירת חברה).
+**Depends on:** Phase 16
+**Requirements doc:** [vehicle-card-redesign-requirements.md](vehicle-card-redesign-requirements.md)
+**Plans:** TBD
+
+### Phase 18: Vehicle Card Redesign — Ownership Tab + Licensing & Insurance Tab
+
+**Goal:** טאב בעלות חדש (תצורת רכב, ספק בעלות מ-vehicle_suppliers, מספר חוזה, PDF חוזה, יומן עלויות חודשיות, קבוצת רכב) + טאב רישוי וביטוח מאוחד (2 חלקים זהים עם PDF, תפוגה, והתראה).
+**Depends on:** Phase 16
+**Requirements doc:** [vehicle-card-redesign-requirements.md](vehicle-card-redesign-requirements.md)
+**Plans:** TBD
+
+### Phase 19: Vehicle Card Redesign — Assignment Tab (צמידות) + Documents + Cleanup
+
+**Goal:** טאב צמידות מחודש — קטגוריית רכב (מחנה/צמוד), אחראי רכב, יומן פעילות לנהגים, יומן פעילות לפרויקטים. טאב מסמכים (העתקה מכרטיס נהג). הסרת טאב עלויות. VehicleCard shell update (7 טאבים במקום 8).
+**Depends on:** Phase 16
+**Requirements doc:** [vehicle-card-redesign-requirements.md](vehicle-card-redesign-requirements.md)
+**Plans:** TBD
 
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-07 — Phase 14 executed*
+*Last updated: 2026-03-07 — Phases 16-19 added (Vehicle Card Redesign)*
