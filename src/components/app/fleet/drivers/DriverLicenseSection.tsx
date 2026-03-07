@@ -13,16 +13,16 @@
 
 import { useState, useTransition, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save, Upload, X, Camera, Bell, Image } from 'lucide-react'
+import { Loader2, Save, Upload, X, Camera, Image } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
 import { createClient as createBrowserClient } from '@/lib/supabase/browser'
 import { upsertDriverLicense, type DriverLicense } from '@/actions/fleet/drivers'
 import { formatDate, daysUntil } from '@/lib/format'
-import { FleetDateInput } from './FleetDateInput'
+import { FleetDateInput } from '../shared/FleetDateInput'
+import { AlertToggle } from '../shared/AlertToggle'
 
 // All valid Israeli license categories
 const LICENSE_CATEGORIES = ['A1', 'A2', 'A', 'B', 'C1', 'C', 'D1', 'D2', 'D3', 'D', 'M', 'N']
@@ -36,27 +36,6 @@ type Props = {
 }
 
 // formatDate, daysUntil — imported from @/lib/format
-
-// ── Alert Toggle (shadcn Switch — dir="ltr" to fix RTL slide direction) ──────
-
-function AlertToggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <div className="flex items-center gap-2.5 shrink-0" dir="ltr">
-      <Switch
-        checked={checked}
-        onCheckedChange={onChange}
-        className="data-[state=checked]:bg-[#4ECDC4]"
-      />
-      <span
-        dir="rtl"
-        className={`text-xs flex items-center gap-1 transition-colors ${checked ? 'text-amber-600 font-medium' : 'text-muted-foreground'}`}
-      >
-        <Bell className="h-3.5 w-3.5" />
-        {label}
-      </span>
-    </div>
-  )
-}
 
 // ── Image Upload Zone ────────────────────────────────────────
 

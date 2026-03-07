@@ -5,6 +5,9 @@ import { useState, useEffect } from 'react'
 /**
  * FleetDateInput — three-select date picker in dd/mm/yyyy order.
  *
+ * Shared component — used by driver sections (documents, license, violations)
+ * and will be used by vehicle sections in Phase 14+.
+ *
  * Props:
  *   value    — yyyy-mm-dd string (DB format) or ''
  *   onChange  — emits yyyy-mm-dd when all three fields are filled, '' when cleared

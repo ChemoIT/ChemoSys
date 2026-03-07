@@ -15,13 +15,12 @@
 import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import {
-  Loader2, Plus, Trash2, Upload, FileText, X, AlertCircle, Camera,
-  Eye, Pencil, Bell, Save,
+  Loader2, Plus, Trash2, FileText, AlertCircle,
+  Bell, Pencil, Save,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { createClient as createBrowserClient } from '@/lib/supabase/browser'
 import {
   addDriverDocument,
@@ -30,176 +29,17 @@ import {
   getDocumentNameSuggestions,
   type DriverDocument,
 } from '@/actions/fleet/drivers'
-import { formatDate, daysUntil } from '@/lib/format'
-import { FleetDateInput } from './FleetDateInput'
+import { daysUntil } from '@/lib/format'
+import { FleetDateInput } from '../shared/FleetDateInput'
+import { AlertToggle } from '../shared/AlertToggle'
+import { ExpiryIndicator } from '../shared/ExpiryIndicator'
+import { FleetUploadZone } from '../shared/FleetUploadZone'
 
 type Props = {
   driverId: string
   documents: DriverDocument[]
   docYellowDays: number
   onEditingChange?: (isEditing: boolean) => void
-}
-
-// formatDate, daysUntil — imported from @/lib/format
-
-function ExpiryIndicator({ expiryDate, yellowDays }: { expiryDate: string | null; yellowDays: number }) {
-  if (!expiryDate) return <span className="text-muted-foreground text-xs">ללא תוקף</span>
-  const days = daysUntil(expiryDate)
-  if (days === null) return null
-  const dateStr = formatDate(expiryDate)
-  const color = days < 0 ? 'text-red-600' : days <= yellowDays ? 'text-yellow-600' : 'text-green-600'
-  return (
-    <div className={`text-xs ${color}`}>
-      {dateStr}
-      <span className="ms-1">
-        ({days < 0 ? `פג לפני ${Math.abs(days)} ימים` : `${days} ימים`})
-      </span>
-    </div>
-  )
-}
-
-// ── Toggle Switch (same as DriverLicenseSection) ─────────────────────────────
-
-function AlertToggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <div className="flex items-center gap-2.5 shrink-0" dir="ltr">
-      <Switch
-        checked={checked}
-        onCheckedChange={onChange}
-        className="data-[state=checked]:bg-[#4ECDC4]"
-      />
-      <span
-        dir="rtl"
-        className={`text-xs flex items-center gap-1 transition-colors ${checked ? 'text-amber-600 font-medium' : 'text-muted-foreground'}`}
-      >
-        <Bell className="h-3.5 w-3.5" />
-        {label}
-      </span>
-    </div>
-  )
-}
-
-// ── File Preview ─────────────────────────────────────────────────────────────
-
-function FilePreview({ url, onClear }: { url: string; onClear: () => void }) {
-  const isPdf = url.toLowerCase().includes('.pdf')
-
-  return (
-    <div className="relative border rounded-xl overflow-hidden bg-muted/10">
-      {isPdf ? (
-        /* PDF: styled card — iframe blocked by signed URL CSP */
-        <div className="flex flex-col items-center justify-center gap-3 py-8">
-          <div
-            className="w-14 h-14 rounded-xl flex items-center justify-center"
-            style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}
-          >
-            <FileText className="h-7 w-7 text-red-500" />
-          </div>
-          <span className="text-xs text-muted-foreground">PDF הועלה בהצלחה</span>
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-primary bg-primary/8 hover:bg-primary/15 transition-colors"
-          >
-            <Eye className="h-3.5 w-3.5" />
-            פתח לצפייה
-          </a>
-        </div>
-      ) : (
-        /* Image: show inline */
-        <img src={url} alt="תצוגה מקדימה" className="w-full h-56 object-contain" />
-      )}
-      <div className="absolute top-2 left-2 flex gap-1.5">
-        {!isPdf && (
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-background/90 backdrop-blur-sm rounded-full p-1.5 hover:bg-background shadow-sm transition-colors"
-            title="פתח בחלון חדש"
-          >
-            <Eye className="h-3.5 w-3.5 text-primary" />
-          </a>
-        )}
-        <button
-          onClick={onClear}
-          className="bg-background/90 backdrop-blur-sm rounded-full p-1.5 hover:bg-background shadow-sm transition-colors"
-          title="הסר קובץ"
-        >
-          <X className="h-3.5 w-3.5 text-destructive" />
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ── Upload Zone ──────────────────────────────────────────────────────────────
-
-function UploadZone({
-  fileUrl,
-  uploading,
-  dragging,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onFileClick,
-  onCameraClick,
-  onClear,
-}: {
-  fileUrl: string
-  uploading: boolean
-  dragging: boolean
-  onDragOver: (e: React.DragEvent) => void
-  onDragLeave: () => void
-  onDrop: (e: React.DragEvent) => void
-  onFileClick: () => void
-  onCameraClick: () => void
-  onClear: () => void
-}) {
-  if (fileUrl) {
-    return <FilePreview url={fileUrl} onClear={onClear} />
-  }
-
-  return (
-    <div
-      className={`border-2 border-dashed rounded-xl p-4 transition-colors ${
-        dragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
-      }`}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-    >
-      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-        {uploading ? (
-          <Loader2 className="h-6 w-6 animate-spin" />
-        ) : (
-          <>
-            <FileText className="h-6 w-6" />
-            <span className="text-xs">{dragging ? 'שחרר כאן...' : 'גרור קובץ לכאן'}</span>
-          </>
-        )}
-      </div>
-      {!uploading && (
-        <div className="flex justify-center gap-3 mt-3">
-          <button
-            onClick={onFileClick}
-            className="flex items-center justify-center h-10 w-10 rounded-lg border border-border bg-background hover:bg-muted transition-colors"
-            title="העלה מהמחשב"
-          >
-            <Upload className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <button
-            onClick={onCameraClick}
-            className="flex items-center justify-center h-10 w-10 rounded-lg border border-border bg-background hover:bg-muted transition-colors"
-            title="סרוק / צלם"
-          >
-            <Camera className="h-4 w-4 text-muted-foreground" />
-          </button>
-        </div>
-      )}
-    </div>
-  )
 }
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -486,7 +326,7 @@ export function DriverDocumentsSection({ driverId, documents: initialDocs, docYe
         {/* File upload with preview */}
         <div className="space-y-1.5">
           <Label>קובץ (PDF/תמונה)</Label>
-          <UploadZone
+          <FleetUploadZone
             fileUrl={fileUrl}
             uploading={uploading}
             dragging={dragging}
