@@ -47,6 +47,10 @@ import { VehicleFitnessLight } from '@/components/app/fleet/shared/VehicleFitnes
 import { VehicleDetailsSection } from './VehicleDetailsSection'
 import { VehicleTestsSection } from './VehicleTestsSection'
 import { VehicleInsuranceSection } from './VehicleInsuranceSection'
+import { VehicleAssignmentSection } from './VehicleAssignmentSection'
+import { VehicleCostsSection } from './VehicleCostsSection'
+import { VehicleDocumentsSection } from './VehicleDocumentsSection'
+import { VehicleNotesSection } from './VehicleNotesSection'
 import { deleteVehicleWithPassword } from '@/actions/fleet/vehicles'
 import { formatLicensePlate } from '@/lib/format'
 import type {
@@ -71,25 +75,6 @@ type VehicleCardProps = {
   testExpiryDate: string | null
   insuranceMinExpiry: string | null
   documentMinExpiry: string | null
-}
-
-// ─────────────────────────────────────────────────────────────
-// PlaceholderTab — for tabs 4-8 (populated in Plan 14-02)
-// ─────────────────────────────────────────────────────────────
-
-function PlaceholderTab({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
-  return (
-    <div className="bg-white border-x border-b rounded-b-2xl py-12 text-center" style={{ borderColor: '#E2EBF4' }}>
-      <div
-        className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3"
-        style={{ background: '#F0F5FB', border: '1px solid #E2EBF4' }}
-      >
-        <Icon className="h-6 w-6 text-muted-foreground/35" />
-      </div>
-      <p className="text-sm font-semibold text-muted-foreground">{label}</p>
-      <p className="text-xs text-muted-foreground/50 mt-0.5">פיתוח עתידי</p>
-    </div>
-  )
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -405,29 +390,74 @@ export function VehicleCard({
           </div>
         </TabsContent>
 
-        {/* ══ Tab 4 — שיוך נהג (placeholder — Plan 14-02) ═══ */}
+        {/* ══ Tab 4 — שיוך נהג ═══════════════════════════════ */}
         <TabsContent value="assignment" className="mt-0">
-          <PlaceholderTab icon={User} label="שיוך נהג" />
+          <div
+            dir="rtl"
+            className="bg-white border-x border-b rounded-b-2xl p-5"
+            style={{ borderColor: '#E2EBF4' }}
+          >
+            <VehicleAssignmentSection
+              vehicleId={vehicle.id}
+              assignedDriverId={vehicle.assignedDriverId}
+              assignedDriverName={vehicle.assignedDriverName}
+            />
+          </div>
         </TabsContent>
 
-        {/* ══ Tab 5 — עלויות (placeholder — Plan 14-02) ══════ */}
+        {/* ══ Tab 5 — עלויות (Coming Soon) ════════════════════ */}
         <TabsContent value="costs" className="mt-0">
-          <PlaceholderTab icon={DollarSign} label="עלויות" />
+          <VehicleCostsSection />
         </TabsContent>
 
-        {/* ══ Tab 6 — מסמכים (placeholder — Plan 14-02) ══════ */}
+        {/* ══ Tab 6 — מסמכים ══════════════════════════════════ */}
         <TabsContent value="documents" className="mt-0">
-          <PlaceholderTab icon={Paperclip} label="מסמכים" />
+          <div
+            dir="rtl"
+            className="bg-white border-x border-b rounded-b-2xl p-5"
+            style={{ borderColor: '#E2EBF4' }}
+          >
+            <VehicleDocumentsSection
+              vehicleId={vehicle.id}
+              documents={documents}
+              docYellowDays={docYellowDays}
+              onEditingChange={onDocumentsEditingChange}
+            />
+          </div>
         </TabsContent>
 
-        {/* ══ Tab 7 — הערות (placeholder — Plan 14-02) ═══════ */}
+        {/* ══ Tab 7 — הערות ═══════════════════════════════════ */}
         <TabsContent value="notes" className="mt-0">
-          <PlaceholderTab icon={FileText} label="הערות" />
+          <div
+            dir="rtl"
+            className="bg-white border-x border-b rounded-b-2xl p-5"
+            style={{ borderColor: '#E2EBF4' }}
+          >
+            <VehicleNotesSection
+              vehicleId={vehicle.id}
+              notes={vehicle.notes}
+              onEditingChange={onNotesEditingChange}
+            />
+          </div>
         </TabsContent>
 
-        {/* ══ Tab 8 — ק"מ (placeholder — Plan 14-02) ══════════ */}
+        {/* ══ Tab 8 — ק"מ (Coming Soon) ════════════════════════ */}
         <TabsContent value="km" className="mt-0">
-          <PlaceholderTab icon={Gauge} label='ק"מ' />
+          <div dir="rtl">
+            <div
+              className="bg-white border-x border-b rounded-b-2xl py-12 text-center"
+              style={{ borderColor: '#E2EBF4' }}
+            >
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3"
+                style={{ background: '#F0F5FB', border: '1px solid #E2EBF4' }}
+              >
+                <Gauge className="h-6 w-6 text-muted-foreground/35" />
+              </div>
+              <p className="text-sm font-semibold text-muted-foreground">פיתוח עתידי</p>
+              <p className="text-xs text-muted-foreground/50 mt-0.5">מעקב קילומטראז׳ ייפתח בגרסה הבאה</p>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 
