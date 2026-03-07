@@ -13,6 +13,10 @@
  * null (non-mobile), we store the raw value with non-digit chars stripped.
  *
  * Soft-delete: MUST use RPC `soft_delete_vehicle_supplier` — never direct UPDATE.
+ *
+ * NOTE: Types and constants (VehicleSupplier, SUPPLIER_TYPE_LABELS) live in
+ * @/lib/fleet/supplier-types — 'use server' files can ONLY export async functions.
+ * We re-export them from there for convenience.
  */
 
 import { revalidatePath } from 'next/cache'
@@ -20,31 +24,14 @@ import { createClient } from '@/lib/supabase/server'
 import { verifySession } from '@/lib/dal'
 import { writeAuditLog } from '@/lib/audit'
 import { normalizePhone } from '@/lib/format'
+import {
+  SUPPLIER_TYPE_LABELS,
+  type VehicleSupplier,
+} from '@/lib/fleet/supplier-types'
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export type VehicleSupplier = {
-  id: string
-  supplier_type: string
-  name: string
-  contact_name: string | null
-  phone: string | null
-  email: string | null
-  address: string | null
-  notes: string | null
-  is_active: boolean
-  created_at: string
-}
-
-export const SUPPLIER_TYPE_LABELS: Record<string, string> = {
-  leasing:   'חברת ליסינג',
-  insurance: 'חברת ביטוח',
-  fuel_card: 'ספק כרטיס דלק',
-  garage:    'מוסך',
-  other:     'אחר',
-}
+// Re-export for consumers who import from this file
+export type { VehicleSupplier } from '@/lib/fleet/supplier-types'
+export { SUPPLIER_TYPE_LABELS } from '@/lib/fleet/supplier-types'
 
 const VALID_SUPPLIER_TYPES = Object.keys(SUPPLIER_TYPE_LABELS)
 

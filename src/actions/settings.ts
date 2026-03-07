@@ -71,6 +71,10 @@ export type FleetSettingsData = {
   licenseRedDays: number      // FLEET_LICENSE_RED_DAYS
   documentYellowDays: number  // FLEET_DOCUMENT_YELLOW_DAYS
   documentRedDays: number     // FLEET_DOCUMENT_RED_DAYS
+  testYellowDays: number      // FLEET_TEST_YELLOW_DAYS
+  testRedDays: number         // FLEET_TEST_RED_DAYS
+  insuranceYellowDays: number // FLEET_INSURANCE_YELLOW_DAYS
+  insuranceRedDays: number    // FLEET_INSURANCE_RED_DAYS
   hasSavedAdminPassword: boolean // FLEET_ADMIN_PASSWORD is set
   adminPassword: string       // actual value (admin-only page, safe to display)
 }
@@ -162,10 +166,14 @@ export async function getIntegrationSettings(): Promise<IntegrationSettings> {
       hasSavedPassword: Boolean(env['EMAIL_PASSWORD']),
     },
     fleet: {
-      licenseYellowDays: parseInt(env['FLEET_LICENSE_YELLOW_DAYS'] ?? '60', 10),
-      licenseRedDays:    parseInt(env['FLEET_LICENSE_RED_DAYS']    ?? '30', 10),
-      documentYellowDays: parseInt(env['FLEET_DOCUMENT_YELLOW_DAYS'] ?? '60', 10),
-      documentRedDays:    parseInt(env['FLEET_DOCUMENT_RED_DAYS']    ?? '30', 10),
+      licenseYellowDays:   parseInt(env['FLEET_LICENSE_YELLOW_DAYS']   ?? '60', 10),
+      licenseRedDays:      parseInt(env['FLEET_LICENSE_RED_DAYS']       ?? '30', 10),
+      documentYellowDays:  parseInt(env['FLEET_DOCUMENT_YELLOW_DAYS']   ?? '60', 10),
+      documentRedDays:     parseInt(env['FLEET_DOCUMENT_RED_DAYS']      ?? '30', 10),
+      testYellowDays:      parseInt(env['FLEET_TEST_YELLOW_DAYS']       ?? '60', 10),
+      testRedDays:         parseInt(env['FLEET_TEST_RED_DAYS']          ?? '30', 10),
+      insuranceYellowDays: parseInt(env['FLEET_INSURANCE_YELLOW_DAYS']  ?? '60', 10),
+      insuranceRedDays:    parseInt(env['FLEET_INSURANCE_RED_DAYS']     ?? '30', 10),
       hasSavedAdminPassword: Boolean(env['FLEET_ADMIN_PASSWORD']),
       adminPassword: env['FLEET_ADMIN_PASSWORD'] ?? '',
     },
@@ -223,11 +231,15 @@ const ENV_KEY_MAP: Record<IntegrationType, Record<string, string>> = {
     fromName: 'EMAIL_FROM_NAME',
   },
   fleet: {
-    licenseYellowDays:  'FLEET_LICENSE_YELLOW_DAYS',
-    licenseRedDays:     'FLEET_LICENSE_RED_DAYS',
-    documentYellowDays: 'FLEET_DOCUMENT_YELLOW_DAYS',
-    documentRedDays:    'FLEET_DOCUMENT_RED_DAYS',
-    adminPassword:      'FLEET_ADMIN_PASSWORD',
+    licenseYellowDays:   'FLEET_LICENSE_YELLOW_DAYS',
+    licenseRedDays:      'FLEET_LICENSE_RED_DAYS',
+    documentYellowDays:  'FLEET_DOCUMENT_YELLOW_DAYS',
+    documentRedDays:     'FLEET_DOCUMENT_RED_DAYS',
+    testYellowDays:      'FLEET_TEST_YELLOW_DAYS',
+    testRedDays:         'FLEET_TEST_RED_DAYS',
+    insuranceYellowDays: 'FLEET_INSURANCE_YELLOW_DAYS',
+    insuranceRedDays:    'FLEET_INSURANCE_RED_DAYS',
+    adminPassword:       'FLEET_ADMIN_PASSWORD',
   },
 }
 
