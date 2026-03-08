@@ -170,7 +170,16 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
       ownership_supplier_id,
       contract_number,
       contract_file_url,
-      vehicle_group
+      vehicle_group,
+      toll_road_permits,
+      weekend_holiday_permit,
+      pascal_number,
+      service_interval_km,
+      service_interval_alert,
+      annual_km_limit,
+      annual_km_limit_alert,
+      monthly_fuel_limit_liters,
+      monthly_fuel_limit_alert
     `)
     .eq('id', vehicleId)
     .is('deleted_at', null)
@@ -241,6 +250,15 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
     contractNumber: data.contract_number,
     contractFileUrl: data.contract_file_url,
     vehicleGroup: data.vehicle_group,
+    tollRoadPermits: data.toll_road_permits ?? [],
+    weekendHolidayPermit: data.weekend_holiday_permit ?? false,
+    pascalNumber: data.pascal_number ?? null,
+    serviceIntervalKm: data.service_interval_km ?? null,
+    serviceIntervalAlert: data.service_interval_alert ?? false,
+    annualKmLimit: data.annual_km_limit ?? null,
+    annualKmLimitAlert: data.annual_km_limit_alert ?? false,
+    monthlyFuelLimitLiters: data.monthly_fuel_limit_liters ?? null,
+    monthlyFuelLimitAlert: data.monthly_fuel_limit_alert ?? false,
   }
 }
 
@@ -316,6 +334,16 @@ export type UpdateVehicleInput = {
   contractNumber?: string | null
   contractFileUrl?: string | null
   vehicleGroup?: number | null
+  // Permits & limits (migration 00031)
+  tollRoadPermits?: string[]
+  weekendHolidayPermit?: boolean
+  pascalNumber?: string | null
+  serviceIntervalKm?: number | null
+  serviceIntervalAlert?: boolean
+  annualKmLimit?: number | null
+  annualKmLimitAlert?: boolean
+  monthlyFuelLimitLiters?: number | null
+  monthlyFuelLimitAlert?: boolean
 }
 
 /**
@@ -359,6 +387,16 @@ export async function updateVehicleDetails(input: UpdateVehicleInput): Promise<A
   if (input.contractNumber !== undefined) updateObj.contract_number = input.contractNumber
   if (input.contractFileUrl !== undefined) updateObj.contract_file_url = input.contractFileUrl
   if (input.vehicleGroup !== undefined) updateObj.vehicle_group = input.vehicleGroup
+  // Permits & limits (migration 00031)
+  if (input.tollRoadPermits !== undefined) updateObj.toll_road_permits = input.tollRoadPermits
+  if (input.weekendHolidayPermit !== undefined) updateObj.weekend_holiday_permit = input.weekendHolidayPermit
+  if (input.pascalNumber !== undefined) updateObj.pascal_number = input.pascalNumber || null
+  if (input.serviceIntervalKm !== undefined) updateObj.service_interval_km = input.serviceIntervalKm
+  if (input.serviceIntervalAlert !== undefined) updateObj.service_interval_alert = input.serviceIntervalAlert
+  if (input.annualKmLimit !== undefined) updateObj.annual_km_limit = input.annualKmLimit
+  if (input.annualKmLimitAlert !== undefined) updateObj.annual_km_limit_alert = input.annualKmLimitAlert
+  if (input.monthlyFuelLimitLiters !== undefined) updateObj.monthly_fuel_limit_liters = input.monthlyFuelLimitLiters
+  if (input.monthlyFuelLimitAlert !== undefined) updateObj.monthly_fuel_limit_alert = input.monthlyFuelLimitAlert
 
   const { error } = await supabase
     .from('vehicles')

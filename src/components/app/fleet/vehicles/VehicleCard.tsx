@@ -2,7 +2,7 @@
 
 /**
  * VehicleCard — tabs layout for the vehicle card page.
- * Tabs: פרטי הרכב | בעלות | רישוי וביטוח | צמידות | מסמכים | הערות | ק"מ (7 tabs)
+ * Tabs: פרטי הרכב | חוזה | צמידות | אשרות והגבלים | מסמכים | הערות | ק"מ | מוסך (8 tabs)
  *
  * Mirrors DriverCard.tsx pattern:
  *  - Header: avatar (plate chars), license plate, vehicle info, status badge, fitness light
@@ -30,6 +30,8 @@ import {
   X,
   Lock,
   AlertTriangle,
+  ShieldCheck,
+  Wrench,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -46,6 +48,7 @@ import { VehicleContractSection } from './VehicleContractSection'
 import { VehicleAssignmentSection } from './VehicleAssignmentSection'
 import { VehicleDocumentsSection } from './VehicleDocumentsSection'
 import { VehicleNotesSection } from './VehicleNotesSection'
+import { VehiclePermitsSection } from './VehiclePermitsSection'
 import { deleteVehicleWithPassword } from '@/actions/fleet/vehicles'
 import { formatLicensePlate } from '@/lib/format'
 import {
@@ -121,14 +124,19 @@ export function VehicleCard({
   const onAssignmentEditingChange = useCallback((dirty: boolean) => {
     dirtyStates.current.assignment = dirty
   }, [])
+  const onPermitsEditingChange = useCallback((dirty: boolean) => {
+    dirtyStates.current.permits = dirty
+  }, [])
 
   const TAB_LABELS: Record<string, string> = {
     details:    'פרטי הרכב',
     contract:   'חוזה',
     assignment: 'צמידות',
+    permits:    'אשרות והגבלים',
     documents:  'מסמכים',
     notes:      'הערות',
     km:         'ק"מ',
+    garage:     'מוסך',
   }
 
   /** Check if the current tab has unsaved changes */
@@ -332,9 +340,11 @@ export function VehicleCard({
               { value: 'details',    label: 'פרטי הרכב',    icon: Car },
               { value: 'contract',   label: 'חוזה',          icon: FileSignature },
               { value: 'assignment', label: 'צמידות',        icon: Shuffle },
+              { value: 'permits',    label: 'אשרות והגבלים', icon: ShieldCheck },
               { value: 'documents',  label: 'מסמכים',        icon: Paperclip },
               { value: 'notes',      label: 'הערות',         icon: FileText },
               { value: 'km',         label: 'ק"מ',            icon: Gauge },
+              { value: 'garage',     label: 'מוסך',          icon: Wrench },
             ].map(({ value, label, icon: Icon }) => (
               <TabsTrigger
                 key={value}
@@ -398,6 +408,20 @@ export function VehicleCard({
           </div>
         </TabsContent>
 
+        {/* ══ Tab — אשרות והגבלים ══════════════════════════════ */}
+        <TabsContent value="permits" className="mt-0">
+          <div
+            dir="rtl"
+            className="bg-white border-x border-b rounded-b-2xl p-6 md:p-8"
+            style={{ borderColor: '#E2EBF4' }}
+          >
+            <VehiclePermitsSection
+              vehicle={vehicle}
+              onEditingChange={onPermitsEditingChange}
+            />
+          </div>
+        </TabsContent>
+
         {/* ══ Tab 5 — מסמכים ══════════════════════════════════ */}
         <TabsContent value="documents" className="mt-0">
           <div
@@ -429,7 +453,7 @@ export function VehicleCard({
           </div>
         </TabsContent>
 
-        {/* ══ Tab 7 — ק"מ (Coming Soon) ════════════════════════ */}
+        {/* ══ Tab — ק"מ (Coming Soon) ════════════════════════ */}
         <TabsContent value="km" className="mt-0">
           <div dir="rtl">
             <div
@@ -444,6 +468,25 @@ export function VehicleCard({
               </div>
               <p className="text-sm font-semibold text-muted-foreground">פיתוח עתידי</p>
               <p className="text-xs text-muted-foreground/50 mt-0.5">מעקב קילומטראז׳ ייפתח בגרסה הבאה</p>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ══ Tab — מוסך (Coming Soon) ════════════════════════ */}
+        <TabsContent value="garage" className="mt-0">
+          <div dir="rtl">
+            <div
+              className="bg-white border-x border-b rounded-b-2xl py-12 text-center"
+              style={{ borderColor: '#E2EBF4' }}
+            >
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3"
+                style={{ background: '#F0F5FB', border: '1px solid #E2EBF4' }}
+              >
+                <Wrench className="h-6 w-6 text-muted-foreground/35" />
+              </div>
+              <p className="text-sm font-semibold text-muted-foreground">פיתוח עתידי</p>
+              <p className="text-xs text-muted-foreground/50 mt-0.5">ניהול מוסך ייפתח בגרסה הבאה</p>
             </div>
           </div>
         </TabsContent>

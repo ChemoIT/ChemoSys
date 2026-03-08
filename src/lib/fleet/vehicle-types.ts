@@ -136,6 +136,17 @@ export type VehicleFull = {
   contractNumber: string | null         // contract reference number
   contractFileUrl: string | null        // signed URL for contract PDF (migration 00029)
   vehicleGroup: number | null           // 1-7
+
+  // Permits & limits (migration 00031)
+  tollRoadPermits: string[]             // ['kvish6','hotzefon','carmel','nativ']
+  weekendHolidayPermit: boolean
+  pascalNumber: string | null
+  serviceIntervalKm: number | null
+  serviceIntervalAlert: boolean
+  annualKmLimit: number | null
+  annualKmLimitAlert: boolean
+  monthlyFuelLimitLiters: number | null
+  monthlyFuelLimitAlert: boolean
 }
 
 // ─────────────────────────────────────────────────────────────
