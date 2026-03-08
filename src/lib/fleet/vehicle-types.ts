@@ -286,6 +286,7 @@ export type VehicleProjectJournal = {
   projectId: string
   projectName: string        // joined from projects
   projectNumber: string      // joined from projects
+  projectManagerName: string | null  // joined projects → employees (PM)
   startDate: string          // yyyy-mm-dd
   endDate: string | null     // null = currently active
   createdAt: string

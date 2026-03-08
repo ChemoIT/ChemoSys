@@ -1076,7 +1076,7 @@ export async function getVehicleProjectJournal(vehicleId: string): Promise<Vehic
     .from('vehicle_project_journal')
     .select(`
       id, vehicle_id, project_id, start_date, end_date, created_at,
-      projects ( name, project_number )
+      projects ( name, project_number, project_manager:employees!project_manager_id ( first_name, last_name ) )
     `)
     .eq('vehicle_id', vehicleId)
     .order('start_date', { ascending: false })
@@ -1084,13 +1084,16 @@ export async function getVehicleProjectJournal(vehicleId: string): Promise<Vehic
   return (data ?? []).map((row) => {
     const project = (row.projects as unknown) as {
       name: string; project_number: string
+      project_manager: { first_name: string; last_name: string } | null
     } | null
+    const pm = project?.project_manager
     return {
       id: row.id,
       vehicleId: row.vehicle_id,
       projectId: row.project_id,
       projectName: project?.name ?? '—',
       projectNumber: project?.project_number ?? '',
+      projectManagerName: pm ? `${pm.first_name} ${pm.last_name}`.trim() : null,
       startDate: row.start_date,
       endDate: row.end_date,
       createdAt: row.created_at,

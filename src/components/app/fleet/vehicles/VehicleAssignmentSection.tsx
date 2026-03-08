@@ -3,14 +3,13 @@
 /**
  * VehicleAssignmentSection — Tab 4: צמידות (Vehicle Assignment).
  *
- * Sections (top to bottom, RTL):
- *  1. Vehicle category selector (מחנה / צמוד נהג) — auto-save on change
- *  2. Camp responsible sub-form — shown only when vehicleCategory === 'camp'
- *     • אחראי כללי של הפרויקט | אחראי רכב אחר
- *     • Name + Phone inputs when "אחראי רכב אחר" selected
- *     • Dirty tracking via onEditingChange — triggers unsaved Dialog in VehicleCard
- *  3. Driver activity journal — history table + inline assign/end form
- *  4. Project activity journal — history table + inline assign/end form
+ * Two-column RTL grid (mirrors VehicleContractSection layout):
+ *   Right column:
+ *     1. Vehicle category selector (מחנה / צמוד נהג) — auto-save on change
+ *     2. Camp responsible sub-form — shown only when vehicleCategory === 'camp'
+ *     3. Driver activity journal — history table + inline assign/end form
+ *   Left column:
+ *     4. Project activity journal — history table + inline assign/end form
  *
  * Design rules:
  *  - dir="rtl" on outermost div
@@ -84,6 +83,17 @@ function CurrentBadge() {
     </span>
   )
 }
+
+// ─────────────────────────────────────────────────────────────
+// Shared styles
+// ─────────────────────────────────────────────────────────────
+
+const sectionCard = 'bg-[#F0F5FB] border border-[#C8D5E2] rounded-xl p-4'
+const sectionHeader = 'text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2'
+const selectClass =
+  'flex-1 min-w-[180px] border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right'
+const inputClass =
+  'w-full border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right'
 
 // ─────────────────────────────────────────────────────────────
 // Main Component
@@ -279,509 +289,527 @@ export function VehicleAssignmentSection({
   }
 
   // ─────────────────────────────────────────────────────────
-  // Shared styles
-  // ─────────────────────────────────────────────────────────
-
-  const sectionCard = 'bg-[#F0F5FB] border border-[#C8D5E2] rounded-xl p-4'
-  const sectionHeader = 'text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2'
-  const selectClass =
-    'flex-1 min-w-[180px] border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right'
-  const inputClass =
-    'w-full border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right'
-
-  // ─────────────────────────────────────────────────────────
-  // Render
+  // Render — two-column grid like VehicleContractSection
   // ─────────────────────────────────────────────────────────
 
   return (
-    <div dir="rtl" className="space-y-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-0">
 
-      {/* ══ 1. Vehicle Category Selector ════════════════════════════════ */}
-      <div>
-        <h3 className={sectionHeader}>
-          <Shuffle className="h-4 w-4" />
-          קטגוריית רכב
-        </h3>
+      {/* ═══════════════════════════════════════════════════════ */}
+      {/* RIGHT COLUMN — Category + Camp Responsible + Drivers   */}
+      {/* ═══════════════════════════════════════════════════════ */}
+      <div dir="rtl" className="space-y-6">
 
-        <div className="flex gap-3 flex-wrap">
-          {(['camp', 'assigned'] as const).map((cat) => {
-            const label = cat === 'camp' ? 'רכב מחנה' : 'רכב צמוד נהג'
-            const active = category === cat
-            return (
-              <button
-                key={cat}
-                type="button"
-                disabled={isSavingCategory}
-                onClick={() => handleCategoryChange(cat)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all"
-                style={{
-                  background: active ? 'linear-gradient(135deg, #4ECDC4, #3ABFB6)' : '#F8FAFB',
-                  borderColor: active ? '#3ABFB6' : '#C8D5E2',
-                  color: active ? '#fff' : '#374151',
-                  boxShadow: active ? '0 2px 8px rgba(78,205,196,0.3)' : 'none',
-                }}
-              >
-                {isSavingCategory && category === cat ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Shuffle className="h-4 w-4" />
-                )}
-                {label}
-              </button>
-            )
-          })}
-
-          {!category && (
-            <p className="text-xs text-muted-foreground self-center">
-              לא הוגדרה קטגוריה — בחר אחת מהאפשרויות לעיל
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* ══ 2. Camp Responsible Sub-form ════════════════════════════════ */}
-      {category === 'camp' && (
-        <div className={sectionCard}>
-          <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-            <User className="h-4 w-4 text-primary" />
-            אחראי רכב
+        {/* ══ 1. Vehicle Category Selector ══════════════════════ */}
+        <div>
+          <h3 className={sectionHeader}>
+            <Shuffle className="h-4 w-4" />
+            קטגוריית רכב
           </h3>
 
-          {/* Camp type radio */}
-          <div className="flex flex-col gap-3 mb-4">
-            {(
-              [
-                { value: 'project_manager', label: 'אחראי כללי של הפרויקט' },
-                { value: 'other',           label: 'אחראי רכב אחר' },
-              ] as { value: 'project_manager' | 'other'; label: string }[]
-            ).map(({ value, label }) => (
-              <label
-                key={value}
-                className="flex items-center gap-3 cursor-pointer select-none"
-              >
-                <input
-                  type="radio"
-                  name="campType"
-                  value={value}
-                  checked={campType === value}
-                  onChange={() => setCampType(value)}
-                  className="h-4 w-4 accent-primary"
-                />
-                <span className="text-sm text-foreground">{label}</span>
-              </label>
-            ))}
-          </div>
+          <div className="flex gap-3 flex-wrap">
+            {(['camp', 'assigned'] as const).map((cat) => {
+              const label = cat === 'camp' ? 'רכב מחנה' : 'רכב צמוד נהג'
+              const active = category === cat
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  disabled={isSavingCategory}
+                  onClick={() => handleCategoryChange(cat)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all"
+                  style={{
+                    background: active ? 'linear-gradient(135deg, #4ECDC4, #3ABFB6)' : '#F8FAFB',
+                    borderColor: active ? '#3ABFB6' : '#C8D5E2',
+                    color: active ? '#fff' : '#374151',
+                    boxShadow: active ? '0 2px 8px rgba(78,205,196,0.3)' : 'none',
+                  }}
+                >
+                  {isSavingCategory && category === cat ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Shuffle className="h-4 w-4" />
+                  )}
+                  {label}
+                </button>
+              )
+            })}
 
-          {/* "Other" fields */}
-          {campType === 'other' && (
-            <div className="space-y-3 mb-4">
-              <div>
-                <label className="text-xs text-muted-foreground block mb-1">שם האחראי</label>
-                <input
-                  type="text"
-                  value={campName}
-                  onChange={(e) => setCampName(e.target.value)}
-                  placeholder="שם מלא..."
-                  className={inputClass}
-                  style={{ borderColor: '#C8D5E2' }}
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground block mb-1 flex items-center gap-1.5">
-                  <Phone className="h-3.5 w-3.5" />
-                  טלפון נייד
+            {!category && (
+              <p className="text-xs text-muted-foreground self-center">
+                לא הוגדרה קטגוריה — בחר אחת מהאפשרויות לעיל
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* ══ 2. Camp Responsible Sub-form ═══════════════════════ */}
+        {category === 'camp' && (
+          <div className={sectionCard}>
+            <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+              <User className="h-4 w-4 text-primary" />
+              אחראי רכב
+            </h3>
+
+            {/* Camp type radio */}
+            <div className="flex flex-col gap-3 mb-4">
+              {(
+                [
+                  { value: 'project_manager', label: 'אחראי כללי של הפרויקט' },
+                  { value: 'other',           label: 'אחראי רכב אחר' },
+                ] as { value: 'project_manager' | 'other'; label: string }[]
+              ).map(({ value, label }) => (
+                <label
+                  key={value}
+                  className="flex items-center gap-3 cursor-pointer select-none"
+                >
+                  <input
+                    type="radio"
+                    name="campType"
+                    value={value}
+                    checked={campType === value}
+                    onChange={() => setCampType(value)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  <span className="text-sm text-foreground">{label}</span>
                 </label>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  value={campPhone}
-                  onChange={(e) => setCampPhone(e.target.value)}
-                  placeholder="05x-xxxxxxx"
-                  className={inputClass}
-                  style={{ borderColor: '#C8D5E2' }}
-                  dir="ltr"
-                />
-                {campPhone && formatPhone(campPhone) && (
-                  <p className="text-xs text-muted-foreground mt-0.5 text-left" dir="ltr">
-                    {formatPhone(campPhone)}
+              ))}
+            </div>
+
+            {/* Show PM name from active project when project_manager selected */}
+            {campType === 'project_manager' && activeProjectEntry && (
+              <div
+                className="flex items-center gap-2 p-3 rounded-lg border mb-4"
+                style={{ background: '#F8FAFB', borderColor: '#E2EBF4' }}
+              >
+                <User className="h-4 w-4 text-primary shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">אחראי פרויקט {activeProjectEntry.projectName}:</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {activeProjectEntry.projectManagerName ?? 'לא הוגדר אחראי'}
                   </p>
-                )}
+                </div>
               </div>
+            )}
+
+            {/* "Other" fields */}
+            {campType === 'other' && (
+              <div className="space-y-3 mb-4">
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">שם האחראי</label>
+                  <input
+                    type="text"
+                    value={campName}
+                    onChange={(e) => setCampName(e.target.value)}
+                    placeholder="שם מלא..."
+                    className={inputClass}
+                    style={{ borderColor: '#C8D5E2' }}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1 flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5" />
+                    טלפון נייד
+                  </label>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    value={campPhone}
+                    onChange={(e) => setCampPhone(e.target.value)}
+                    placeholder="05x-xxxxxxx"
+                    className={inputClass}
+                    style={{ borderColor: '#C8D5E2' }}
+                    dir="ltr"
+                  />
+                  {campPhone && formatPhone(campPhone) && (
+                    <p className="text-xs text-muted-foreground mt-0.5 text-left" dir="ltr">
+                      {formatPhone(campPhone)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Save button */}
+            <Button
+              onClick={handleSaveCamp}
+              disabled={!campDirty || isSavingCamp}
+              className="gap-2"
+              style={{
+                background: campDirty
+                  ? 'linear-gradient(135deg, #4ECDC4, #3ABFB6)'
+                  : undefined,
+                border: 'none',
+              }}
+            >
+              {isSavingCamp ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              שמור
+            </Button>
+          </div>
+        )}
+
+        {/* ══ 3. Driver Activity Journal ═════════════════════════ */}
+        <div>
+          <h3 className={sectionHeader}>
+            <Users className="h-4 w-4" />
+            יומן נהגים
+          </h3>
+
+          {/* Current driver card */}
+          {activeDriverEntry ? (
+            <div
+              className="flex items-center justify-between gap-3 p-3 rounded-xl border mb-3"
+              style={{ background: '#F0F5FB', borderColor: '#C8D5E2' }}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #152D3C, #1E3D50)' }}
+                >
+                  <Users className="h-4 w-4 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    {activeDriverEntry.driverName ?? 'נהג לא ידוע'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    משויך מ-{formatDate(activeDriverEntry.startDate)}
+                  </p>
+                </div>
+              </div>
+              <CurrentBadge />
+            </div>
+          ) : (
+            <div
+              className="p-3 rounded-xl border mb-3 text-center"
+              style={{ borderColor: '#E2EBF4', borderStyle: 'dashed' }}
+            >
+              <p className="text-sm text-muted-foreground">אין נהג משויך כרגע</p>
             </div>
           )}
 
-          {/* Save button */}
-          <Button
-            onClick={handleSaveCamp}
-            disabled={!campDirty || isSavingCamp}
-            className="gap-2"
-            style={{
-              background: campDirty
-                ? 'linear-gradient(135deg, #4ECDC4, #3ABFB6)'
-                : undefined,
-              border: 'none',
-            }}
+          {/* Open/close inline form */}
+          <button
+            type="button"
+            onClick={() => showDriverForm ? setShowDriverForm(false) : openDriverForm()}
+            className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors mb-3"
           >
-            {isSavingCamp ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            שמור
-          </Button>
+            {showDriverForm ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            שינוי נהג
+          </button>
+
+          {/* Inline driver form */}
+          {showDriverForm && (
+            <div
+              className="rounded-xl border p-4 mb-3 space-y-3"
+              style={{ background: '#FAFCFF', borderColor: '#C8D5E2' }}
+            >
+              {loadingDrivers ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  טוען נהגים...
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">בחר נהג</label>
+                    <select
+                      value={selectedDriverId}
+                      onChange={(e) => setSelectedDriverId(e.target.value)}
+                      className={selectClass}
+                      style={{ borderColor: '#C8D5E2' }}
+                      disabled={isAssigningDriver}
+                    >
+                      <option value="">בחר נהג...</option>
+                      {drivers.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.fullName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">תאריך התחלה</label>
+                    <FleetDateInput
+                      value={driverStartDate}
+                      onChange={setDriverStartDate}
+                      maxYear={new Date().getFullYear() + 1}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      onClick={handleAssignDriver}
+                      disabled={isAssigningDriver || !selectedDriverId || !driverStartDate}
+                      size="sm"
+                      className="gap-1.5"
+                      style={{
+                        background: selectedDriverId && driverStartDate
+                          ? 'linear-gradient(135deg, #4ECDC4, #3ABFB6)'
+                          : undefined,
+                        border: 'none',
+                      }}
+                    >
+                      {isAssigningDriver ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Users className="h-3.5 w-3.5" />
+                      )}
+                      שייך
+                    </Button>
+
+                    {activeDriverEntry && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleEndDriver}
+                        disabled={isEndingDriver}
+                        className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+                      >
+                        {isEndingDriver ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : null}
+                        סיים שיוך
+                      </Button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Driver journal table */}
+          {driverJournal.length > 0 ? (
+            <div className="rounded-xl border overflow-hidden" style={{ borderColor: '#C8D5E2' }}>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-xs text-muted-foreground" style={{ background: '#F8FAFB', borderColor: '#E2EBF4' }}>
+                    <th className="px-3 py-2 text-right font-semibold">שם נהג</th>
+                    <th className="px-3 py-2 text-right font-semibold">תאריך התחלה</th>
+                    <th className="px-3 py-2 text-right font-semibold">תאריך סיום</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {driverJournal.map((entry, idx) => (
+                    <tr
+                      key={entry.id}
+                      className="border-b last:border-b-0"
+                      style={{ borderColor: '#F0F5FB', background: idx % 2 === 0 ? '#fff' : '#FAFCFF' }}
+                    >
+                      <td className="px-3 py-2 font-medium">
+                        {entry.driverName ?? '—'}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {formatDate(entry.startDate)}
+                      </td>
+                      <td className="px-3 py-2">
+                        {entry.endDate ? (
+                          <span className="text-muted-foreground">{formatDate(entry.endDate)}</span>
+                        ) : (
+                          <CurrentBadge />
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div
+              className="p-4 rounded-xl border text-center"
+              style={{ borderColor: '#E2EBF4', borderStyle: 'dashed' }}
+            >
+              <p className="text-sm text-muted-foreground">אין שיוכי נהגים</p>
+            </div>
+          )}
         </div>
-      )}
 
-      {/* ══ 3. Driver Activity Journal ══════════════════════════════════ */}
-      <div>
-        <h3 className={sectionHeader}>
-          <Users className="h-4 w-4" />
-          יומן נהגים
-        </h3>
-
-        {/* Current driver card */}
-        {activeDriverEntry ? (
-          <div
-            className="flex items-center justify-between gap-3 p-3 rounded-xl border mb-3"
-            style={{ background: '#F0F5FB', borderColor: '#C8D5E2' }}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                style={{ background: 'linear-gradient(135deg, #152D3C, #1E3D50)' }}
-              >
-                <Users className="h-4 w-4 text-white" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground truncate">
-                  {activeDriverEntry.driverName ?? 'נהג לא ידוע'}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  משויך מ-{formatDate(activeDriverEntry.startDate)}
-                </p>
-              </div>
-            </div>
-            <CurrentBadge />
-          </div>
-        ) : (
-          <div
-            className="p-3 rounded-xl border mb-3 text-center"
-            style={{ borderColor: '#E2EBF4', borderStyle: 'dashed' }}
-          >
-            <p className="text-sm text-muted-foreground">אין נהג משויך כרגע</p>
-          </div>
-        )}
-
-        {/* Open/close inline form */}
-        <button
-          type="button"
-          onClick={() => showDriverForm ? setShowDriverForm(false) : openDriverForm()}
-          className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors mb-3"
-        >
-          {showDriverForm ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          שינוי נהג
-        </button>
-
-        {/* Inline driver form */}
-        {showDriverForm && (
-          <div
-            className="rounded-xl border p-4 mb-3 space-y-3"
-            style={{ background: '#FAFCFF', borderColor: '#C8D5E2' }}
-          >
-            {loadingDrivers ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                טוען נהגים...
-              </div>
-            ) : (
-              <>
-                <div>
-                  <label className="text-xs text-muted-foreground block mb-1">בחר נהג</label>
-                  <select
-                    value={selectedDriverId}
-                    onChange={(e) => setSelectedDriverId(e.target.value)}
-                    className={selectClass}
-                    style={{ borderColor: '#C8D5E2' }}
-                    disabled={isAssigningDriver}
-                  >
-                    <option value="">בחר נהג...</option>
-                    {drivers.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.fullName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs text-muted-foreground block mb-1">תאריך התחלה</label>
-                  <FleetDateInput
-                    value={driverStartDate}
-                    onChange={setDriverStartDate}
-                    maxYear={new Date().getFullYear() + 1}
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    onClick={handleAssignDriver}
-                    disabled={isAssigningDriver || !selectedDriverId || !driverStartDate}
-                    size="sm"
-                    className="gap-1.5"
-                    style={{
-                      background: selectedDriverId && driverStartDate
-                        ? 'linear-gradient(135deg, #4ECDC4, #3ABFB6)'
-                        : undefined,
-                      border: 'none',
-                    }}
-                  >
-                    {isAssigningDriver ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Users className="h-3.5 w-3.5" />
-                    )}
-                    שייך
-                  </Button>
-
-                  {activeDriverEntry && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleEndDriver}
-                      disabled={isEndingDriver}
-                      className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
-                    >
-                      {isEndingDriver ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : null}
-                      סיים שיוך
-                    </Button>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Driver journal table */}
-        {driverJournal.length > 0 ? (
-          <div className="rounded-xl border overflow-hidden" style={{ borderColor: '#C8D5E2' }}>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-xs text-muted-foreground" style={{ background: '#F8FAFB', borderColor: '#E2EBF4' }}>
-                  <th className="px-3 py-2 text-right font-semibold">שם נהג</th>
-                  <th className="px-3 py-2 text-right font-semibold">תאריך התחלה</th>
-                  <th className="px-3 py-2 text-right font-semibold">תאריך סיום</th>
-                </tr>
-              </thead>
-              <tbody>
-                {driverJournal.map((entry, idx) => (
-                  <tr
-                    key={entry.id}
-                    className="border-b last:border-b-0"
-                    style={{ borderColor: '#F0F5FB', background: idx % 2 === 0 ? '#fff' : '#FAFCFF' }}
-                  >
-                    <td className="px-3 py-2 font-medium">
-                      {entry.driverName ?? '—'}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground" dir="ltr">
-                      {formatDate(entry.startDate)}
-                    </td>
-                    <td className="px-3 py-2">
-                      {entry.endDate ? (
-                        <span className="text-muted-foreground" dir="ltr">{formatDate(entry.endDate)}</span>
-                      ) : (
-                        <CurrentBadge />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div
-            className="p-4 rounded-xl border text-center"
-            style={{ borderColor: '#E2EBF4', borderStyle: 'dashed' }}
-          >
-            <p className="text-sm text-muted-foreground">אין שיוכי נהגים</p>
-          </div>
-        )}
       </div>
 
-      {/* ══ 4. Project Activity Journal ═════════════════════════════════ */}
-      <div>
-        <h3 className={sectionHeader}>
-          <FolderKanban className="h-4 w-4" />
-          יומן פרויקטים
-        </h3>
+      {/* ═══════════════════════════════════════════════════════ */}
+      {/* LEFT COLUMN — Project Journal                          */}
+      {/* ═══════════════════════════════════════════════════════ */}
+      <div dir="rtl" className="space-y-6">
 
-        {/* Current project card */}
-        {activeProjectEntry ? (
-          <div
-            className="flex items-center justify-between gap-3 p-3 rounded-xl border mb-3"
-            style={{ background: '#F0F5FB', borderColor: '#C8D5E2' }}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                style={{ background: 'linear-gradient(135deg, #152D3C, #1E3D50)' }}
-              >
-                <FolderKanban className="h-4 w-4 text-white" />
+        {/* ══ 4. Project Activity Journal ═══════════════════════ */}
+        <div>
+          <h3 className={sectionHeader}>
+            <FolderKanban className="h-4 w-4" />
+            יומן פרויקטים
+          </h3>
+
+          {/* Current project card */}
+          {activeProjectEntry ? (
+            <div
+              className="flex items-center justify-between gap-3 p-3 rounded-xl border mb-3"
+              style={{ background: '#F0F5FB', borderColor: '#C8D5E2' }}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #152D3C, #1E3D50)' }}
+                >
+                  <FolderKanban className="h-4 w-4 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    {activeProjectEntry.projectName}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    פרויקט {activeProjectEntry.projectNumber} · משויך מ-{formatDate(activeProjectEntry.startDate)}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground truncate">
-                  {activeProjectEntry.projectName}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  פרויקט {activeProjectEntry.projectNumber} · משויך מ-{formatDate(activeProjectEntry.startDate)}
-                </p>
-              </div>
+              <CurrentBadge />
             </div>
-            <CurrentBadge />
-          </div>
-        ) : (
-          <div
-            className="p-3 rounded-xl border mb-3 text-center"
-            style={{ borderColor: '#E2EBF4', borderStyle: 'dashed' }}
+          ) : (
+            <div
+              className="p-3 rounded-xl border mb-3 text-center"
+              style={{ borderColor: '#E2EBF4', borderStyle: 'dashed' }}
+            >
+              <p className="text-sm text-muted-foreground">אין פרויקט משויך כרגע</p>
+            </div>
+          )}
+
+          {/* Open/close inline form */}
+          <button
+            type="button"
+            onClick={() => showProjectForm ? setShowProjectForm(false) : openProjectForm()}
+            className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors mb-3"
           >
-            <p className="text-sm text-muted-foreground">אין פרויקט משויך כרגע</p>
-          </div>
-        )}
+            {showProjectForm ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            שייך פרויקט
+          </button>
 
-        {/* Open/close inline form */}
-        <button
-          type="button"
-          onClick={() => showProjectForm ? setShowProjectForm(false) : openProjectForm()}
-          className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors mb-3"
-        >
-          {showProjectForm ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          שייך פרויקט
-        </button>
-
-        {/* Inline project form */}
-        {showProjectForm && (
-          <div
-            className="rounded-xl border p-4 mb-3 space-y-3"
-            style={{ background: '#FAFCFF', borderColor: '#C8D5E2' }}
-          >
-            {loadingProjects ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                טוען פרויקטים...
-              </div>
-            ) : (
-              <>
-                <div>
-                  <label className="text-xs text-muted-foreground block mb-1">בחר פרויקט</label>
-                  <select
-                    value={selectedProjectId}
-                    onChange={(e) => setSelectedProjectId(e.target.value)}
-                    className={selectClass}
-                    style={{ borderColor: '#C8D5E2' }}
-                    disabled={isAssigningProject}
-                  >
-                    <option value="">בחר פרויקט...</option>
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.projectNumber} — {p.name}
-                      </option>
-                    ))}
-                  </select>
+          {/* Inline project form */}
+          {showProjectForm && (
+            <div
+              className="rounded-xl border p-4 mb-3 space-y-3"
+              style={{ background: '#FAFCFF', borderColor: '#C8D5E2' }}
+            >
+              {loadingProjects ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  טוען פרויקטים...
                 </div>
-
-                <div>
-                  <label className="text-xs text-muted-foreground block mb-1">תאריך התחלה</label>
-                  <FleetDateInput
-                    value={projectStartDate}
-                    onChange={setProjectStartDate}
-                    maxYear={new Date().getFullYear() + 1}
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    onClick={handleAssignProject}
-                    disabled={isAssigningProject || !selectedProjectId || !projectStartDate}
-                    size="sm"
-                    className="gap-1.5"
-                    style={{
-                      background: selectedProjectId && projectStartDate
-                        ? 'linear-gradient(135deg, #4ECDC4, #3ABFB6)'
-                        : undefined,
-                      border: 'none',
-                    }}
-                  >
-                    {isAssigningProject ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <FolderKanban className="h-3.5 w-3.5" />
-                    )}
-                    שייך
-                  </Button>
-
-                  {activeProjectEntry && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleEndProject}
-                      disabled={isEndingProject}
-                      className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+              ) : (
+                <>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">בחר פרויקט</label>
+                    <select
+                      value={selectedProjectId}
+                      onChange={(e) => setSelectedProjectId(e.target.value)}
+                      className={selectClass}
+                      style={{ borderColor: '#C8D5E2' }}
+                      disabled={isAssigningProject}
                     >
-                      {isEndingProject ? (
+                      <option value="">בחר פרויקט...</option>
+                      {projects.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.projectNumber} — {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">תאריך התחלה</label>
+                    <FleetDateInput
+                      value={projectStartDate}
+                      onChange={setProjectStartDate}
+                      maxYear={new Date().getFullYear() + 1}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      onClick={handleAssignProject}
+                      disabled={isAssigningProject || !selectedProjectId || !projectStartDate}
+                      size="sm"
+                      className="gap-1.5"
+                      style={{
+                        background: selectedProjectId && projectStartDate
+                          ? 'linear-gradient(135deg, #4ECDC4, #3ABFB6)'
+                          : undefined,
+                        border: 'none',
+                      }}
+                    >
+                      {isAssigningProject ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : null}
-                      סיים שיוך
-                    </Button>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Project journal table */}
-        {projectJournal.length > 0 ? (
-          <div className="rounded-xl border overflow-hidden" style={{ borderColor: '#C8D5E2' }}>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-xs text-muted-foreground" style={{ background: '#F8FAFB', borderColor: '#E2EBF4' }}>
-                  <th className="px-3 py-2 text-right font-semibold">שם פרויקט</th>
-                  <th className="px-3 py-2 text-right font-semibold">מספר פרויקט</th>
-                  <th className="px-3 py-2 text-right font-semibold">תאריך התחלה</th>
-                  <th className="px-3 py-2 text-right font-semibold">תאריך סיום</th>
-                </tr>
-              </thead>
-              <tbody>
-                {projectJournal.map((entry, idx) => (
-                  <tr
-                    key={entry.id}
-                    className="border-b last:border-b-0"
-                    style={{ borderColor: '#F0F5FB', background: idx % 2 === 0 ? '#fff' : '#FAFCFF' }}
-                  >
-                    <td className="px-3 py-2 font-medium">{entry.projectName}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{entry.projectNumber}</td>
-                    <td className="px-3 py-2 text-muted-foreground" dir="ltr">
-                      {formatDate(entry.startDate)}
-                    </td>
-                    <td className="px-3 py-2">
-                      {entry.endDate ? (
-                        <span className="text-muted-foreground" dir="ltr">{formatDate(entry.endDate)}</span>
                       ) : (
-                        <CurrentBadge />
+                        <FolderKanban className="h-3.5 w-3.5" />
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div
-            className="p-4 rounded-xl border text-center"
-            style={{ borderColor: '#E2EBF4', borderStyle: 'dashed' }}
-          >
-            <p className="text-sm text-muted-foreground">אין שיוכי פרויקטים</p>
-          </div>
-        )}
-      </div>
+                      שייך
+                    </Button>
 
+                    {activeProjectEntry && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleEndProject}
+                        disabled={isEndingProject}
+                        className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+                      >
+                        {isEndingProject ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : null}
+                        סיים שיוך
+                      </Button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Project journal table */}
+          {projectJournal.length > 0 ? (
+            <div className="rounded-xl border overflow-hidden" style={{ borderColor: '#C8D5E2' }}>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-xs text-muted-foreground" style={{ background: '#F8FAFB', borderColor: '#E2EBF4' }}>
+                    <th className="px-3 py-2 text-right font-semibold">שם פרויקט</th>
+                    <th className="px-3 py-2 text-right font-semibold">מספר פרויקט</th>
+                    <th className="px-3 py-2 text-right font-semibold">תאריך התחלה</th>
+                    <th className="px-3 py-2 text-right font-semibold">תאריך סיום</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projectJournal.map((entry, idx) => (
+                    <tr
+                      key={entry.id}
+                      className="border-b last:border-b-0"
+                      style={{ borderColor: '#F0F5FB', background: idx % 2 === 0 ? '#fff' : '#FAFCFF' }}
+                    >
+                      <td className="px-3 py-2 font-medium">{entry.projectName}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{entry.projectNumber}</td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {formatDate(entry.startDate)}
+                      </td>
+                      <td className="px-3 py-2">
+                        {entry.endDate ? (
+                          <span className="text-muted-foreground">{formatDate(entry.endDate)}</span>
+                        ) : (
+                          <CurrentBadge />
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div
+              className="p-4 rounded-xl border text-center"
+              style={{ borderColor: '#E2EBF4', borderStyle: 'dashed' }}
+            >
+              <p className="text-sm text-muted-foreground">אין שיוכי פרויקטים</p>
+            </div>
+          )}
+        </div>
+
+      </div>
     </div>
   )
 }
