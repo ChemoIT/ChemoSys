@@ -2,7 +2,7 @@
 
 /**
  * VehicleCard — tabs layout for the vehicle card page.
- * Tabs: פרטי הרכב | טסטים | ביטוח | צמידות | מסמכים | הערות | ק"מ (7 tabs)
+ * Tabs: פרטי הרכב | בעלות | רישוי וביטוח | צמידות | מסמכים | הערות | ק"מ (7 tabs)
  *
  * Mirrors DriverCard.tsx pattern:
  *  - Header: avatar (plate chars), license plate, vehicle info, status badge, fitness light
@@ -20,8 +20,8 @@ import {
   Trash2,
   ArrowRight,
   Car,
-  ClipboardCheck,
-  Shield,
+  Building2,
+  ShieldCheck,
   Shuffle,
   Paperclip,
   FileText,
@@ -43,8 +43,8 @@ import {
 } from '@/components/ui/dialog'
 import { VehicleFitnessLight } from '@/components/app/fleet/shared/VehicleFitnessLight'
 import { VehicleDetailsSection } from './VehicleDetailsSection'
-import { VehicleTestsSection } from './VehicleTestsSection'
-import { VehicleInsuranceSection } from './VehicleInsuranceSection'
+import { VehicleOwnershipSection } from './VehicleOwnershipSection'
+import { VehicleLicensingSection } from './VehicleLicensingSection'
 import { VehicleAssignmentSection } from './VehicleAssignmentSection'
 import { VehicleDocumentsSection } from './VehicleDocumentsSection'
 import { VehicleNotesSection } from './VehicleNotesSection'
@@ -57,6 +57,7 @@ import type {
   VehicleDocument,
   VehicleDriverJournal,
   VehicleProjectJournal,
+  VehicleMonthlyCost,
 } from '@/lib/fleet/vehicle-types'
 
 // ─────────────────────────────────────────────────────────────
@@ -68,6 +69,7 @@ type VehicleCardProps = {
   tests: VehicleTest[]
   insurance: VehicleInsurance[]
   documents: VehicleDocument[]
+  costs: VehicleMonthlyCost[]
   driverJournal: VehicleDriverJournal[]
   projectJournal: VehicleProjectJournal[]
   companies: { id: string; name: string }[]
@@ -87,6 +89,7 @@ export function VehicleCard({
   tests,
   insurance,
   documents,
+  costs,
   driverJournal,
   projectJournal,
   companies,
@@ -107,11 +110,11 @@ export function VehicleCard({
   const onDetailsEditingChange = useCallback((dirty: boolean) => {
     dirtyStates.current.details = dirty
   }, [])
-  const onTestsEditingChange = useCallback((dirty: boolean) => {
-    dirtyStates.current.tests = dirty
+  const onOwnershipEditingChange = useCallback((dirty: boolean) => {
+    dirtyStates.current.ownership = dirty
   }, [])
-  const onInsuranceEditingChange = useCallback((dirty: boolean) => {
-    dirtyStates.current.insurance = dirty
+  const onLicensingEditingChange = useCallback((dirty: boolean) => {
+    dirtyStates.current.licensing = dirty
   }, [])
   const onDocumentsEditingChange = useCallback((dirty: boolean) => {
     dirtyStates.current.documents = dirty
@@ -125,8 +128,8 @@ export function VehicleCard({
 
   const TAB_LABELS: Record<string, string> = {
     details:    'פרטי הרכב',
-    tests:      'טסטים',
-    insurance:  'ביטוח',
+    ownership:  'בעלות',
+    licensing:  'רישוי וביטוח',
     assignment: 'צמידות',
     documents:  'מסמכים',
     notes:      'הערות',
@@ -326,13 +329,13 @@ export function VehicleCard({
             className="w-full h-auto p-0 bg-transparent rounded-none gap-0 overflow-x-auto flex justify-start"
           >
             {[
-              { value: 'details',    label: 'פרטי הרכב',  icon: Car },
-              { value: 'tests',      label: 'טסטים',      icon: ClipboardCheck },
-              { value: 'insurance',  label: 'ביטוח',      icon: Shield },
-              { value: 'assignment', label: 'צמידות',     icon: Shuffle },
-              { value: 'documents',  label: 'מסמכים',     icon: Paperclip },
-              { value: 'notes',      label: 'הערות',      icon: FileText },
-              { value: 'km',         label: 'ק"מ',         icon: Gauge },
+              { value: 'details',    label: 'פרטי הרכב',    icon: Car },
+              { value: 'ownership',  label: 'בעלות',         icon: Building2 },
+              { value: 'licensing',  label: 'רישוי וביטוח', icon: ShieldCheck },
+              { value: 'assignment', label: 'צמידות',        icon: Shuffle },
+              { value: 'documents',  label: 'מסמכים',        icon: Paperclip },
+              { value: 'notes',      label: 'הערות',         icon: FileText },
+              { value: 'km',         label: 'ק"מ',            icon: Gauge },
             ].map(({ value, label, icon: Icon }) => (
               <TabsTrigger
                 key={value}
@@ -362,34 +365,28 @@ export function VehicleCard({
           </div>
         </TabsContent>
 
-        {/* ══ Tab 2 — טסטים ══════════════════════════════════ */}
-        <TabsContent value="tests" className="mt-0">
-          <div
-            dir="rtl"
-            className="bg-white border-x border-b rounded-b-2xl p-5"
-            style={{ borderColor: '#E2EBF4' }}
-          >
-            <VehicleTestsSection
-              vehicleId={vehicle.id}
-              tests={tests}
-              docYellowDays={yellowDays}
-              onEditingChange={onTestsEditingChange}
-            />
-          </div>
+        {/* ══ Tab 2 — בעלות ══════════════════════════════════ */}
+        <TabsContent value="ownership" className="mt-0">
+          <VehicleOwnershipSection
+            vehicle={vehicle}
+            costs={costs}
+            onEditingChange={onOwnershipEditingChange}
+          />
         </TabsContent>
 
-        {/* ══ Tab 3 — ביטוח ══════════════════════════════════ */}
-        <TabsContent value="insurance" className="mt-0">
+        {/* ══ Tab 3 — רישוי וביטוח ══════════════════════════ */}
+        <TabsContent value="licensing" className="mt-0">
           <div
             dir="rtl"
             className="bg-white border-x border-b rounded-b-2xl p-5"
             style={{ borderColor: '#E2EBF4' }}
           >
-            <VehicleInsuranceSection
+            <VehicleLicensingSection
               vehicleId={vehicle.id}
+              tests={tests}
               insurance={insurance}
-              docYellowDays={yellowDays}
-              onEditingChange={onInsuranceEditingChange}
+              docYellowDays={docYellowDays}
+              onEditingChange={onLicensingEditingChange}
             />
           </div>
         </TabsContent>

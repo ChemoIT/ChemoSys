@@ -22,6 +22,7 @@ import {
   getVehicleDriverJournal,
   getVehicleProjectJournal,
 } from '@/actions/fleet/vehicles'
+import { getVehicleMonthlyCosts } from '@/actions/fleet/vehicle-ownership'
 import { VehicleCard } from '@/components/app/fleet/vehicles/VehicleCard'
 
 type Props = {
@@ -33,13 +34,14 @@ export default async function VehicleCardDetailPage({ params }: Props) {
   const { id } = await params
 
   // Fetch all vehicle data in parallel
-  const [vehicle, tests, insurance, documents, driverJournal, projectJournal] = await Promise.all([
+  const [vehicle, tests, insurance, documents, driverJournal, projectJournal, costs] = await Promise.all([
     getVehicleById(id),
     getVehicleTests(id),
     getVehicleInsurance(id),
     getVehicleDocuments(id),
     getVehicleDriverJournal(id),
     getVehicleProjectJournal(id),
+    getVehicleMonthlyCosts(id),
   ])
 
   if (!vehicle) notFound()
@@ -72,6 +74,7 @@ export default async function VehicleCardDetailPage({ params }: Props) {
       tests={tests}
       insurance={insurance}
       documents={documents}
+      costs={costs}
       driverJournal={driverJournal}
       projectJournal={projectJournal}
       companies={companies}
