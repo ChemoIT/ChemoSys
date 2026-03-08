@@ -5,13 +5,13 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** v2.0 — Phase 18 COMPLETE. All 3 plans done: 18-01 (DB layer), 18-02 (VehicleOwnershipSection UI), 18-03 (VehicleLicensingSection + VehicleCard 7-tab restructure). VehicleCard now has final tabs: פרטי הרכב, בעלות, רישוי וביטוח, צמידות, מסמכים, הערות, ק"מ.
+**Current focus:** v2.0 — Phase 19 Plan 02 IN PROGRESS. Plans 19-01 ✓ + 19-02 tasks 1+2 ✓. Checkpoint (Task 3) pending — multiple UI issues found during verification. Migration 00029 must be run in Supabase before vehicle card works.
 
 ## Current Position
 
-Phase: 18 (Vehicle Card Redesign — Ownership Tab + Licensing/Insurance Tab) — 3/3 plans complete
-Status: **Phase 18 COMPLETE** — All plans done: 18-01 (migration 00029 + DB types + server actions), 18-02 (VehicleOwnershipSection + VehicleOwnershipJournal), 18-03 (VehicleLicensingSection + VehicleCard 7-tab restructure + page.tsx costs fetch).
-Last activity: 2026-03-08 — Session #41 (execute-phase 18-03 — licensing tab wiring + VehicleCard tab restructure)
+Phase: 19 (Vehicle Card Redesign — Assignment Tab + Documents + Cleanup) — Plan 01 ✓, Plan 02 tasks 1+2 ✓, Task 3 (checkpoint) PENDING
+Status: **Phase 19 IN PROGRESS** — 19-01 complete (journal types + 7 server actions). 19-02 tasks 1+2 committed (VehicleAssignmentSection rewrite + VehicleCard 7-tab). Checkpoint pending — UI issues found during verification, new session needed.
+Last activity: 2026-03-08 — Session #42 (execute-phase 19 — data layer + UI rewrite + bug fixes)
 
 Progress: v2.0 [█████████████████████████] Phase 18 COMPLETE — Phase 19 next (or new phase TBD)
 
