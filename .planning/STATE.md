@@ -5,15 +5,15 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** v2.0 — Phase 16 Plan 01 complete. Migration 00027+00028 written. Phase 16 Plan 02 is next.
+**Current focus:** v2.0 — Phase 16 COMPLETE. Migrations 00027+00028 verified in Supabase. Phase 17 (Vehicle Card Redesign UI — Tab 1 + Tab 2) is next.
 
 ## Current Position
 
-Phase: 16 (Vehicle Card Redesign DB Migration) — 1/2 plans complete
-Status: **Vehicle Card Redesign** — 00027_vehicle_card_redesign.sql + 00028 storage policies written and committed. Ready to run in Supabase.
-Last activity: 2026-03-07 — Session #36 (execute-phase 16-01 — migration 00027+00028)
+Phase: 16 (Vehicle Card Redesign DB Migration) — 2/2 plans complete (PHASE DONE)
+Status: **Vehicle Card Redesign DB** — COMPLETE. Migrations 00027+00028 verified in production Supabase. 6 new tables, 9 new vehicles columns, vehicle-images bucket live.
+Last activity: 2026-03-08 — Session #37 (execute-phase 16-02 — migration verification + phase complete)
 
-Progress: v2.0 [█████████████████████░░░░] Phase 16 Plan 01 done — Plan 02 next
+Progress: v2.0 [██████████████████████░░░] Phase 16 DONE — Phase 17 next
 
 ## Strategic Decision (Session #18)
 
@@ -114,7 +114,8 @@ Progress: v2.0 [█████████████████████�
 - **[16-01]** Activity journal tables (driver/project/monthly_costs journals) = no soft-delete — historical facts never removed
 - **[16-01]** vehicle_status NOT NULL DEFAULT 'active' — all existing vehicles auto-assigned 'active' on migration run
 - **[16-01]** Single-active-record-per-vehicle rule enforced in Server Actions, NOT in DB triggers — follows project pattern
-- **[16-01]** Migrations 00027+00028: NOT YET RUN in Supabase — must run before Phase 17 UI can function
+- **[16-01]** 00028 storage policies created in same plan as 00027 — matches established 00025+00026 two-file split pattern
+- **[16-02]** Migrations 00027+00028 verified in production Supabase (2026-03-08) — schema stable, ready for Phase 17-19 UI
 
 ### Roadmap Evolution
 
@@ -139,18 +140,18 @@ None.
 - Migration 00016: חייב לרוץ ב-Supabase לפני deploy של כל קוד (app)
 - Migration 00017: חייבת לרוץ ב-Supabase לפני test של fleet permissions (מוסיפה app_fleet_charging_stations + app_fleet_forms)
 - **Migrations 00025+00026: RUN ✓** — vehicle module DB foundation complete
-- **Migrations 00027+00028: NOT YET RUN** — vehicle card redesign schema written, needs Supabase SQL Editor run before Phase 17 UI. For 00028: create 'vehicle-images' Private bucket in Storage Dashboard first.
+- **Migrations 00027+00028: RUN ✓** — vehicle card redesign schema live in Supabase. 6 new tables, 9 new vehicles columns, vehicle-images Private bucket all verified (2026-03-08).
 
 ## Session Continuity
 
-Last session: 2026-03-07 (session #36)
-Stopped at: Phase 16 Plan 01 COMPLETE — migration 00027_vehicle_card_redesign.sql + 00028_vehicle_images_storage_policies.sql written and committed.
+Last session: 2026-03-08 (session #37)
+Stopped at: Phase 16 Plan 02 COMPLETE — migrations 00027+00028 verified in Supabase. Phase 16 is DONE. Phase 17 is next.
 
 ### Context for next session:
 
-**מה קיים:** Phase 16 Plan 01 DONE — 00027 extends vehicles schema (9 new columns, 6 new tables, 2 updated views, soft-delete RPC), 00028 adds storage policies for vehicle-images bucket. Both files are ready to run in Supabase SQL Editor.
+**מה קיים:** Phase 16 DONE — 00027 extends vehicles schema (9 new columns, 6 new tables, 2 updated views, soft-delete RPC), 00028 adds storage policies for vehicle-images bucket. Both VERIFIED in production Supabase.
 
-**מה הבא:** Phase 16 Plan 02 — (check 16-02-PLAN.md for next migration tasks if any, otherwise Phase 17 UI begins).
+**מה הבא:** Phase 17 — Vehicle Card Redesign UI (Tab 1: Vehicle Details with image gallery + Tab 2: Ownership).
 
 **Key new files (Phase 14-02):**
 
