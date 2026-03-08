@@ -10,7 +10,6 @@
 
 export const SUPPLIER_TYPE_LABELS: Record<string, string> = {
   ownership: 'בעלות רכב',
-  leasing:   'חברת ליסינג',
   insurance: 'חברת ביטוח',
   fuel_card: 'ספק כרטיס דלק',
   garage:    'מוסך',

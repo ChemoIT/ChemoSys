@@ -365,14 +365,20 @@ export function VehicleCard({
 
         {/* ══ Tab 2 — חוזה ══════════════════════════════════ */}
         <TabsContent value="contract" className="mt-0">
-          <VehicleContractSection
-            vehicle={vehicle}
-            costs={costs}
-            tests={tests}
-            insurance={insurance}
-            docYellowDays={docYellowDays}
-            onEditingChange={onContractEditingChange}
-          />
+          <div
+            dir="rtl"
+            className="bg-white border-x border-b rounded-b-2xl p-6 md:p-8"
+            style={{ borderColor: '#E2EBF4' }}
+          >
+            <VehicleContractSection
+              vehicle={vehicle}
+              costs={costs}
+              tests={tests}
+              insurance={insurance}
+              docYellowDays={docYellowDays}
+              onEditingChange={onContractEditingChange}
+            />
+          </div>
         </TabsContent>
 
         {/* ══ Tab 4 — צמידות ═════════════════════════════════ */}

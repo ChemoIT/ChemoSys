@@ -326,36 +326,43 @@ export async function updateVehicleDetails(input: UpdateVehicleInput): Promise<A
   const { userId } = await verifyAppUser()
   const supabase = await createClient()
 
+  // Build update object — only include fields that were explicitly passed
+  // to avoid overwriting values from other tabs (e.g. status from details tab)
+  const updateObj: Record<string, unknown> = { updated_by: userId }
+
+  if (input.vehicleType !== undefined) updateObj.vehicle_type = input.vehicleType
+  if (input.ownershipType !== undefined) updateObj.ownership_type = input.ownershipType
+  if (input.companyId !== undefined) updateObj.company_id = input.companyId
+  if (input.vehicleStatus !== undefined) {
+    updateObj.vehicle_status = input.vehicleStatus
+    updateObj.is_active = input.vehicleStatus === 'active'
+  }
+  if (input.fleetEntryDate !== undefined) updateObj.fleet_entry_date = input.fleetEntryDate
+  if (input.fleetEntryKm !== undefined) updateObj.fleet_entry_km = input.fleetEntryKm
+  if (input.fleetExitDate !== undefined) updateObj.fleet_exit_date = input.fleetExitDate
+  if (input.fleetExitKm !== undefined) updateObj.fleet_exit_km = input.fleetExitKm
+  if (input.assignedDriverId !== undefined) updateObj.assigned_driver_id = input.assignedDriverId
+  if (input.notes !== undefined) updateObj.notes = input.notes || null
+  if (input.leasingCompanyId !== undefined) updateObj.leasing_company_id = input.leasingCompanyId
+  if (input.insuranceCompanyId !== undefined) updateObj.insurance_company_id = input.insuranceCompanyId
+  if (input.fuelCardSupplierId !== undefined) updateObj.fuel_card_supplier_id = input.fuelCardSupplierId
+  if (input.garageId !== undefined) updateObj.garage_id = input.garageId
+  if (input.vehicleCategory !== undefined) updateObj.vehicle_category = input.vehicleCategory
+  if (input.campResponsibleType !== undefined) updateObj.camp_responsible_type = input.campResponsibleType
+  if (input.campResponsibleName !== undefined) updateObj.camp_responsible_name = input.campResponsibleName
+  if (input.campResponsiblePhone !== undefined) {
+    updateObj.camp_responsible_phone = input.campResponsiblePhone != null
+      ? normalizePhone(input.campResponsiblePhone) ?? null
+      : null
+  }
+  if (input.ownershipSupplierId !== undefined) updateObj.ownership_supplier_id = input.ownershipSupplierId
+  if (input.contractNumber !== undefined) updateObj.contract_number = input.contractNumber
+  if (input.contractFileUrl !== undefined) updateObj.contract_file_url = input.contractFileUrl
+  if (input.vehicleGroup !== undefined) updateObj.vehicle_group = input.vehicleGroup
+
   const { error } = await supabase
     .from('vehicles')
-    .update({
-      vehicle_type: input.vehicleType ?? null,
-      ownership_type: input.ownershipType ?? null,
-      company_id: input.companyId ?? null,
-      vehicle_status: input.vehicleStatus ?? 'active',
-      fleet_entry_date: input.fleetEntryDate ?? null,
-      fleet_entry_km: input.fleetEntryKm ?? null,
-      fleet_exit_date: input.fleetExitDate ?? null,
-      fleet_exit_km: input.fleetExitKm ?? null,
-      is_active: (input.vehicleStatus ?? 'active') === 'active',
-      assigned_driver_id: input.assignedDriverId ?? null,
-      notes: input.notes || null,
-      leasing_company_id: input.leasingCompanyId ?? null,
-      insurance_company_id: input.insuranceCompanyId ?? null,
-      fuel_card_supplier_id: input.fuelCardSupplierId ?? null,
-      garage_id: input.garageId ?? null,
-      vehicle_category: input.vehicleCategory,
-      camp_responsible_type: input.campResponsibleType,
-      camp_responsible_name: input.campResponsibleName,
-      camp_responsible_phone: input.campResponsiblePhone != null
-        ? normalizePhone(input.campResponsiblePhone) ?? null
-        : null,
-      ...(input.ownershipSupplierId !== undefined && { ownership_supplier_id: input.ownershipSupplierId }),
-      ...(input.contractNumber !== undefined && { contract_number: input.contractNumber }),
-      ...(input.contractFileUrl !== undefined && { contract_file_url: input.contractFileUrl }),
-      ...(input.vehicleGroup !== undefined && { vehicle_group: input.vehicleGroup }),
-      updated_by: userId,
-    })
+    .update(updateObj)
     .eq('id', input.vehicleId)
     .is('deleted_at', null)
 
