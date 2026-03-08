@@ -5,36 +5,30 @@
  *
  * Layout: two-column RTL grid
  *  Right column (first in RTL): MOT data (read-only, gray background)
- *  Left column: operational fields (editable) + image gallery
- *
- * MOT fields: license plate, manufacturer, model, commercial name, year, color,
- *   fuel type, chassis, engine model, trim level, emission group, ownership (MOT),
- *   registration date, last sync date + button
- *
- * Operational fields: image gallery, vehicle type, vehicle status,
- *   fleet exit date, ownership type, company, leasing, insurance, fuel card, garage
+ *  Left column: vehicle status + image gallery + inline replacement vehicles list
  *
  * Lock logic: returned/sold/decommissioned => all fields disabled except vehicle_status
- * Supplier dropdowns: fetched via getActiveSuppliersByType() on mount.
- * Dirty tracking: compare current form vs original vehicle data.
  */
 
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2, RefreshCw, Save, Lock, Car } from 'lucide-react'
+import { Loader2, RefreshCw, Save, Lock, Plus, Trash2 } from 'lucide-react'
 import { Label } from '@/components/ui/label'
-import { getActiveSuppliersByType, updateVehicleDetails } from '@/actions/fleet/vehicles'
+import { updateVehicleDetails } from '@/actions/fleet/vehicles'
 import { syncVehicleFromMot } from '@/actions/fleet/mot-sync'
+import {
+  getVehicleReplacementRecords,
+  deleteVehicleReplacementRecord,
+} from '@/actions/fleet/vehicle-replacement'
 import { formatLicensePlate, formatDate } from '@/lib/format'
 import {
-  VEHICLE_TYPE_LABELS,
-  OWNERSHIP_TYPE_LABELS,
   VEHICLE_STATUS_LABELS,
+  REPLACEMENT_REASON_LABELS,
   type VehicleFull,
+  type VehicleReplacementRecord,
 } from '@/lib/fleet/vehicle-types'
 import { VehicleImageGallery } from './VehicleImageGallery'
-import { FleetDateInput } from '@/components/app/fleet/shared/FleetDateInput'
 import { ReplacementVehicleDialog } from './ReplacementVehicleDialog'
 
 // ─────────────────────────────────────────────────────────────
@@ -56,16 +50,47 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Status color helpers
+// ─────────────────────────────────────────────────────────────
+
+function getStatusStyle(status: string) {
+  switch (status) {
+    case 'active':
+      return { bg: '#DCFCE7', color: '#16A34A', border: '#BBF7D0' }
+    case 'suspended':
+      return { bg: '#FEF3C7', color: '#B45309', border: '#FDE68A' }
+    default: // returned, sold, decommissioned
+      return { bg: '#FEE2E2', color: '#DC2626', border: '#FECACA' }
+  }
+}
+
+/** Calculate days between two dates (or from date to today) */
+function daysBetween(start: string, end?: string | null): number {
+  const s = new Date(start).getTime()
+  const e = end ? new Date(end).getTime() : Date.now()
+  return Math.max(0, Math.round((e - s) / 86400000))
+}
+
+/** Extract MOT summary string from motData JSONB */
+function motSummary(motData: Record<string, unknown> | null): string | null {
+  if (!motData) return null
+  const parts = [
+    motData.tozeret_nm as string,
+    motData.degem_nm as string,
+    motData.shnat_yitzur ? `(${motData.shnat_yitzur})` : null,
+    motData.tzeva_rechev as string,
+  ].filter(Boolean)
+  return parts.length > 0 ? parts.join(' ') : null
+}
+
+// ─────────────────────────────────────────────────────────────
 // Props
 // ─────────────────────────────────────────────────────────────
 
 type Props = {
   vehicle: VehicleFull
-  companies: { id: string; name: string }[]
   onEditingChange?: (isDirty: boolean) => void
 }
-
-type SupplierOption = { id: string; name: string }
 
 // Statuses that lock the card (all fields disabled except vehicle_status)
 const LOCKED_STATUSES = ['returned', 'sold', 'decommissioned'] as const
@@ -75,82 +100,57 @@ type LockedStatus = typeof LOCKED_STATUSES[number]
 // Main Component
 // ─────────────────────────────────────────────────────────────
 
-export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: Props) {
+export function VehicleDetailsSection({ vehicle, onEditingChange }: Props) {
   const router = useRouter()
 
   // -- Editable form state --
-  const [vehicleType, setVehicleType] = useState(vehicle.vehicleType ?? '')
-  const [ownershipType, setOwnershipType] = useState(vehicle.ownershipType ?? '')
-  const [companyId, setCompanyId] = useState(vehicle.companyId ?? '')
   const [vehicleStatus, setVehicleStatus] = useState(vehicle.vehicleStatus ?? 'active')
-  const [fleetExitDate, setFleetExitDate] = useState(vehicle.fleetExitDate ?? '')
-  const [leasingCompanyId, setLeasingCompanyId] = useState(vehicle.leasingCompanyId ?? '')
-  const [insuranceCompanyId, setInsuranceCompanyId] = useState(vehicle.insuranceCompanyId ?? '')
-  const [fuelCardSupplierId, setFuelCardSupplierId] = useState(vehicle.fuelCardSupplierId ?? '')
-  const [garageId, setGarageId] = useState(vehicle.garageId ?? '')
 
   // -- Lock state (derived from vehicleStatus) --
   const isLocked = LOCKED_STATUSES.includes(vehicleStatus as LockedStatus)
 
-  // -- Supplier options --
-  const [leasingSuppliers, setLeasingSuppliers] = useState<SupplierOption[]>([])
-  const [insuranceSuppliers, setInsuranceSuppliers] = useState<SupplierOption[]>([])
-  const [fuelCardSuppliers, setFuelCardSuppliers] = useState<SupplierOption[]>([])
-  const [garageSuppliers, setGarageSuppliers] = useState<SupplierOption[]>([])
+  // -- Dialog state for add/edit replacement --
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editRecordId, setEditRecordId] = useState<string | null>(null)
 
-  // -- Dialog state --
-  const [showReplacementDialog, setShowReplacementDialog] = useState(false)
+  // -- Replacement records (inline list) --
+  const [records, setRecords] = useState<VehicleReplacementRecord[]>([])
+  const [isLoadingRecords, setIsLoadingRecords] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   // -- Transitions --
   const [isSaving, startSaveTransition] = useTransition()
   const [isSyncing, startSyncTransition] = useTransition()
 
   // -- Dirty tracking --
-  const isDirty =
-    vehicleType !== (vehicle.vehicleType ?? '') ||
-    ownershipType !== (vehicle.ownershipType ?? '') ||
-    companyId !== (vehicle.companyId ?? '') ||
-    vehicleStatus !== (vehicle.vehicleStatus ?? 'active') ||
-    fleetExitDate !== (vehicle.fleetExitDate ?? '') ||
-    leasingCompanyId !== (vehicle.leasingCompanyId ?? '') ||
-    insuranceCompanyId !== (vehicle.insuranceCompanyId ?? '') ||
-    fuelCardSupplierId !== (vehicle.fuelCardSupplierId ?? '') ||
-    garageId !== (vehicle.garageId ?? '')
+  const isDirty = vehicleStatus !== (vehicle.vehicleStatus ?? 'active')
 
   useEffect(() => {
     onEditingChange?.(isDirty)
   }, [isDirty, onEditingChange])
 
-  // -- Fetch supplier options on mount --
+  // -- Load replacement records --
+  async function loadRecords() {
+    setIsLoadingRecords(true)
+    const data = await getVehicleReplacementRecords(vehicle.id)
+    setRecords(data)
+    setIsLoadingRecords(false)
+  }
+
   useEffect(() => {
-    void getActiveSuppliersByType('leasing').then(setLeasingSuppliers)
-    void getActiveSuppliersByType('insurance').then(setInsuranceSuppliers)
-    void getActiveSuppliersByType('fuel_card').then(setFuelCardSuppliers)
-    void getActiveSuppliersByType('garage').then(setGarageSuppliers)
-  }, [])
+    void loadRecords()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicle.id])
 
   // ----------------------------------------------------------
   // Handlers
   // ----------------------------------------------------------
 
   function handleSave() {
-    // Validation: locked status requires fleet exit date
-    if (LOCKED_STATUSES.includes(vehicleStatus as LockedStatus) && !fleetExitDate) {
-      toast.error('יש להזין תאריך יציאה מהצי לפני שינוי הסטאטוס')
-      return
-    }
     startSaveTransition(async () => {
       const result = await updateVehicleDetails({
         vehicleId: vehicle.id,
-        vehicleType: vehicleType || null,
-        ownershipType: ownershipType || null,
-        companyId: companyId || null,
         vehicleStatus,
-        fleetExitDate: fleetExitDate || null,
-        leasingCompanyId: leasingCompanyId || null,
-        insuranceCompanyId: insuranceCompanyId || null,
-        fuelCardSupplierId: fuelCardSupplierId || null,
-        garageId: garageId || null,
       })
       if (result.success) {
         toast.success('פרטי הרכב נשמרו בהצלחה')
@@ -171,12 +171,45 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
     })
   }
 
+  async function handleDeleteRecord(e: React.MouseEvent, recordId: string) {
+    e.stopPropagation()
+    setDeletingId(recordId)
+    const result = await deleteVehicleReplacementRecord(recordId, vehicle.id)
+    if (result.success) {
+      toast.success('רכב חלופי נמחק')
+      await loadRecords()
+      router.refresh()
+    } else {
+      toast.error(result.error ?? 'שגיאה במחיקה')
+    }
+    setDeletingId(null)
+  }
+
+  function handleDialogClose() {
+    setDialogOpen(false)
+    setEditRecordId(null)
+    void loadRecords()
+    router.refresh()
+  }
+
+  function openAdd() {
+    setEditRecordId(null)
+    setDialogOpen(true)
+  }
+
+  function openEdit(recordId: string) {
+    setEditRecordId(recordId)
+    setDialogOpen(true)
+  }
+
   // ----------------------------------------------------------
-  // Shared select class
+  // Shared styles
   // ----------------------------------------------------------
 
   const selectClass =
     'w-full border border-border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
+
+  const statusStyle = getStatusStyle(vehicleStatus)
 
   // ----------------------------------------------------------
   // Render
@@ -238,7 +271,7 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
         </div>
       </div>
 
-      {/* -- עמודה שמאלית -- שדות תפעוליים (עריכה) */}
+      {/* -- עמודה שמאלית -- שדות תפעוליים + רכבים חלופיים */}
       <div className="space-y-4">
 
         {/* תג נעילה -- מוצג רק כשנעול */}
@@ -254,25 +287,23 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
           <VehicleImageGallery vehicleId={vehicle.id} isLocked={isLocked} />
         </div>
 
-        {/* סוג רכב */}
-        <div className="space-y-1.5">
-          <Label>סוג רכב</Label>
-          <select
-            value={vehicleType}
-            onChange={(e) => setVehicleType(e.target.value)}
-            className={selectClass}
-            disabled={isLocked}
-          >
-            <option value="">— בחר סוג —</option>
-            {Object.entries(VEHICLE_TYPE_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* סטאטוס רכב -- תמיד enabled גם כשנעול */}
-        <div className="space-y-1.5">
+        {/* סטאטוס רכב — badge גדול ובולט + select */}
+        <div className="space-y-2">
           <Label>סטאטוס רכב</Label>
+
+          {/* Badge בולט */}
+          <div
+            className="flex items-center justify-center rounded-xl px-4 py-3 text-lg font-bold"
+            style={{
+              background: statusStyle.bg,
+              color: statusStyle.color,
+              border: `2px solid ${statusStyle.border}`,
+            }}
+          >
+            {VEHICLE_STATUS_LABELS[vehicleStatus as keyof typeof VEHICLE_STATUS_LABELS] ?? vehicleStatus}
+          </div>
+
+          {/* select לשינוי */}
           <select
             value={vehicleStatus}
             onChange={(e) => setVehicleStatus(e.target.value)}
@@ -284,132 +315,8 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
           </select>
         </div>
 
-        {/* תאריך יציאה מהצי */}
-        <div className="space-y-1.5">
-          <Label>
-            תאריך יציאה מהצי
-            {LOCKED_STATUSES.includes(vehicleStatus as LockedStatus) && (
-              <span className="text-red-500 mr-1">*</span>
-            )}
-          </Label>
-          <FleetDateInput
-            value={fleetExitDate}
-            onChange={setFleetExitDate}
-            disabled={isLocked}
-            minYear={2000}
-          />
-        </div>
-
-        {/* סוג בעלות */}
-        <div className="space-y-1.5">
-          <Label>סוג בעלות</Label>
-          <select
-            value={ownershipType}
-            onChange={(e) => setOwnershipType(e.target.value)}
-            className={selectClass}
-            disabled={isLocked}
-          >
-            <option value="">— בחר בעלות —</option>
-            {Object.entries(OWNERSHIP_TYPE_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* חברה */}
-        <div className="space-y-1.5">
-          <Label>חברה</Label>
-          <select
-            value={companyId}
-            onChange={(e) => setCompanyId(e.target.value)}
-            className={selectClass}
-            disabled={isLocked}
-          >
-            <option value="">— בחר חברה —</option>
-            {companies.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* חברת ליסינג */}
-        <div className="space-y-1.5">
-          <Label>חברת ליסינג</Label>
-          <select
-            value={leasingCompanyId}
-            onChange={(e) => setLeasingCompanyId(e.target.value)}
-            className={selectClass}
-            disabled={isLocked}
-          >
-            <option value="">— ללא —</option>
-            {leasingSuppliers.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* חברת ביטוח */}
-        <div className="space-y-1.5">
-          <Label>חברת ביטוח</Label>
-          <select
-            value={insuranceCompanyId}
-            onChange={(e) => setInsuranceCompanyId(e.target.value)}
-            className={selectClass}
-            disabled={isLocked}
-          >
-            <option value="">— ללא —</option>
-            {insuranceSuppliers.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* ספק כרטיס דלק */}
-        <div className="space-y-1.5">
-          <Label>ספק כרטיס דלק</Label>
-          <select
-            value={fuelCardSupplierId}
-            onChange={(e) => setFuelCardSupplierId(e.target.value)}
-            className={selectClass}
-            disabled={isLocked}
-          >
-            <option value="">— ללא —</option>
-            {fuelCardSuppliers.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* מוסך */}
-        <div className="space-y-1.5">
-          <Label>מוסך</Label>
-          <select
-            value={garageId}
-            onChange={(e) => setGarageId(e.target.value)}
-            className={selectClass}
-            disabled={isLocked}
-          >
-            <option value="">— ללא —</option>
-            {garageSuppliers.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* כפתור ניהול רכב חלופי */}
-        <div className="space-y-1.5">
-          <button
-            type="button"
-            onClick={() => setShowReplacementDialog(true)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-muted/60 transition-colors"
-          >
-            <Car className="h-4 w-4" />
-            ניהול רכב חלופי
-          </button>
-        </div>
-
         {/* Save button */}
-        <div className="pt-2 flex justify-start">
+        <div className="flex justify-start">
           <button
             onClick={handleSave}
             disabled={isSaving || !isDirty}
@@ -437,16 +344,113 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
             שמור שינויים
           </button>
         </div>
+
+        {/* ──────────────────────────────────────────────── */}
+        {/* רכבים חלופיים — רשימה inline                      */}
+        {/* ──────────────────────────────────────────────── */}
+        <div
+          className="rounded-xl p-3"
+          style={{ background: '#F7FAFD', border: '1px solid #E2EBF4' }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-muted-foreground font-semibold">רכבים חלופיים</p>
+            <button
+              type="button"
+              onClick={openAdd}
+              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors font-medium"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              הוסף
+            </button>
+          </div>
+
+          {isLoadingRecords ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : records.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-3">
+              אין רכבים חלופיים מתועדים
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {records.map((rec) => {
+                const days = daysBetween(rec.entryDate, rec.returnDate)
+                const mot = motSummary(rec.motData as Record<string, unknown> | null)
+                return (
+                  <div
+                    key={rec.id}
+                    className="border border-border rounded-lg px-3 py-2.5 bg-background hover:bg-muted/30 transition-colors cursor-pointer"
+                    onClick={() => openEdit(rec.id)}
+                  >
+                    {/* שורה ראשונה: סטטוס + ימים | מספר רישוי + מחיקה */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                            rec.status === 'active'
+                              ? 'bg-green-100 text-green-700 border border-green-300'
+                              : 'bg-gray-100 text-gray-600 border border-gray-300'
+                          }`}
+                        >
+                          {rec.status === 'active' ? 'פעיל' : 'הוחזר'}
+                        </span>
+                        <span className="text-xs text-muted-foreground font-medium">
+                          {days} ימים{rec.status === 'active' ? ' בצי' : ''}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-sm" dir="ltr">
+                          {rec.licensePlate}
+                        </span>
+                        <button
+                          onClick={(e) => void handleDeleteRecord(e, rec.id)}
+                          disabled={deletingId === rec.id}
+                          className="text-muted-foreground hover:text-red-500 transition-colors p-0.5"
+                          title="מחק רכב חלופי"
+                          type="button"
+                        >
+                          {deletingId === rec.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* שורת MOT */}
+                    {mot && (
+                      <p className="text-xs text-muted-foreground mt-1">{mot}</p>
+                    )}
+
+                    {/* שורת פרטים: סיבה + תאריכים */}
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
+                      <span>{REPLACEMENT_REASON_LABELS[rec.reason]}</span>
+                      <span>
+                        {formatDate(rec.entryDate)}
+                        {rec.returnDate && ` — ${formatDate(rec.returnDate)}`}
+                      </span>
+                    </div>
+                    {rec.fuelCards.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {rec.fuelCards.length} כרטיסי דלק
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ReplacementVehicleDialog */}
+      {/* ReplacementVehicleDialog — for add/edit only */}
       <ReplacementVehicleDialog
         vehicleId={vehicle.id}
-        open={showReplacementDialog}
-        onClose={() => {
-          setShowReplacementDialog(false)
-          router.refresh() // מרענן header badge + vehicleStatus לאחר שינוי
-        }}
+        open={dialogOpen}
+        editRecordId={editRecordId}
+        onClose={handleDialogClose}
       />
     </div>
   )

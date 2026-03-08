@@ -1,24 +1,19 @@
 'use client'
 
 /**
- * ReplacementVehicleDialog — Dialog for managing replacement vehicles.
+ * ReplacementVehicleDialog — Dialog for adding/editing a replacement vehicle record.
  *
- * Two views:
- *   list — shows all replacement records for a vehicle
- *   add  — form for adding a new replacement record
- *   edit — form for editing an existing record (with fuel cards sub-list)
+ * The LIST view is now inline in VehicleDetailsSection.
+ * This dialog handles only the ADD and EDIT forms.
  *
- * Business rules:
- *   - Only one active replacement per vehicle (enforced in server action)
- *   - After adding a new record → auto-switch to edit mode to enable fuel cards
- *   - Fuel cards: digits-only, hard-delete on remove
- *   - Closing dialog always triggers router.refresh() (vehicle_status may have changed)
+ * Props:
+ *   - editRecordId: if provided, opens in edit mode for that record; else opens in add mode
+ *   - onClose: called when dialog closes (parent should refresh records list)
  */
 
 import { useState, useEffect, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, ChevronRight, Loader2, X, Car, RefreshCw } from 'lucide-react'
+import { ChevronRight, Loader2, X, Plus, RefreshCw } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -42,17 +37,37 @@ import {
   type VehicleFuelCard,
 } from '@/lib/fleet/vehicle-types'
 import { lookupVehicleFromMot } from '@/actions/fleet/mot-sync'
-import { formatDate } from '@/lib/format'
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+
+/** Format today as yyyy-mm-dd */
+function todayStr(): string {
+  const t = new Date()
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
+}
+
+/** Extract MOT summary string from motData JSONB */
+function motSummary(motData: Record<string, unknown> | null): string | null {
+  if (!motData) return null
+  const parts = [
+    motData.tozeret_nm as string,
+    motData.degem_nm as string,
+    motData.shnat_yitzur ? `(${motData.shnat_yitzur})` : null,
+    motData.tzeva_rechev as string,
+  ].filter(Boolean)
+  return parts.length > 0 ? parts.join(' ') : null
+}
 
 // ─────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────
 
-type DialogView = 'list' | 'add' | 'edit'
-
 type Props = {
   vehicleId: string
   open: boolean
+  editRecordId?: string | null
   onClose: () => void
 }
 
@@ -104,7 +119,6 @@ function FuelCardsList({
     <div className="space-y-2 pt-2 border-t border-border">
       <Label>כרטיסי דלק</Label>
 
-      {/* רשימת כרטיסים קיימים */}
       {cards.length > 0 ? (
         <div className="space-y-1">
           {cards.map((card) => (
@@ -130,7 +144,6 @@ function FuelCardsList({
         <p className="text-xs text-muted-foreground">אין כרטיסי דלק</p>
       )}
 
-      {/* הוספת כרטיס חדש */}
       <div className="flex gap-2">
         <Input
           value={newCard}
@@ -161,25 +174,22 @@ function FuelCardsList({
 }
 
 // ─────────────────────────────────────────────────────────────
-// ReplacementRecordForm — internal form for add/edit
+// ReplacementRecordForm — add/edit form
 // ─────────────────────────────────────────────────────────────
 
 function ReplacementRecordForm({
   vehicleId,
   record,
   onSave,
-  onCancel,
 }: {
   vehicleId: string
   record: VehicleReplacementRecord | null
   onSave: (newRecordId?: string) => void
-  onCancel: () => void
 }) {
   const isEdit = !!record
 
-  // Form state — pre-filled in edit mode
   const [plate, setPlate] = useState(record?.licensePlate ?? '')
-  const [entryDate, setEntryDate] = useState(record?.entryDate ?? '')
+  const [entryDate, setEntryDate] = useState(record?.entryDate ?? (isEdit ? '' : todayStr()))
   const [entryKm, setEntryKm] = useState(record?.entryKm?.toString() ?? '')
   const [returnDate, setReturnDate] = useState(record?.returnDate ?? '')
   const [returnKm, setReturnKm] = useState(record?.returnKm?.toString() ?? '')
@@ -188,13 +198,15 @@ function ReplacementRecordForm({
   )
   const [reasonOther, setReasonOther] = useState(record?.reasonOther ?? '')
   const [notes, setNotes] = useState(record?.notes ?? '')
-  const [motInfo, setMotInfo] = useState<string | null>(null)
+  const [motData, setMotData] = useState<Record<string, unknown> | null>(record?.motData ?? null)
+  const [motInfo, setMotInfo] = useState<string | null>(
+    record?.motData ? motSummary(record.motData as Record<string, unknown>) : null
+  )
   const [fuelCards, setFuelCards] = useState<VehicleFuelCard[]>(record?.fuelCards ?? [])
 
   const [isSaving, startSaving] = useTransition()
   const [isLooking, startLookup] = useTransition()
 
-  // חישוב תקופת שהייה (client-side)
   const stayDays =
     entryDate && returnDate
       ? Math.round(
@@ -202,24 +214,24 @@ function ReplacementRecordForm({
         )
       : null
 
-  // חישוב ק"מ (client-side)
   const kmTotal =
     entryKm && returnKm
       ? Math.max(0, parseInt(returnKm) - parseInt(entryKm))
       : null
 
-  // MOT lookup לרכב החלופי
+  const computedStatus = returnDate ? 'returned' : 'active'
+
   function handleMotLookup() {
     if (!plate.trim()) return
     startLookup(async () => {
       const result = await lookupVehicleFromMot(plate)
       if (result.success && result.data) {
         const d = result.data as Record<string, unknown>
-        setMotInfo(
-          `${(d.tozeret_nm as string) ?? ''} ${(d.degem_nm as string) ?? ''} (${(d.shnat_yitzur as number) ?? ''})`
-        )
+        setMotData(d)
+        setMotInfo(motSummary(d))
       } else {
         toast.warning('לא נמצאו נתוני MOT לרכב זה')
+        setMotData(null)
         setMotInfo(null)
       }
     })
@@ -241,7 +253,6 @@ function ReplacementRecordForm({
 
     startSaving(async () => {
       if (isEdit && record) {
-        // עדכון רשומה קיימת
         const result = await updateVehicleReplacementRecord({
           recordId: record.id,
           vehicleId,
@@ -253,6 +264,7 @@ function ReplacementRecordForm({
           reason,
           reasonOther: reason === 'other' ? reasonOther.trim() : null,
           notes: notes.trim() || null,
+          motData,
         })
         if (result.success) {
           toast.success('הרשומה עודכנה')
@@ -261,7 +273,6 @@ function ReplacementRecordForm({
           toast.error(result.error ?? 'שגיאה בשמירה')
         }
       } else {
-        // הוספת רשומה חדשה
         const result = await addVehicleReplacementRecord({
           vehicleId,
           licensePlate: plate.trim(),
@@ -270,10 +281,11 @@ function ReplacementRecordForm({
           reason,
           reasonOther: reason === 'other' ? reasonOther.trim() : null,
           notes: notes.trim() || null,
+          motData,
         })
         if (result.success && result.id) {
           toast.success('רכב חלופי נוסף — כעת ניתן להוסיף כרטיסי דלק')
-          onSave(result.id) // מעביר recordId החדש לדיאלוג לעבור למצב עריכה
+          onSave(result.id)
         } else {
           toast.error(result.error ?? 'שגיאה בשמירה')
         }
@@ -281,7 +293,6 @@ function ReplacementRecordForm({
     })
   }
 
-  // רענון כרטיסי דלק ממסד הנתונים
   async function refreshFuelCards() {
     if (!record) return
     const records = await getVehicleReplacementRecords(vehicleId)
@@ -294,18 +305,22 @@ function ReplacementRecordForm({
 
   return (
     <div className="space-y-4">
-      {/* כותרת עם כפתור חזרה */}
+      {/* כותרת + סטטוס badge */}
       <div className="flex items-center gap-2">
-        <button
-          onClick={onCancel}
-          className="text-muted-foreground hover:text-foreground transition-colors"
-          type="button"
-        >
-          <ChevronRight className="h-5 w-5" />
-        </button>
-        <h3 className="font-semibold text-sm">
+        <h3 className="font-semibold text-sm flex-1">
           {isEdit ? 'עריכת רכב חלופי' : 'הוספת רכב חלופי'}
         </h3>
+        {isEdit && (
+          <span
+            className={`text-xs px-2.5 py-1 rounded-full font-bold ${
+              computedStatus === 'active'
+                ? 'bg-green-100 text-green-700 border border-green-300'
+                : 'bg-gray-100 text-gray-600 border border-gray-300'
+            }`}
+          >
+            {computedStatus === 'active' ? 'פעיל' : 'הוחזר'}
+          </span>
+        )}
       </div>
 
       {/* לוחית רישוי + MOT lookup */}
@@ -341,7 +356,7 @@ function ReplacementRecordForm({
         )}
       </div>
 
-      {/* תאריכים וק"מ — 2 עמודות */}
+      {/* תאריכים וק"מ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label>
@@ -350,7 +365,7 @@ function ReplacementRecordForm({
           <FleetDateInput value={entryDate} onChange={setEntryDate} minYear={2000} />
         </div>
         <div className="space-y-1.5">
-          <Label>ק"מ כניסה</Label>
+          <Label>ק&quot;מ כניסה</Label>
           <Input
             value={entryKm}
             onChange={(e) => setEntryKm(e.target.value.replace(/\D/g, ''))}
@@ -365,7 +380,7 @@ function ReplacementRecordForm({
           <FleetDateInput value={returnDate} onChange={setReturnDate} minYear={2000} />
         </div>
         <div className="space-y-1.5">
-          <Label>ק"מ החזרה</Label>
+          <Label>ק&quot;מ החזרה</Label>
           <Input
             value={returnKm}
             onChange={(e) => setReturnKm(e.target.value.replace(/\D/g, ''))}
@@ -411,7 +426,6 @@ function ReplacementRecordForm({
         </select>
       </div>
 
-      {/* הסבר לסיבה "אחר" */}
       {reason === 'other' && (
         <div className="space-y-1.5">
           <Label>
@@ -437,7 +451,7 @@ function ReplacementRecordForm({
         />
       </div>
 
-      {/* כרטיסי דלק — רק במצב עריכה (לאחר שמירה ראשונה) */}
+      {/* כרטיסי דלק — רק במצב עריכה */}
       {isEdit && record ? (
         <FuelCardsList
           recordId={record.id}
@@ -451,16 +465,8 @@ function ReplacementRecordForm({
         </p>
       )}
 
-      {/* כפתורי פעולה */}
-      <div className="flex justify-between pt-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={isSaving}
-        >
-          ביטול
-        </Button>
+      {/* כפתור שמירה */}
+      <div className="flex justify-end pt-2">
         <Button type="button" onClick={handleSave} disabled={isSaving}>
           {isSaving && <Loader2 className="h-4 w-4 ms-2 animate-spin" />}
           {isEdit ? 'שמור שינויים' : 'הוסף רכב חלופי'}
@@ -474,142 +480,59 @@ function ReplacementRecordForm({
 // ReplacementVehicleDialog — main exported component
 // ─────────────────────────────────────────────────────────────
 
-export function ReplacementVehicleDialog({ vehicleId, open, onClose }: Props) {
-  const router = useRouter()
-  const [view, setView] = useState<DialogView>('list')
-  const [editingRecord, setEditingRecord] = useState<VehicleReplacementRecord | null>(null)
-  const [records, setRecords] = useState<VehicleReplacementRecord[]>([])
+export function ReplacementVehicleDialog({ vehicleId, open, editRecordId, onClose }: Props) {
+  const [record, setRecord] = useState<VehicleReplacementRecord | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const isEdit = !!editRecordId
 
-  // טעינת רשומות מהשרת
-  async function loadRecords() {
-    setIsLoading(true)
-    const data = await getVehicleReplacementRecords(vehicleId)
-    setRecords(data)
-    setIsLoading(false)
-  }
-
-  // טען בפתיחת הדיאלוג
+  // Load the record to edit (if editRecordId is provided)
   useEffect(() => {
-    if (open) {
-      setView('list')
-      setEditingRecord(null)
-      void loadRecords()
+    if (open && editRecordId) {
+      setIsLoading(true)
+      void getVehicleReplacementRecords(vehicleId).then((data) => {
+        const found = data.find((r) => r.id === editRecordId) ?? null
+        setRecord(found)
+        setIsLoading(false)
+      })
+    } else if (open && !editRecordId) {
+      setRecord(null)
+      setIsLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, vehicleId])
+  }, [open, editRecordId, vehicleId])
 
-  // לאחר שמירת רשומה
-  function handleSaveRecord(newRecordId?: string) {
+  function handleSave(newRecordId?: string) {
     if (newRecordId) {
-      // רשומה חדשה — עבור למצב עריכה כדי לאפשר הוספת כרטיסי דלק
+      // New record created — reload as edit to allow fuel cards
+      setIsLoading(true)
       void getVehicleReplacementRecords(vehicleId).then((data) => {
-        const newRecord = data.find((r) => r.id === newRecordId) ?? null
-        setRecords(data)
-        setEditingRecord(newRecord)
-        setView('edit')
+        const newRec = data.find((r) => r.id === newRecordId) ?? null
+        setRecord(newRec)
+        setIsLoading(false)
       })
     } else {
-      // עדכון — חזור לרשימה ורענן
-      void loadRecords()
-      setView('list')
-      router.refresh() // מרענן VehicleDetailsSection עם vehicleStatus מעודכן
+      onClose()
     }
-  }
-
-  // סגירת הדיאלוג
-  function handleClose() {
-    router.refresh() // תמיד רענן — vehicle_status עשוי להשתנות
-    onClose()
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-lg max-h-[90dvh] overflow-y-auto" dir="rtl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Car className="h-5 w-5" />
-            ניהול רכב חלופי
+          <DialogTitle>
+            {isEdit ? 'עריכת רכב חלופי' : 'הוספת רכב חלופי'}
           </DialogTitle>
         </DialogHeader>
 
-        {/* תצוגת רשימה */}
-        {view === 'list' && (
-          <div className="space-y-3">
-            {isLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : records.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">
-                אין רכבים חלופיים מתועדים
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {records.map((rec) => (
-                  <button
-                    key={rec.id}
-                    onClick={() => {
-                      setEditingRecord(rec)
-                      setView('edit')
-                    }}
-                    className="w-full text-right border border-border rounded-lg px-4 py-3 hover:bg-muted/50 transition-colors space-y-1"
-                    type="button"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          rec.status === 'active'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {rec.status === 'active' ? 'פעיל' : 'הוחזר'}
-                      </span>
-                      <span className="font-mono font-bold text-sm" dir="ltr">
-                        {rec.licensePlate}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{REPLACEMENT_REASON_LABELS[rec.reason]}</span>
-                      <span>
-                        {formatDate(rec.entryDate)}
-                        {rec.returnDate && ` — ${formatDate(rec.returnDate)}`}
-                      </span>
-                    </div>
-                    {rec.fuelCards.length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {rec.fuelCards.length} כרטיסי דלק
-                      </p>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* כפתור הוסף */}
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setEditingRecord(null)
-                setView('add')
-              }}
-            >
-              <Plus className="h-4 w-4 ms-2" />
-              הוסף רכב חלופי
-            </Button>
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        )}
-
-        {/* תצוגת טופס הוספה/עריכה */}
-        {(view === 'add' || view === 'edit') && (
+        ) : (
           <ReplacementRecordForm
             vehicleId={vehicleId}
-            record={view === 'edit' ? editingRecord : null}
-            onSave={handleSaveRecord}
-            onCancel={() => setView('list')}
+            record={record}
+            onSave={handleSave}
           />
         )}
       </DialogContent>

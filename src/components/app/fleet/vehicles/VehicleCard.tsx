@@ -50,14 +50,15 @@ import { VehicleDocumentsSection } from './VehicleDocumentsSection'
 import { VehicleNotesSection } from './VehicleNotesSection'
 import { deleteVehicleWithPassword } from '@/actions/fleet/vehicles'
 import { formatLicensePlate } from '@/lib/format'
-import type {
-  VehicleFull,
-  VehicleTest,
-  VehicleInsurance,
-  VehicleDocument,
-  VehicleDriverJournal,
-  VehicleProjectJournal,
-  VehicleMonthlyCost,
+import {
+  VEHICLE_STATUS_LABELS,
+  type VehicleFull,
+  type VehicleTest,
+  type VehicleInsurance,
+  type VehicleDocument,
+  type VehicleDriverJournal,
+  type VehicleProjectJournal,
+  type VehicleMonthlyCost,
 } from '@/lib/fleet/vehicle-types'
 
 // ─────────────────────────────────────────────────────────────
@@ -263,21 +264,26 @@ export function VehicleCard({
           <div className="flex items-center gap-3 min-w-0">
             <div className="min-w-0 text-right">
               <div className="flex items-center gap-2 justify-end flex-wrap">
-                {vehicle.isActive ? (
-                  <span
-                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
-                    style={{ background: '#DCFCE7', color: '#16A34A', border: '1px solid #BBF7D0' }}
-                  >
-                    פעיל
-                  </span>
-                ) : (
-                  <span
-                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
-                    style={{ background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0' }}
-                  >
-                    לא פעיל
-                  </span>
-                )}
+                {(() => {
+                  const status = vehicle.vehicleStatus ?? (vehicle.isActive ? 'active' : 'suspended')
+                  const styles: Record<string, { bg: string; color: string; border: string }> = {
+                    active:         { bg: '#DCFCE7', color: '#16A34A', border: '#BBF7D0' },
+                    suspended:      { bg: '#FEF3C7', color: '#B45309', border: '#FDE68A' },
+                    returned:       { bg: '#FEE2E2', color: '#DC2626', border: '#FECACA' },
+                    sold:           { bg: '#FEE2E2', color: '#DC2626', border: '#FECACA' },
+                    decommissioned: { bg: '#FEE2E2', color: '#DC2626', border: '#FECACA' },
+                  }
+                  const s = styles[status] ?? styles.active
+                  const label = VEHICLE_STATUS_LABELS[status] ?? 'פעיל'
+                  return (
+                    <span
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold"
+                      style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}` }}
+                    >
+                      {label}
+                    </span>
+                  )
+                })()}
                 <h1 className="text-2xl font-black text-foreground leading-tight tracking-tight" dir="ltr">
                   {formatLicensePlate(vehicle.licensePlate)}
                 </h1>
@@ -359,7 +365,6 @@ export function VehicleCard({
           >
             <VehicleDetailsSection
               vehicle={vehicle}
-              companies={companies}
               onEditingChange={onDetailsEditingChange}
             />
           </div>

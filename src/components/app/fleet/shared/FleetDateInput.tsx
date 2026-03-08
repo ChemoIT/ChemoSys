@@ -36,10 +36,25 @@ export function FleetDateInput({
   const currentYear = new Date().getFullYear()
   const maxY = maxYear ?? currentYear + 20
 
+  // Today's date parts — used as defaults when user focuses an empty select
+  const todayDay = String(new Date().getDate()).padStart(2, '0')
+  const todayMonth = String(new Date().getMonth() + 1).padStart(2, '0')
+  const todayYear = String(currentYear)
+
   // Internal state for partial selections
   const [day, setDay] = useState('')
   const [month, setMonth] = useState('')
   const [year, setYear] = useState('')
+
+  /** When user focuses an empty select, pre-fill all three to today */
+  function handleFocusDefault() {
+    if (!day && !month && !year) {
+      setDay(todayDay)
+      setMonth(todayMonth)
+      setYear(todayYear)
+      emit(todayDay, todayMonth, todayYear)
+    }
+  }
 
   // Sync internal state from external value changes (e.g. quick-expiry buttons)
   useEffect(() => {
@@ -79,6 +94,7 @@ export function FleetDateInput({
       <select
         value={day}
         onChange={(e) => { setDay(e.target.value); emit(e.target.value, month, year) }}
+        onFocus={handleFocusDefault}
         className={`${selectClass} w-[4.5rem]`}
         disabled={disabled}
       >
@@ -96,6 +112,7 @@ export function FleetDateInput({
       <select
         value={month}
         onChange={(e) => { setMonth(e.target.value); emit(day, e.target.value, year) }}
+        onFocus={handleFocusDefault}
         className={`${selectClass} w-[4.5rem]`}
         disabled={disabled}
       >
@@ -113,12 +130,13 @@ export function FleetDateInput({
       <select
         value={year}
         onChange={(e) => { setYear(e.target.value); emit(day, month, e.target.value) }}
+        onFocus={handleFocusDefault}
         className={`${selectClass} w-[5.5rem]`}
         disabled={disabled}
       >
         <option value="">שנה</option>
         {Array.from({ length: maxY - minYear + 1 }, (_, i) => {
-          const y = maxY - i
+          const y = minYear + i
           return (
             <option key={y} value={String(y)}>
               {y}

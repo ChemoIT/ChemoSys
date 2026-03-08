@@ -89,6 +89,7 @@ type AddReplacementInput = {
   reason: 'maintenance' | 'test' | 'accident' | 'other'
   reasonOther?: string | null
   notes?: string | null
+  motData?: Record<string, unknown> | null
 }
 
 export async function addVehicleReplacementRecord(
@@ -131,6 +132,7 @@ export async function addVehicleReplacementRecord(
       reason: input.reason,
       reason_other: input.reasonOther?.trim() ?? null,
       notes: input.notes?.trim() ?? null,
+      mot_data: input.motData ?? null,
       created_by: userId,
     })
     .select('id')
@@ -164,6 +166,7 @@ type UpdateReplacementInput = {
   reason: 'maintenance' | 'test' | 'accident' | 'other'
   reasonOther?: string | null
   notes?: string | null
+  motData?: Record<string, unknown> | null
 }
 
 export async function updateVehicleReplacementRecord(
@@ -187,6 +190,7 @@ export async function updateVehicleReplacementRecord(
       reason: input.reason,
       reason_other: input.reasonOther?.trim() ?? null,
       notes: input.notes?.trim() ?? null,
+      mot_data: input.motData ?? null,
       updated_by: userId,
     })
     .eq('id', input.recordId)
@@ -229,12 +233,43 @@ export async function deleteVehicleReplacementRecord(
   const { userId } = await verifyAppUser()
   const supabase = await createClient()
 
+  // Check if the record being deleted is active (no return_date)
+  const { data: record } = await supabase
+    .from('vehicle_replacement_records')
+    .select('return_date')
+    .eq('id', recordId)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  const wasActive = record && !record.return_date
+
   const { error } = await supabase.rpc('soft_delete_vehicle_replacement_record', {
     p_id: recordId,
     p_user_id: userId,
   })
 
   if (error) return { success: false, error: 'שגיאה במחיקת רכב חלופי' }
+
+  // If deleted record was active → check if any other active replacement exists
+  if (wasActive) {
+    const { data: otherActive } = await supabase
+      .from('vehicle_replacement_records')
+      .select('id')
+      .eq('vehicle_id', vehicleId)
+      .is('return_date', null)
+      .is('deleted_at', null)
+      .neq('id', recordId)
+      .maybeSingle()
+
+    if (!otherActive) {
+      // No more active replacements → restore original vehicle to active
+      await supabase
+        .from('vehicles')
+        .update({ vehicle_status: 'active', is_active: true, updated_by: userId })
+        .eq('id', vehicleId)
+        .is('deleted_at', null)
+    }
+  }
 
   revalidatePath('/app/fleet/vehicle-card/' + vehicleId)
   return { success: true }
