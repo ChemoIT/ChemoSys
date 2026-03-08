@@ -164,7 +164,7 @@ Plans:
 | 13. Phase 10C — Vehicle Server Actions + Shared Components | v2.0 | 2/2 | Complete | 2026-03-07 |
 | 14. Phase 10E — VehicleCard Full UI (8 Tabs) | v2.0 | 2/2 | Complete | 2026-03-07 |
 | 15. Phase 10F — VehicleList + AddVehicleDialog | v2.0 | 1/2 | In progress | - |
-| 16. Vehicle Card Redesign — DB Migration | v2.0 | 0/? | Not started | - |
+| 16. Vehicle Card Redesign — DB Migration | v2.0 | 2/2 | Complete | 2026-03-08 |
 | 17. Vehicle Card Redesign — Details + Images + Replacement | v2.0 | 0/? | Not started | - |
 | 18. Vehicle Card Redesign — Ownership + Licensing & Insurance | v2.0 | 0/? | Not started | - |
 | 19. Vehicle Card Redesign — Assignment (צמידות) + Documents | v2.0 | 0/? | Not started | - |
@@ -233,8 +233,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 16-01-PLAN.md — Main migration 00027: ALTER TABLE vehicles (9 columns + constraints) + vehicle_suppliers + 6 new tables + views + RPC + RLS
-- [ ] 16-02-PLAN.md — Storage policies migration 00028 (vehicle-images bucket) + human verification of both migrations in Supabase
+- [x] 16-01-PLAN.md — Main migration 00027: ALTER TABLE vehicles (9 columns + constraints) + vehicle_suppliers + 6 new tables + views + RPC + RLS
+- [x] 16-02-PLAN.md — Storage policies migration 00028 (vehicle-images bucket) + human verification of both migrations in Supabase
 
 ### Phase 17: Vehicle Card Redesign — Details Tab + Images + Replacement Vehicle
 
