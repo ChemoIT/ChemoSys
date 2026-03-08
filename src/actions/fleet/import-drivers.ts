@@ -494,8 +494,8 @@ export async function executeDriverImport(fileBuffer: Buffer): Promise<ImportRes
   const { userId } = await verifySession()
   const admin = createImportClient()
 
-  // Re-run dry-run to get fresh matched data
-  const report = await dryRunDriverImport(fileBuffer)
+  // Parse file once (dry-run already ran on client side — no need to repeat)
+  const { parsed: allParsed } = await parseDriversFile(fileBuffer)
 
   const result: ImportResult = {
     success: true,
@@ -509,7 +509,70 @@ export async function executeDriverImport(fileBuffer: Buffer): Promise<ImportRes
     errors: [],
   }
 
-  for (const item of report.importReady) {
+  // ── 1. Fetch ALL lookup tables in parallel ──
+  const [companiesResult, employees, existingDriversAll] = await Promise.all([
+    admin.from('companies').select('id, name, internal_number').is('deleted_at', null),
+    fetchAllRows(admin, 'employees', 'id, employee_number, company_id, mobile_phone, status, deleted_at'),
+    fetchAllRows(admin, 'drivers', 'id, employee_id, deleted_at'),
+  ])
+
+  // Build company code → UUID map
+  const companyMap = new Map<string, string>()
+  for (const c of companiesResult.data ?? []) {
+    companyMap.set(c.internal_number, c.id)
+  }
+
+  // Build employee lookups
+  const empLookup = new Map<string, { id: string; phone: string | null }>()
+  const empByNumber = new Map<string, { id: string; phone: string | null; companyId: string }[]>()
+  for (const e of employees) {
+    const key = `${e.employee_number}__${e.company_id}`
+    empLookup.set(key, { id: e.id, phone: e.mobile_phone })
+    const list = empByNumber.get(e.employee_number) ?? []
+    list.push({ id: e.id, phone: e.mobile_phone, companyId: e.company_id })
+    empByNumber.set(e.employee_number, list)
+  }
+
+  // Build existing driver map
+  const existingDriverMap = new Map<string, { id: string; deletedAt: string | null }>()
+  for (const d of existingDriversAll) {
+    const existing = existingDriverMap.get(d.employee_id)
+    if (!existing || (existing.deletedAt && !d.deleted_at)) {
+      existingDriverMap.set(d.employee_id, { id: d.id, deletedAt: d.deleted_at })
+    }
+  }
+
+  // ── 2. Match parsed drivers to employees (same logic as dry-run) ──
+  type ImportReadyItem = { parsed: ParsedDriver; employeeId: string; phoneOverride: string | null; mode: 'insert' | 'update'; existingDriverId?: string }
+  const importReady: ImportReadyItem[] = []
+
+  for (const p of allParsed) {
+    const companyId = companyMap.get(p.companyCode)
+    if (!companyId) continue
+
+    const key = `${p.employeeNumber}__${companyId}`
+    let emp = empLookup.get(key)
+    if (!emp) {
+      const candidates = empByNumber.get(p.employeeNumber)
+      if (candidates?.length === 1) emp = { id: candidates[0].id, phone: candidates[0].phone }
+    }
+    if (!emp) continue
+
+    let phoneOverride: string | null = null
+    if (p.phone && (!emp.phone || emp.phone !== p.phone)) {
+      phoneOverride = p.phone
+    }
+
+    const existingDriver = existingDriverMap.get(emp.id)
+    if (existingDriver && !existingDriver.deletedAt) {
+      importReady.push({ parsed: p, employeeId: emp.id, phoneOverride, mode: 'update', existingDriverId: existingDriver.id })
+    } else {
+      importReady.push({ parsed: p, employeeId: emp.id, phoneOverride, mode: 'insert', existingDriverId: existingDriver?.id })
+    }
+  }
+
+  // ── 3. Process each driver ──
+  for (const item of importReady) {
     const { parsed, employeeId, phoneOverride, mode, existingDriverId } = item
 
     let driverId: string
@@ -555,35 +618,36 @@ export async function executeDriverImport(fileBuffer: Buffer): Promise<ImportRes
         }
       }
 
-      // Merge documents: delete all existing (hard) + re-insert from file
+      // Batch documents: delete all + re-insert as batch
       await admin.from('driver_documents').delete().eq('driver_id', driverId)
-      for (const doc of parsed.documents) {
-        const { error: docErr } = await admin
-          .from('driver_documents')
-          .insert({
-            driver_id: driverId,
-            document_name: doc.name,
-            expiry_date: doc.expiryDate,
-            alert_enabled: doc.alertOnExpiry,
-            deleted_at: doc.isActive ? null : new Date().toISOString(),
-            created_by: userId,
-            updated_by: userId,
-          })
+      if (parsed.documents.length > 0) {
+        const docRows = parsed.documents.map(doc => ({
+          driver_id: driverId,
+          document_name: doc.name,
+          expiry_date: doc.expiryDate,
+          alert_enabled: doc.alertOnExpiry,
+          deleted_at: doc.isActive ? null : new Date().toISOString(),
+          created_by: userId,
+          updated_by: userId,
+        }))
+        const { error: docErr } = await admin.from('driver_documents').insert(docRows)
         if (docErr) {
-          result.errors.push(`מסמך "${doc.name}" של נהג ${parsed.employeeNumber}: ${docErr.message}`)
+          result.errors.push(`מסמכים נהג ${parsed.employeeNumber}: ${docErr.message}`)
         } else {
-          result.documentsUpdated++
+          result.documentsUpdated += docRows.length
         }
       }
 
     } else {
       // ── INSERT new driver ──
 
-      // If soft-deleted driver exists, hard-delete it first (unique constraint on employee_id)
+      // If soft-deleted driver exists, hard-delete it first — in parallel
       if (existingDriverId) {
-        await admin.from('driver_violations').delete().eq('driver_id', existingDriverId)
-        await admin.from('driver_documents').delete().eq('driver_id', existingDriverId)
-        await admin.from('driver_licenses').delete().eq('driver_id', existingDriverId)
+        await Promise.all([
+          admin.from('driver_violations').delete().eq('driver_id', existingDriverId),
+          admin.from('driver_documents').delete().eq('driver_id', existingDriverId),
+          admin.from('driver_licenses').delete().eq('driver_id', existingDriverId),
+        ])
         await admin.from('drivers').delete().eq('id', existingDriverId)
       }
 
@@ -629,42 +693,40 @@ export async function executeDriverImport(fileBuffer: Buffer): Promise<ImportRes
         }
       }
 
-      // Insert documents
-      for (const doc of parsed.documents) {
-        const { error: docErr } = await admin
-          .from('driver_documents')
-          .insert({
-            driver_id: driverId,
-            document_name: doc.name,
-            expiry_date: doc.expiryDate,
-            alert_enabled: doc.alertOnExpiry,
-            deleted_at: doc.isActive ? null : new Date().toISOString(),
-            created_by: userId,
-            updated_by: userId,
-          })
+      // Batch insert documents
+      if (parsed.documents.length > 0) {
+        const docRows = parsed.documents.map(doc => ({
+          driver_id: driverId,
+          document_name: doc.name,
+          expiry_date: doc.expiryDate,
+          alert_enabled: doc.alertOnExpiry,
+          deleted_at: doc.isActive ? null : new Date().toISOString(),
+          created_by: userId,
+          updated_by: userId,
+        }))
+        const { error: docErr } = await admin.from('driver_documents').insert(docRows)
         if (docErr) {
-          result.errors.push(`מסמך "${doc.name}" של נהג ${parsed.employeeNumber}: ${docErr.message}`)
+          result.errors.push(`מסמכים נהג ${parsed.employeeNumber}: ${docErr.message}`)
         } else {
-          result.documentsCreated++
+          result.documentsCreated += docRows.length
         }
       }
     }
   }
 
-  // 4. Upsert document names
-  const allDocNames = new Map<string, number>()
-  for (const item of report.importReady) {
+  // 4. Batch upsert document names — all RPC calls in parallel
+  const allDocNames = new Set<string>()
+  for (const item of importReady) {
     for (const doc of item.parsed.documents) {
-      allDocNames.set(doc.name, (allDocNames.get(doc.name) ?? 0) + 1)
+      allDocNames.add(doc.name)
     }
   }
 
-  for (const [name, count] of allDocNames) {
-    const { error: nameErr } = await admin.rpc('increment_document_name_usage', {
-      p_name: name,
-    })
-    if (!nameErr) result.documentNamesUpserted++
-    // Fire-and-forget: don't fail import for autocomplete upsert errors
+  if (allDocNames.size > 0) {
+    const rpcResults = await Promise.all(
+      [...allDocNames].map(name => admin.rpc('increment_document_name_usage', { p_name: name }))
+    )
+    result.documentNamesUpserted = rpcResults.filter(r => !r.error).length
   }
 
   if (result.errors.length > 0) {

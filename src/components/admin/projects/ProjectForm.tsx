@@ -173,13 +173,17 @@ export function ProjectForm({
   const [status, setStatus]           = useState<string>(project?.status ?? 'active')
 
   // ── Section 2: PM state ──
+  const [pmIsEmployee, setPmIsEmployee] = useState(project?.pm_is_employee ?? true)
   const [pmId, setPmId]       = useState(project?.project_manager_id ?? '')
+  const [pmName, setPmName]   = useState(project?.pm_name ?? '')
   const [pmEmail, setPmEmail] = useState(project?.pm_email ?? '')
   const [pmPhone, setPmPhone] = useState(project?.pm_phone ?? '')
   const [pmNotif, setPmNotif] = useState(project?.pm_notifications ?? true)
 
   // ── Section 2: SM state ──
+  const [smIsEmployee, setSmIsEmployee] = useState(project?.sm_is_employee ?? true)
   const [smId, setSmId]       = useState(project?.site_manager_id ?? '')
+  const [smName, setSmName]   = useState(project?.sm_name ?? '')
   const [smEmail, setSmEmail] = useState(project?.sm_email ?? '')
   const [smPhone, setSmPhone] = useState(project?.sm_phone ?? '')
   const [smNotif, setSmNotif] = useState(project?.sm_notifications ?? true)
@@ -215,12 +219,16 @@ export function ProjectForm({
     setProjectType(project?.project_type ?? '')
     setStatus(project?.status ?? 'active')
 
+    setPmIsEmployee(project?.pm_is_employee ?? true)
     setPmId(project?.project_manager_id ?? '')
+    setPmName(project?.pm_name ?? '')
     setPmEmail(project?.pm_email ?? '')
     setPmPhone(project?.pm_phone ?? '')
     setPmNotif(project?.pm_notifications ?? true)
 
+    setSmIsEmployee(project?.sm_is_employee ?? true)
     setSmId(project?.site_manager_id ?? '')
+    setSmName(project?.sm_name ?? '')
     setSmEmail(project?.sm_email ?? '')
     setSmPhone(project?.sm_phone ?? '')
     setSmNotif(project?.sm_notifications ?? true)
@@ -478,42 +486,106 @@ export function ProjectForm({
               {/* ── Project Manager ── */}
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-2">מנהל פרויקט</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <FieldLabel>בחירת עובד</FieldLabel>
-                    <EmployeeCombobox
-                      employees={employees}
-                      value={pmId}
-                      onChange={(id, emp) => {
-                        setPmId(id)
-                        setPmEmail(emp.email ?? '')
-                        setPmPhone(formatIsraeliPhone(emp.mobile_phone))
+
+                {/* PM mode toggle — employee selector vs free text */}
+                <div className="flex items-center gap-4 mb-3">
+                  <span className="text-xs font-medium text-muted-foreground">אופן בחירה:</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="_pm_mode_radio"
+                      value="employee"
+                      checked={pmIsEmployee}
+                      onChange={() => {
+                        setPmIsEmployee(true)
+                        setPmName('')
+                        setPmEmail('')
+                        setPmPhone('')
                       }}
-                      placeholder="בחר מנהל פרויקט"
+                      className="h-4 w-4"
                     />
+                    <span className="text-xs">בחירה מרשימת עובדים</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="_pm_mode_radio"
+                      value="manual"
+                      checked={!pmIsEmployee}
+                      onChange={() => {
+                        setPmIsEmployee(false)
+                        setPmId('')
+                        setPmEmail('')
+                        setPmPhone('')
+                      }}
+                      className="h-4 w-4"
+                    />
+                    <span className="text-xs">רישום חופשי</span>
+                  </label>
+                </div>
+
+                {pmIsEmployee ? (
+                  /* Employee mode — select from list, email/phone auto-pulled */
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <FieldLabel>בחירת עובד</FieldLabel>
+                      <EmployeeCombobox
+                        employees={employees}
+                        value={pmId}
+                        onChange={(id, emp) => {
+                          setPmId(id)
+                          setPmEmail(emp.email ?? '')
+                          setPmPhone(formatIsraeliPhone(emp.mobile_phone))
+                        }}
+                        placeholder="בחר מנהל פרויקט"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <FieldLabel>מייל (מתוך רישום העובד)</FieldLabel>
+                        <Input value={pmEmail} disabled placeholder="יתמלא אוטומטית" dir="ltr" className="bg-muted/30" />
+                      </div>
+                      <div className="space-y-1">
+                        <FieldLabel>טלפון (מתוך רישום העובד)</FieldLabel>
+                        <Input value={pmPhone} disabled placeholder="יתמלא אוטומטית" dir="ltr" className="bg-muted/30" />
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                ) : (
+                  /* Free-text mode — name + email + phone manual entry */
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <FieldLabel required>שם מנהל</FieldLabel>
+                      <Input
+                        value={pmName}
+                        onChange={(e) => setPmName(e.target.value)}
+                        placeholder="שם מלא"
+                      />
+                      <FieldError errors={errors} field="pm_name" />
+                    </div>
                     <div className="space-y-1">
                       <FieldLabel>מייל</FieldLabel>
                       <Input
                         value={pmEmail}
                         onChange={(e) => setPmEmail(e.target.value)}
                         type="email"
-                        placeholder="מייל מנהל"
+                        placeholder="email@company.com"
                         dir="ltr"
                       />
                     </div>
                     <div className="space-y-1">
-                      <FieldLabel>טלפון</FieldLabel>
+                      <FieldLabel required>טלפון נייד</FieldLabel>
                       <Input
                         value={pmPhone}
                         onChange={(e) => setPmPhone(e.target.value)}
-                        placeholder="טלפון מנהל"
+                        placeholder="05x-xxxxxxx"
                         dir="ltr"
                       />
+                      <FieldError errors={errors} field="pm_phone" />
                     </div>
                   </div>
-                </div>
+                )}
+
                 <div className="flex items-center gap-2 mt-2">
                   <input
                     type="checkbox"
@@ -528,8 +600,10 @@ export function ProjectForm({
                 </div>
               </div>
 
-              {/* Hidden inputs for PM — Server Action reads these (not the combobox display) */}
+              {/* Hidden inputs for PM — Server Action reads these */}
               <input type="hidden" name="project_manager_id" value={pmId} />
+              <input type="hidden" name="pm_is_employee" value={pmIsEmployee ? 'true' : 'false'} />
+              <input type="hidden" name="pm_name" value={pmName} />
               <input type="hidden" name="pm_email" value={pmEmail} />
               <input type="hidden" name="pm_phone" value={pmPhone} />
               <input type="hidden" name="pm_notifications" value={pmNotif ? 'true' : 'false'} />
@@ -539,42 +613,106 @@ export function ProjectForm({
               {/* ── Site Manager ── */}
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-2">מנהל עבודה</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <FieldLabel>בחירת עובד</FieldLabel>
-                    <EmployeeCombobox
-                      employees={employees}
-                      value={smId}
-                      onChange={(id, emp) => {
-                        setSmId(id)
-                        setSmEmail(emp.email ?? '')
-                        setSmPhone(formatIsraeliPhone(emp.mobile_phone))
+
+                {/* SM mode toggle — employee selector vs free text */}
+                <div className="flex items-center gap-4 mb-3">
+                  <span className="text-xs font-medium text-muted-foreground">אופן בחירה:</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="_sm_mode_radio"
+                      value="employee"
+                      checked={smIsEmployee}
+                      onChange={() => {
+                        setSmIsEmployee(true)
+                        setSmName('')
+                        setSmEmail('')
+                        setSmPhone('')
                       }}
-                      placeholder="בחר מנהל עבודה"
+                      className="h-4 w-4"
                     />
+                    <span className="text-xs">בחירה מרשימת עובדים</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="_sm_mode_radio"
+                      value="manual"
+                      checked={!smIsEmployee}
+                      onChange={() => {
+                        setSmIsEmployee(false)
+                        setSmId('')
+                        setSmEmail('')
+                        setSmPhone('')
+                      }}
+                      className="h-4 w-4"
+                    />
+                    <span className="text-xs">רישום חופשי</span>
+                  </label>
+                </div>
+
+                {smIsEmployee ? (
+                  /* Employee mode — select from list, email/phone auto-pulled */
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <FieldLabel>בחירת עובד</FieldLabel>
+                      <EmployeeCombobox
+                        employees={employees}
+                        value={smId}
+                        onChange={(id, emp) => {
+                          setSmId(id)
+                          setSmEmail(emp.email ?? '')
+                          setSmPhone(formatIsraeliPhone(emp.mobile_phone))
+                        }}
+                        placeholder="בחר מנהל עבודה"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <FieldLabel>מייל (מתוך רישום העובד)</FieldLabel>
+                        <Input value={smEmail} disabled placeholder="יתמלא אוטומטית" dir="ltr" className="bg-muted/30" />
+                      </div>
+                      <div className="space-y-1">
+                        <FieldLabel>טלפון (מתוך רישום העובד)</FieldLabel>
+                        <Input value={smPhone} disabled placeholder="יתמלא אוטומטית" dir="ltr" className="bg-muted/30" />
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                ) : (
+                  /* Free-text mode — name + email + phone manual entry */
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <FieldLabel required>שם מנהל</FieldLabel>
+                      <Input
+                        value={smName}
+                        onChange={(e) => setSmName(e.target.value)}
+                        placeholder="שם מלא"
+                      />
+                      <FieldError errors={errors} field="sm_name" />
+                    </div>
                     <div className="space-y-1">
                       <FieldLabel>מייל</FieldLabel>
                       <Input
                         value={smEmail}
                         onChange={(e) => setSmEmail(e.target.value)}
                         type="email"
-                        placeholder="מייל מנהל"
+                        placeholder="email@company.com"
                         dir="ltr"
                       />
                     </div>
                     <div className="space-y-1">
-                      <FieldLabel>טלפון</FieldLabel>
+                      <FieldLabel required>טלפון נייד</FieldLabel>
                       <Input
                         value={smPhone}
                         onChange={(e) => setSmPhone(e.target.value)}
-                        placeholder="טלפון מנהל"
+                        placeholder="05x-xxxxxxx"
                         dir="ltr"
                       />
+                      <FieldError errors={errors} field="sm_phone" />
                     </div>
                   </div>
-                </div>
+                )}
+
                 <div className="flex items-center gap-2 mt-2">
                   <input
                     type="checkbox"
@@ -591,6 +729,8 @@ export function ProjectForm({
 
               {/* Hidden inputs for SM */}
               <input type="hidden" name="site_manager_id" value={smId} />
+              <input type="hidden" name="sm_is_employee" value={smIsEmployee ? 'true' : 'false'} />
+              <input type="hidden" name="sm_name" value={smName} />
               <input type="hidden" name="sm_email" value={smEmail} />
               <input type="hidden" name="sm_phone" value={smPhone} />
               <input type="hidden" name="sm_notifications" value={smNotif ? 'true' : 'false'} />

@@ -389,11 +389,15 @@ export interface Database {
           status: 'active' | 'view_only' | 'inactive'
           // Project Manager
           project_manager_id: string | null
+          pm_is_employee: boolean
+          pm_name: string | null
           pm_email: string | null
           pm_phone: string | null
           pm_notifications: boolean
           // Site Manager
           site_manager_id: string | null
+          sm_is_employee: boolean
+          sm_name: string | null
           sm_email: string | null
           sm_phone: string | null
           sm_notifications: boolean
@@ -435,11 +439,15 @@ export interface Database {
           status?: 'active' | 'view_only' | 'inactive'
           // Project Manager
           project_manager_id?: string | null
+          pm_is_employee?: boolean
+          pm_name?: string | null
           pm_email?: string | null
           pm_phone?: string | null
           pm_notifications?: boolean
           // Site Manager
           site_manager_id?: string | null
+          sm_is_employee?: boolean
+          sm_name?: string | null
           sm_email?: string | null
           sm_phone?: string | null
           sm_notifications?: boolean

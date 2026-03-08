@@ -75,7 +75,9 @@ export async function createProject(
   // Normalise boolean fields (FormData sends strings; Zod expects boolean)
   const processedData = {
     ...rawData,
+    pm_is_employee:            formDataToBoolean(formData.get('pm_is_employee'), true),
     pm_notifications:          formDataToBoolean(formData.get('pm_notifications'), true),
+    sm_is_employee:            formDataToBoolean(formData.get('sm_is_employee'), true),
     sm_notifications:          formDataToBoolean(formData.get('sm_notifications'), true),
     cvc_is_employee:           formDataToBoolean(formData.get('cvc_is_employee'), true),
     supervision_notifications:  formDataToBoolean(formData.get('supervision_notifications'), false),
@@ -101,14 +103,18 @@ export async function createProject(
       project_type:   input.project_type ?? null,
       status:         input.status,
 
-      // PM
-      project_manager_id: nullIfEmpty(input.project_manager_id),
+      // PM — when free-text, clear employee_id
+      project_manager_id: input.pm_is_employee ? nullIfEmpty(input.project_manager_id) : null,
+      pm_is_employee:     input.pm_is_employee,
+      pm_name:            nullIfEmpty(input.pm_name),
       pm_email:           nullIfEmpty(input.pm_email),
       pm_phone:           nullIfEmpty(input.pm_phone),
       pm_notifications:   input.pm_notifications,
 
-      // SM
-      site_manager_id:  nullIfEmpty(input.site_manager_id),
+      // SM — when free-text, clear employee_id
+      site_manager_id:  input.sm_is_employee ? nullIfEmpty(input.site_manager_id) : null,
+      sm_is_employee:   input.sm_is_employee,
+      sm_name:          nullIfEmpty(input.sm_name),
       sm_email:         nullIfEmpty(input.sm_email),
       sm_phone:         nullIfEmpty(input.sm_phone),
       sm_notifications: input.sm_notifications,
@@ -214,7 +220,9 @@ export async function updateProject(
 
   const processedData = {
     ...rawData,
+    pm_is_employee:             formDataToBoolean(formData.get('pm_is_employee'), true),
     pm_notifications:           formDataToBoolean(formData.get('pm_notifications'), true),
+    sm_is_employee:             formDataToBoolean(formData.get('sm_is_employee'), true),
     sm_notifications:           formDataToBoolean(formData.get('sm_notifications'), true),
     cvc_is_employee:            formDataToBoolean(formData.get('cvc_is_employee'), true),
     supervision_notifications:  formDataToBoolean(formData.get('supervision_notifications'), false),
@@ -247,14 +255,18 @@ export async function updateProject(
       project_type:   input.project_type ?? null,
       status:         input.status,
 
-      // PM
-      project_manager_id: nullIfEmpty(input.project_manager_id),
+      // PM — when free-text, clear employee_id
+      project_manager_id: input.pm_is_employee ? nullIfEmpty(input.project_manager_id) : null,
+      pm_is_employee:     input.pm_is_employee,
+      pm_name:            nullIfEmpty(input.pm_name),
       pm_email:           nullIfEmpty(input.pm_email),
       pm_phone:           nullIfEmpty(input.pm_phone),
       pm_notifications:   input.pm_notifications,
 
-      // SM
-      site_manager_id:  nullIfEmpty(input.site_manager_id),
+      // SM — when free-text, clear employee_id
+      site_manager_id:  input.sm_is_employee ? nullIfEmpty(input.site_manager_id) : null,
+      sm_is_employee:   input.sm_is_employee,
+      sm_name:          nullIfEmpty(input.sm_name),
       sm_email:         nullIfEmpty(input.sm_email),
       sm_phone:         nullIfEmpty(input.sm_phone),
       sm_notifications: input.sm_notifications,

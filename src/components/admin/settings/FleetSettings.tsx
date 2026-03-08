@@ -31,6 +31,8 @@ import { saveIntegrationSettings } from '@/actions/settings'
 import type { FleetSettingsData } from '@/actions/settings'
 import { testMotApiConnection } from '@/actions/fleet/mot-sync'
 import { DriversImportSection } from './DriversImportSection'
+import { VehiclesImportSection } from './VehiclesImportSection'
+import { ProjectsImportSection } from './ProjectsImportSection'
 
 type Props = {
   settings: FleetSettingsData
@@ -384,6 +386,16 @@ export function FleetSettings({ settings }: Props) {
 
       {/* ── 8. Drivers.top Import ─────────────────────────────── */}
       <DriversImportSection />
+
+      <Separator className="my-6" />
+
+      {/* ── 9. CarList.top Import ──────────────────────────────── */}
+      <VehiclesImportSection />
+
+      <Separator className="my-6" />
+
+      {/* ── 10. SystemProject.top Import ─────────────────────────── */}
+      <ProjectsImportSection />
     </div>
   )
 }

@@ -243,18 +243,20 @@ export function ProjectsTable({ projects, employees, clocks }: ProjectsTableProp
     },
     {
       id: 'project_manager',
-      accessorFn: (row) =>
-        row.project_manager
-          ? `${row.project_manager.first_name} ${row.project_manager.last_name}`
-          : '—',
+      accessorFn: (row) => {
+        if (!row.pm_is_employee && row.pm_name) return row.pm_name
+        if (row.project_manager) return `${row.project_manager.first_name} ${row.project_manager.last_name}`
+        return '—'
+      },
       header: 'מנהל פרויקט',
     },
     {
       id: 'site_manager',
-      accessorFn: (row) =>
-        row.site_manager
-          ? `${row.site_manager.first_name} ${row.site_manager.last_name}`
-          : '—',
+      accessorFn: (row) => {
+        if (!row.sm_is_employee && row.sm_name) return row.sm_name
+        if (row.site_manager) return `${row.site_manager.first_name} ${row.site_manager.last_name}`
+        return '—'
+      },
       header: 'מנהל עבודה',
     },
     {

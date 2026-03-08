@@ -123,12 +123,16 @@ export const ProjectSchema = z
 
     // Project Manager
     project_manager_id: z.string().uuid('מנהל פרויקט לא תקין').optional().or(z.literal('')),
+    pm_is_employee:     z.boolean().default(true),
+    pm_name:            z.string().optional().or(z.literal('')),
     pm_email:           z.string().optional().or(z.literal('')),
     pm_phone:           optionalPhone(),
     pm_notifications:   z.boolean().default(true),
 
     // Site Manager
     site_manager_id:  z.string().uuid('מנהל אתר לא תקין').optional().or(z.literal('')),
+    sm_is_employee:   z.boolean().default(true),
+    sm_name:          z.string().optional().or(z.literal('')),
     sm_email:         z.string().optional().or(z.literal('')),
     sm_phone:         optionalPhone(),
     sm_notifications: z.boolean().default(true),
@@ -160,6 +164,44 @@ export const ProjectSchema = z
     attendance_clocks: z.string().optional().or(z.literal('')),
   })
   .superRefine((data, ctx) => {
+    // Conditional PM validation:
+    // When pm_is_employee is false (free text), name and phone are required.
+    if (!data.pm_is_employee) {
+      if (!data.pm_name || data.pm_name.trim() === '') {
+        ctx.addIssue({
+          code:    z.ZodIssueCode.custom,
+          path:    ['pm_name'],
+          message: 'שם מנהל פרויקט הוא שדה חובה ברישום חופשי',
+        })
+      }
+      if (!data.pm_phone || data.pm_phone.trim() === '') {
+        ctx.addIssue({
+          code:    z.ZodIssueCode.custom,
+          path:    ['pm_phone'],
+          message: 'טלפון מנהל פרויקט הוא שדה חובה ברישום חופשי',
+        })
+      }
+    }
+
+    // Conditional SM validation:
+    // When sm_is_employee is false (free text), name and phone are required.
+    if (!data.sm_is_employee) {
+      if (!data.sm_name || data.sm_name.trim() === '') {
+        ctx.addIssue({
+          code:    z.ZodIssueCode.custom,
+          path:    ['sm_name'],
+          message: 'שם מנהל עבודה הוא שדה חובה ברישום חופשי',
+        })
+      }
+      if (!data.sm_phone || data.sm_phone.trim() === '') {
+        ctx.addIssue({
+          code:    z.ZodIssueCode.custom,
+          path:    ['sm_phone'],
+          message: 'טלפון מנהל עבודה הוא שדה חובה ברישום חופשי',
+        })
+      }
+    }
+
     // Conditional CVC validation:
     // When cvc_is_employee is false (external contact), both name and phone are required.
     if (!data.cvc_is_employee) {
@@ -177,7 +219,6 @@ export const ProjectSchema = z
           message: 'טלפון אחראי רכב/מחנה הוא שדה חובה כאשר הרכז אינו עובד',
         })
       }
-      // Format validation handled by optionalPhone() transform+refine
     }
   })
 
