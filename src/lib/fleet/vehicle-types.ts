@@ -95,6 +95,12 @@ export type VehicleFull = {
   notes: string | null
   computedStatus: 'active' | 'inactive'
 
+  // Assignment / category fields (migration 00027)
+  vehicleCategory: 'camp' | 'assigned' | null
+  campResponsibleType: 'project_manager' | 'other' | null
+  campResponsibleName: string | null
+  campResponsiblePhone: string | null
+
   // Supplier FK fields (null = not linked)
   leasingCompanyId: string | null
   leasingCompanyName: string | null
@@ -160,6 +166,39 @@ export type VehicleDocument = {
   expiryDate: string | null    // yyyy-mm-dd
   alertEnabled: boolean
   notes: string | null
+  createdAt: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// VEHICLE DRIVER JOURNAL TYPE
+// Activity journal for driver assignments — one active record at a time
+// (end_date IS NULL = currently active). Historical facts, never deleted.
+// ─────────────────────────────────────────────────────────────
+
+export type VehicleDriverJournal = {
+  id: string
+  vehicleId: string
+  driverId: string
+  driverName: string | null  // joined from drivers → employees
+  startDate: string          // yyyy-mm-dd
+  endDate: string | null     // null = currently active
+  createdAt: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// VEHICLE PROJECT JOURNAL TYPE
+// Activity journal for project assignments — one active record at a time
+// (end_date IS NULL = currently active). Historical facts, never deleted.
+// ─────────────────────────────────────────────────────────────
+
+export type VehicleProjectJournal = {
+  id: string
+  vehicleId: string
+  projectId: string
+  projectName: string        // joined from projects
+  projectNumber: string      // joined from projects
+  startDate: string          // yyyy-mm-dd
+  endDate: string | null     // null = currently active
   createdAt: string
 }
 
