@@ -1,39 +1,42 @@
 'use client'
 
 /**
- * VehicleDetailsSection — Tab 1 of VehicleCard.
+ * VehicleDetailsSection -- Tab 1 of VehicleCard.
  *
  * Layout: two-column RTL grid
  *  Right column (first in RTL): MOT data (read-only, gray background)
- *  Left column: operational fields (editable)
+ *  Left column: operational fields (editable) + image gallery
  *
  * MOT fields: license plate, manufacturer, model, commercial name, year, color,
  *   fuel type, chassis, engine model, trim level, emission group, ownership (MOT),
- *   registration date, last sync date + "עדכן ממשרד הרישוי" button
+ *   registration date, last sync date + button
  *
- * Operational fields: vehicle type, ownership type, company, is_active,
- *   leasing company, insurance company, fuel card supplier, garage
+ * Operational fields: image gallery, vehicle type, vehicle status,
+ *   fleet exit date, ownership type, company, leasing, insurance, fuel card, garage
  *
+ * Lock logic: returned/sold/decommissioned => all fields disabled except vehicle_status
  * Supplier dropdowns: fetched via getActiveSuppliersByType() on mount.
  * Dirty tracking: compare current form vs original vehicle data.
  */
 
 import { useState, useEffect, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Loader2, RefreshCw, Save } from 'lucide-react'
+import { Loader2, RefreshCw, Save, Lock, Car } from 'lucide-react'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { getActiveSuppliersByType, updateVehicleDetails } from '@/actions/fleet/vehicles'
 import { syncVehicleFromMot } from '@/actions/fleet/mot-sync'
 import { formatLicensePlate, formatDate } from '@/lib/format'
 import {
   VEHICLE_TYPE_LABELS,
   OWNERSHIP_TYPE_LABELS,
+  VEHICLE_STATUS_LABELS,
   type VehicleFull,
 } from '@/lib/fleet/vehicle-types'
+import { VehicleImageGallery } from './VehicleImageGallery'
+import { FleetDateInput } from '@/components/app/fleet/shared/FleetDateInput'
 
 // ─────────────────────────────────────────────────────────────
-// InfoRow — read-only display row
+// InfoRow -- read-only display row
 // ─────────────────────────────────────────────────────────────
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -62,37 +65,46 @@ type Props = {
 
 type SupplierOption = { id: string; name: string }
 
+// Statuses that lock the card (all fields disabled except vehicle_status)
+const LOCKED_STATUSES = ['returned', 'sold', 'decommissioned'] as const
+type LockedStatus = typeof LOCKED_STATUSES[number]
+
 // ─────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────
 
 export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: Props) {
-  // ── Editable form state ──
+  // -- Editable form state --
   const [vehicleType, setVehicleType] = useState(vehicle.vehicleType ?? '')
   const [ownershipType, setOwnershipType] = useState(vehicle.ownershipType ?? '')
   const [companyId, setCompanyId] = useState(vehicle.companyId ?? '')
-  const [isActive, setIsActive] = useState(vehicle.isActive)
+  const [vehicleStatus, setVehicleStatus] = useState(vehicle.vehicleStatus ?? 'active')
+  const [fleetExitDate, setFleetExitDate] = useState(vehicle.fleetExitDate ?? '')
   const [leasingCompanyId, setLeasingCompanyId] = useState(vehicle.leasingCompanyId ?? '')
   const [insuranceCompanyId, setInsuranceCompanyId] = useState(vehicle.insuranceCompanyId ?? '')
   const [fuelCardSupplierId, setFuelCardSupplierId] = useState(vehicle.fuelCardSupplierId ?? '')
   const [garageId, setGarageId] = useState(vehicle.garageId ?? '')
 
-  // ── Supplier options ──
+  // -- Lock state (derived from vehicleStatus) --
+  const isLocked = LOCKED_STATUSES.includes(vehicleStatus as LockedStatus)
+
+  // -- Supplier options --
   const [leasingSuppliers, setLeasingSuppliers] = useState<SupplierOption[]>([])
   const [insuranceSuppliers, setInsuranceSuppliers] = useState<SupplierOption[]>([])
   const [fuelCardSuppliers, setFuelCardSuppliers] = useState<SupplierOption[]>([])
   const [garageSuppliers, setGarageSuppliers] = useState<SupplierOption[]>([])
 
-  // ── Transitions ──
+  // -- Transitions --
   const [isSaving, startSaveTransition] = useTransition()
   const [isSyncing, startSyncTransition] = useTransition()
 
-  // ── Dirty tracking ──
+  // -- Dirty tracking --
   const isDirty =
     vehicleType !== (vehicle.vehicleType ?? '') ||
     ownershipType !== (vehicle.ownershipType ?? '') ||
     companyId !== (vehicle.companyId ?? '') ||
-    isActive !== vehicle.isActive ||
+    vehicleStatus !== (vehicle.vehicleStatus ?? 'active') ||
+    fleetExitDate !== (vehicle.fleetExitDate ?? '') ||
     leasingCompanyId !== (vehicle.leasingCompanyId ?? '') ||
     insuranceCompanyId !== (vehicle.insuranceCompanyId ?? '') ||
     fuelCardSupplierId !== (vehicle.fuelCardSupplierId ?? '') ||
@@ -102,7 +114,7 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
     onEditingChange?.(isDirty)
   }, [isDirty, onEditingChange])
 
-  // ── Fetch supplier options on mount ──
+  // -- Fetch supplier options on mount --
   useEffect(() => {
     void getActiveSuppliersByType('leasing').then(setLeasingSuppliers)
     void getActiveSuppliersByType('insurance').then(setInsuranceSuppliers)
@@ -110,18 +122,24 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
     void getActiveSuppliersByType('garage').then(setGarageSuppliers)
   }, [])
 
-  // ─────────────────────────────────────────────────────────
+  // ----------------------------------------------------------
   // Handlers
-  // ─────────────────────────────────────────────────────────
+  // ----------------------------------------------------------
 
   function handleSave() {
+    // Validation: locked status requires fleet exit date
+    if (LOCKED_STATUSES.includes(vehicleStatus as LockedStatus) && !fleetExitDate) {
+      toast.error('יש להזין תאריך יציאה מהצי לפני שינוי הסטאטוס')
+      return
+    }
     startSaveTransition(async () => {
       const result = await updateVehicleDetails({
         vehicleId: vehicle.id,
         vehicleType: vehicleType || null,
         ownershipType: ownershipType || null,
         companyId: companyId || null,
-        vehicleStatus: isActive ? 'active' : 'suspended',
+        vehicleStatus,
+        fleetExitDate: fleetExitDate || null,
         leasingCompanyId: leasingCompanyId || null,
         insuranceCompanyId: insuranceCompanyId || null,
         fuelCardSupplierId: fuelCardSupplierId || null,
@@ -146,21 +164,21 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
     })
   }
 
-  // ─────────────────────────────────────────────────────────
+  // ----------------------------------------------------------
   // Shared select class
-  // ─────────────────────────────────────────────────────────
+  // ----------------------------------------------------------
 
   const selectClass =
-    'w-full border border-border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right appearance-none cursor-pointer'
+    'w-full border border-border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
 
-  // ─────────────────────────────────────────────────────────
+  // ----------------------------------------------------------
   // Render
-  // ─────────────────────────────────────────────────────────
+  // ----------------------------------------------------------
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-0">
 
-      {/* ── עמודה ימנית — נתוני משרד הרישוי (קריאה בלבד) ──── */}
+      {/* -- עמודה ימנית -- נתוני משרד הרישוי (קריאה בלבד) */}
       <div>
         <div
           className="rounded-xl p-3 mb-4"
@@ -213,8 +231,21 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
         </div>
       </div>
 
-      {/* ── עמודה שמאלית — שדות תפעוליים (עריכה) ─────────── */}
+      {/* -- עמודה שמאלית -- שדות תפעוליים (עריכה) */}
       <div className="space-y-4">
+
+        {/* תג נעילה -- מוצג רק כשנעול */}
+        {isLocked && (
+          <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <Lock className="h-3.5 w-3.5" />
+            הכרטיס נעול — שנה סטאטוס לפעיל/מושבת זמני כדי לערוך
+          </div>
+        )}
+
+        {/* גלריית תמונות */}
+        <div className="space-y-1.5">
+          <VehicleImageGallery vehicleId={vehicle.id} isLocked={isLocked} />
+        </div>
 
         {/* סוג רכב */}
         <div className="space-y-1.5">
@@ -223,12 +254,43 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
             value={vehicleType}
             onChange={(e) => setVehicleType(e.target.value)}
             className={selectClass}
+            disabled={isLocked}
           >
             <option value="">— בחר סוג —</option>
             {Object.entries(VEHICLE_TYPE_LABELS).map(([key, label]) => (
               <option key={key} value={key}>{label}</option>
             ))}
           </select>
+        </div>
+
+        {/* סטאטוס רכב -- תמיד enabled גם כשנעול */}
+        <div className="space-y-1.5">
+          <Label>סטאטוס רכב</Label>
+          <select
+            value={vehicleStatus}
+            onChange={(e) => setVehicleStatus(e.target.value)}
+            className={selectClass}
+          >
+            {Object.entries(VEHICLE_STATUS_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* תאריך יציאה מהצי */}
+        <div className="space-y-1.5">
+          <Label>
+            תאריך יציאה מהצי
+            {LOCKED_STATUSES.includes(vehicleStatus as LockedStatus) && (
+              <span className="text-red-500 mr-1">*</span>
+            )}
+          </Label>
+          <FleetDateInput
+            value={fleetExitDate}
+            onChange={setFleetExitDate}
+            disabled={isLocked}
+            minYear={2000}
+          />
         </div>
 
         {/* סוג בעלות */}
@@ -238,6 +300,7 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
             value={ownershipType}
             onChange={(e) => setOwnershipType(e.target.value)}
             className={selectClass}
+            disabled={isLocked}
           >
             <option value="">— בחר בעלות —</option>
             {Object.entries(OWNERSHIP_TYPE_LABELS).map(([key, label]) => (
@@ -253,24 +316,13 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
             value={companyId}
             onChange={(e) => setCompanyId(e.target.value)}
             className={selectClass}
+            disabled={isLocked}
           >
             <option value="">— בחר חברה —</option>
             {companies.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
-        </div>
-
-        {/* פעיל */}
-        <div className="flex items-center justify-between py-1">
-          <div dir="ltr" className="flex items-center gap-2">
-            <Switch
-              checked={isActive}
-              onCheckedChange={setIsActive}
-              className="data-[state=checked]:bg-[#4ECDC4]"
-            />
-          </div>
-          <Label>רכב פעיל</Label>
         </div>
 
         {/* חברת ליסינג */}
@@ -280,6 +332,7 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
             value={leasingCompanyId}
             onChange={(e) => setLeasingCompanyId(e.target.value)}
             className={selectClass}
+            disabled={isLocked}
           >
             <option value="">— ללא —</option>
             {leasingSuppliers.map((s) => (
@@ -295,6 +348,7 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
             value={insuranceCompanyId}
             onChange={(e) => setInsuranceCompanyId(e.target.value)}
             className={selectClass}
+            disabled={isLocked}
           >
             <option value="">— ללא —</option>
             {insuranceSuppliers.map((s) => (
@@ -310,6 +364,7 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
             value={fuelCardSupplierId}
             onChange={(e) => setFuelCardSupplierId(e.target.value)}
             className={selectClass}
+            disabled={isLocked}
           >
             <option value="">— ללא —</option>
             {fuelCardSuppliers.map((s) => (
@@ -325,12 +380,25 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
             value={garageId}
             onChange={(e) => setGarageId(e.target.value)}
             className={selectClass}
+            disabled={isLocked}
           >
             <option value="">— ללא —</option>
             {garageSuppliers.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
+        </div>
+
+        {/* כפתור ניהול רכב חלופי -- placeholder לחיבור ב-Plan 17-02 */}
+        <div className="space-y-1.5">
+          <button
+            type="button"
+            onClick={() => { /* ReplacementVehicleDialog -- יחובר ב-Plan 17-02 */ }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-muted/60 transition-colors"
+          >
+            <Car className="h-4 w-4" />
+            ניהול רכב חלופי
+          </button>
         </div>
 
         {/* Save button */}

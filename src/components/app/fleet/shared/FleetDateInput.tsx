@@ -22,6 +22,7 @@ type FleetDateInputProps = {
   minYear?: number
   maxYear?: number
   className?: string
+  disabled?: boolean
 }
 
 export function FleetDateInput({
@@ -30,6 +31,7 @@ export function FleetDateInput({
   minYear = 2010,
   maxYear,
   className,
+  disabled = false,
 }: FleetDateInputProps) {
   const currentYear = new Date().getFullYear()
   const maxY = maxYear ?? currentYear + 20
@@ -70,7 +72,7 @@ export function FleetDateInput({
   }
 
   const selectClass =
-    'border border-border rounded-lg px-2 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-center appearance-none cursor-pointer'
+    'border border-border rounded-lg px-2 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-center appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
 
   return (
     <div className={`flex items-center gap-1.5 ${className ?? ''}`} dir="ltr">
@@ -78,6 +80,7 @@ export function FleetDateInput({
         value={day}
         onChange={(e) => { setDay(e.target.value); emit(e.target.value, month, year) }}
         className={`${selectClass} w-[4.5rem]`}
+        disabled={disabled}
       >
         <option value="">יום</option>
         {Array.from({ length: 31 }, (_, i) => {
@@ -94,6 +97,7 @@ export function FleetDateInput({
         value={month}
         onChange={(e) => { setMonth(e.target.value); emit(day, e.target.value, year) }}
         className={`${selectClass} w-[4.5rem]`}
+        disabled={disabled}
       >
         <option value="">חודש</option>
         {Array.from({ length: 12 }, (_, i) => {
@@ -110,6 +114,7 @@ export function FleetDateInput({
         value={year}
         onChange={(e) => { setYear(e.target.value); emit(day, month, e.target.value) }}
         className={`${selectClass} w-[5.5rem]`}
+        disabled={disabled}
       >
         <option value="">שנה</option>
         {Array.from({ length: maxY - minYear + 1 }, (_, i) => {

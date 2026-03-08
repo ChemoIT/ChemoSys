@@ -16,14 +16,14 @@ export const VEHICLE_TYPE_LABELS: Record<string, string> = {
   private:    'פרטי',
   commercial: 'מסחרי',
   truck:      'משאית',
-  trailer:    'ניגרר',
+  trailer:    'נגרר',
 }
 
 export const OWNERSHIP_TYPE_LABELS: Record<string, string> = {
-  company_owned:  'בבעלות חברה',
-  leased:         'ליסינג',
-  rented:         'שכור',
-  employee_owned: 'בבעלות עובד',
+  company:             'בבעלות חברה',
+  rental:              'שכירות',
+  operational_leasing: 'ליסינג תפעולי',
+  mini_leasing:        'מיני ליסינג',
 }
 
 export const INSURANCE_TYPE_LABELS: Record<string, string> = {
@@ -126,6 +126,13 @@ export type VehicleFull = {
   fuelCardSupplierName: string | null
   garageId: string | null
   garageName: string | null
+
+  // Phase 18 — ownership tab fields (from migrations 00027 + 00029)
+  ownershipSupplierId: string | null    // FK → vehicle_suppliers WHERE type='ownership'
+  ownershipSupplierName: string | null  // joined from vehicle_suppliers
+  contractNumber: string | null         // contract reference number
+  contractFileUrl: string | null        // signed URL for contract PDF (migration 00029)
+  vehicleGroup: number | null           // 1-7
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -182,6 +189,21 @@ export type VehicleDocument = {
   expiryDate: string | null    // yyyy-mm-dd
   alertEnabled: boolean
   notes: string | null
+  createdAt: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// VEHICLE MONTHLY COST TYPE
+// Activity journal — one active record at a time (end_date IS NULL = current rate).
+// No soft-delete. No delete at all — financial audit trail is immutable.
+// ─────────────────────────────────────────────────────────────
+
+export type VehicleMonthlyCost = {
+  id: string
+  vehicleId: string
+  startDate: string      // yyyy-mm-dd — period start
+  endDate: string | null // yyyy-mm-dd — period end (null = currently active)
+  amount: number         // monthly cost in ILS
   createdAt: string
 }
 

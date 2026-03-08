@@ -4,7 +4,7 @@
  * AddVehicleDialog — two-step dialog to create a new vehicle card.
  *
  * Flow:
- *   Step 1 (input): User enters license plate + selects company.
+ *   Step 1 (input): User enters license plate.
  *                   "בדוק ב-MOT" fetches MOT data (read-only preview).
  *   Step 2 (preview): MOT data displayed in a read-only card.
  *                     "פתח כרטיס רכב" creates the vehicle + triggers MOT sync.
@@ -31,7 +31,7 @@ import {
   syncVehicleFromMot,
   type MotVehicleData,
 } from '@/actions/fleet/mot-sync'
-import { createVehicle, getCompaniesForSelect } from '@/actions/fleet/vehicles'
+import { createVehicle } from '@/actions/fleet/vehicles'
 import { formatLicensePlate } from '@/lib/format'
 
 type Props = {
@@ -47,27 +47,23 @@ export function AddVehicleDialog({ open, onClose }: Props) {
   // State
   const [step, setStep] = useState<Step>('input')
   const [plate, setPlate] = useState('')
-  const [companyId, setCompanyId] = useState('')
   const [motData, setMotData] = useState<MotVehicleData | null>(null)
-  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
 
   // Transitions
   const [isLooking, startLookupTransition] = useTransition()
   const [isCreating, startCreatingTransition] = useTransition()
 
-  // Reset + load companies when dialog opens
+  // Reset when dialog opens
   useEffect(() => {
     if (!open) return
     setStep('input')
     setPlate('')
-    setCompanyId('')
     setMotData(null)
-    getCompaniesForSelect().then(setCompanies)
   }, [open])
 
   // Step 1: Look up MOT data (read-only preview)
   function handleLookup() {
-    if (!plate.trim() || !companyId) return
+    if (!plate.trim()) return
     startLookupTransition(async () => {
       const result = await lookupVehicleFromMot(plate)
       if (!result.success || !result.data) {
@@ -81,10 +77,10 @@ export function AddVehicleDialog({ open, onClose }: Props) {
 
   // Step 2: Create vehicle + fire MOT sync
   function handleCreate() {
-    if (!plate.trim() || !companyId) return
+    if (!plate.trim()) return
     startCreatingTransition(async () => {
-      // 1. Create vehicle card
-      const createResult = await createVehicle(plate, companyId)
+      // 1. Create vehicle card (plate only — no companyId)
+      const createResult = await createVehicle(plate)
       if (!createResult.success || !createResult.vehicleId) {
         toast.error(createResult.error ?? 'שגיאה ביצירת כרטיס הרכב')
         return
@@ -121,7 +117,7 @@ export function AddVehicleDialog({ open, onClose }: Props) {
           </DialogTitle>
           <DialogDescription>
             {step === 'input'
-              ? 'הזן מספר רישוי ובחר חברה, לאחר מכן בדוק נתונים ב-MOT.'
+              ? 'הזן מספר רישוי, לאחר מכן בדוק נתונים ב-MOT.'
               : 'נתוני הרכב שהתקבלו ממשרד הרישוי. אשר כדי לפתוח כרטיס.'}
           </DialogDescription>
         </DialogHeader>
@@ -140,26 +136,9 @@ export function AddVehicleDialog({ open, onClose }: Props) {
                 className="font-mono text-base"
                 autoFocus
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && plate.trim() && companyId) handleLookup()
+                  if (e.key === 'Enter' && plate.trim()) handleLookup()
                 }}
               />
-            </div>
-
-            {/* Company selector */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">חברה</label>
-              <select
-                value={companyId}
-                onChange={(e) => setCompanyId(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="">בחר חברה...</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
             </div>
 
             {/* Actions */}
@@ -169,7 +148,7 @@ export function AddVehicleDialog({ open, onClose }: Props) {
               </Button>
               <Button
                 onClick={handleLookup}
-                disabled={!plate.trim() || !companyId || isLooking}
+                disabled={!plate.trim() || isLooking}
               >
                 {isLooking
                   ? <Loader2 className="h-4 w-4 ms-2 animate-spin" />
