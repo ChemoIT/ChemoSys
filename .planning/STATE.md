@@ -5,15 +5,15 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** v2.0 — Phase 19 Plan 01 COMPLETE. Data layer for Assignment tab: journal types + 7 server actions. Phase 19 Plan 02 (VehicleAssignmentSection UI rewrite) is next.
+**Current focus:** v2.0 — Phase 18 Plan 01 COMPLETE. DB foundation for Ownership tab: migration 00029 + corrected type labels + 5 new VehicleFull fields + vehicle-ownership.ts. Phase 18 Plan 02 (VehicleOwnershipSection UI) is next.
 
 ## Current Position
 
-Phase: 19 (Vehicle Card Redesign — Assignment Tab + Documents + Cleanup) — 1/? plans complete
-Status: **Phase 19 Plan 01 COMPLETE** — Data layer: VehicleDriverJournal + VehicleProjectJournal types, 7 new server actions, VehicleFull extended with 4 camp fields + vehicleStatus + fleetExitDate.
-Last activity: 2026-03-08 — Session #38 (execute-phase 19-01 — assignment data layer)
+Phase: 18 (Vehicle Card Redesign — Ownership Tab + Licensing/Insurance Tab) — 1/? plans complete
+Status: **Phase 18 Plan 01 COMPLETE** — DB foundation: migration 00029 (contract_file_url), corrected OWNERSHIP_TYPE_LABELS, VehicleFull with 5 new ownership fields, VehicleMonthlyCost type, extended getVehicleById + updateVehicleDetails, new vehicle-ownership.ts (3 Server Actions).
+Last activity: 2026-03-08 — Session #39 (execute-phase 18-01 — ownership tab data layer)
 
-Progress: v2.0 [███████████████████████░░] Phase 19 Plan 01 DONE — Plan 02 next
+Progress: v2.0 [████████████████████████░] Phase 18 Plan 01 DONE — Plan 02 next
 
 ## Strategic Decision (Session #18)
 
@@ -116,10 +116,18 @@ Progress: v2.0 [█████████████████████�
 - **[16-01]** Single-active-record-per-vehicle rule enforced in Server Actions, NOT in DB triggers — follows project pattern
 - **[16-01]** 00028 storage policies created in same plan as 00027 — matches established 00025+00026 two-file split pattern
 - **[16-02]** Migrations 00027+00028 verified in production Supabase (2026-03-08) — schema stable, ready for Phase 17-19 UI
+- **[17-01]** VEHICLE_TYPE_LABELS: 4 values (private/commercial/truck/trailer) matching migration 00027 CHECK constraint
+- **[17-01]** is_active derived from vehicle_status in updateVehicleDetails -- not separate field
+- **[17-01]** VehicleImageGallery: client-side upload to storage, then server action for metadata -- avoids base64 overhead
+- **[17-01]** FleetDateInput: disabled prop added to support lock mode in VehicleDetailsSection
+- **[17-01]** AddVehicleDialog: company selector removed -- createVehicle(plate) only
 - **[19-01]** getVehicleDriverJournal + getVehicleProjectJournal use verifyAppUser (ChemoSys context) — consistent with all fleet read actions
 - **[19-01]** assignDriverJournal syncs vehicles.assigned_driver_id after journal write — driver_computed_status view requires this field
 - **[19-01]** campResponsiblePhone normalizePhone returns null on invalid — invalid phone stored as null, never as raw string (IRON RULE)
 - **[19-01]** vehicleStatus + fleetExitDate added to getVehicleById() (Phase 17 added to VehicleFull type) — auto-fixed TS error
+- **[18-01]** OWNERSHIP_TYPE_LABELS corrected to company/rental/operational_leasing/mini_leasing — previous keys (company_owned/leased/rented/employee_owned) did not match 00027 DB CHECK constraint
+- **[18-01]** updateVehicleMonthlyCost uses direct .update() (no RPC) — vehicle_monthly_costs has no deleted_at RLS filter (immutable journal, no soft-delete)
+- **[18-01]** addVehicleMonthlyCost closes previous active record before insert — single-active-record invariant enforced in Server Action, NOT in DB trigger (project pattern)
 
 ### Roadmap Evolution
 
@@ -148,14 +156,14 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-08 (session #38)
-Stopped at: Phase 19 Plan 01 COMPLETE — assignment data layer built. Plan 02 (VehicleAssignmentSection UI) is next.
+Last session: 2026-03-08 (session #39)
+Stopped at: Phase 18 Plan 01 COMPLETE — ownership tab data layer built. Plan 02 (VehicleOwnershipSection UI) is next.
 
 ### Context for next session:
 
-**מה קיים:** Phase 16 DONE — 00027 extends vehicles schema (9 new columns, 6 new tables, 2 updated views, soft-delete RPC), 00028 adds storage policies for vehicle-images bucket. Both VERIFIED in production Supabase.
+**מה קיים:** Phase 18 Plan 01 DONE — migration 00029 (contract_file_url), corrected OWNERSHIP_TYPE_LABELS, VehicleFull with 5 new ownership fields, VehicleMonthlyCost type, extended getVehicleById + updateVehicleDetails, new vehicle-ownership.ts with 3 Server Actions. IMPORTANT: migration 00029 must be applied in Supabase before Plan 02 UI.
 
-**מה הבא:** Phase 17 — Vehicle Card Redesign UI (Tab 1: Vehicle Details with image gallery + Tab 2: Ownership).
+**מה הבא:** Phase 18 Plan 02 (VehicleOwnershipSection) + Plan 18-03 (Insurance/Licensing tab).
 
 **Key new files (Phase 14-02):**
 
