@@ -5,13 +5,13 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** v2.0 — Phase 18 Plan 01 COMPLETE. DB foundation for Ownership tab: migration 00029 + corrected type labels + 5 new VehicleFull fields + vehicle-ownership.ts. Phase 18 Plan 02 (VehicleOwnershipSection UI) is next.
+**Current focus:** v2.0 — Phase 18 Plan 02 COMPLETE. VehicleOwnershipSection (Tab 2) + VehicleOwnershipJournal built. Phase 18 Plan 03 (VehicleLicensingSection wiring into VehicleCard) is next.
 
 ## Current Position
 
-Phase: 18 (Vehicle Card Redesign — Ownership Tab + Licensing/Insurance Tab) — 1/? plans complete
-Status: **Phase 18 Plan 01 COMPLETE** — DB foundation: migration 00029 (contract_file_url), corrected OWNERSHIP_TYPE_LABELS, VehicleFull with 5 new ownership fields, VehicleMonthlyCost type, extended getVehicleById + updateVehicleDetails, new vehicle-ownership.ts (3 Server Actions).
-Last activity: 2026-03-08 — Session #39 (execute-phase 18-01 — ownership tab data layer)
+Phase: 18 (Vehicle Card Redesign — Ownership Tab + Licensing/Insurance Tab) — 2/? plans complete
+Status: **Phase 18 Plan 02 COMPLETE** — VehicleOwnershipSection (Tab 2 form: 7 fields + PDF upload + journal wrapper) + VehicleOwnershipJournal (monthly costs activity journal with add/edit, immutable audit trail).
+Last activity: 2026-03-08 — Session #40 (execute-phase 18-02 — ownership tab UI)
 
 Progress: v2.0 [████████████████████████░] Phase 18 Plan 01 DONE — Plan 02 next
 
@@ -128,6 +128,9 @@ Progress: v2.0 [█████████████████████�
 - **[18-01]** OWNERSHIP_TYPE_LABELS corrected to company/rental/operational_leasing/mini_leasing — previous keys (company_owned/leased/rented/employee_owned) did not match 00027 DB CHECK constraint
 - **[18-01]** updateVehicleMonthlyCost uses direct .update() (no RPC) — vehicle_monthly_costs has no deleted_at RLS filter (immutable journal, no soft-delete)
 - **[18-01]** addVehicleMonthlyCost closes previous active record before insert — single-active-record invariant enforced in Server Action, NOT in DB trigger (project pattern)
+- **[18-02]** VehicleOwnershipJournal optimistic local state: closes previous active record locally after addVehicleMonthlyCost success — no full page reload needed
+- **[18-02]** Exit date asterisk indicator is client-side only (not HTML required attr) — shown when vehicleStatus is returned/sold/decommissioned
+- **[18-02]** Existing contract file link shown only when contractFileUrl matches vehicle.contractFileUrl — prevents stale link when user uploads new contract before saving
 
 ### Roadmap Evolution
 
@@ -157,13 +160,13 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-08 (session #39)
-Stopped at: Phase 18 Plan 01 COMPLETE — ownership tab data layer built. Plan 02 (VehicleOwnershipSection UI) is next.
+Stopped at: Phase 18 Plan 02 COMPLETE — VehicleOwnershipSection + VehicleOwnershipJournal built. Plan 03 (wire VehicleOwnershipSection + VehicleLicensingSection into VehicleCard) is next.
 
 ### Context for next session:
 
-**מה קיים:** Phase 18 Plan 01 DONE — migration 00029 (contract_file_url), corrected OWNERSHIP_TYPE_LABELS, VehicleFull with 5 new ownership fields, VehicleMonthlyCost type, extended getVehicleById + updateVehicleDetails, new vehicle-ownership.ts with 3 Server Actions. IMPORTANT: migration 00029 must be applied in Supabase before Plan 02 UI.
+**מה קיים:** Phase 18 Plans 01+02 DONE — full data layer + Tab 2 UI complete. VehicleOwnershipSection + VehicleOwnershipJournal ready for wiring. VehicleLicensingSection (18-03 commit b353d73) also exists. VehicleCard still has PlaceholderTab for Tab 2 (בעלות).
 
-**מה הבא:** Phase 18 Plan 02 (VehicleOwnershipSection) + Plan 18-03 (Insurance/Licensing tab).
+**מה הבא:** Wire VehicleOwnershipSection into VehicleCard Tab 2, wire VehicleLicensingSection into Tab 3. Fetch costs server-side in vehicle-card/[id]/page.tsx.
 
 **Key new files (Phase 14-02):**
 
