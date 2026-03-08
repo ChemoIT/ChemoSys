@@ -1,17 +1,12 @@
 'use client'
 
 /**
- * VehicleInsuranceSection — Tab 3 of VehicleCard.
+ * VehicleInsuranceSection — Simplified insurance sub-section.
  *
- * Shows insurance policies list + add/edit/delete with supplier dropdown.
- * Mirrors VehicleTestsSection pattern.
- *
- * Features:
- *   - List: insurance type label, policy number, supplier name, expiry (ExpiryIndicator), cost, file, alert bell
- *   - Add/Edit form: insurance_type select, policy_number, supplier_id dropdown, start/expiry dates, cost, file, alert, notes
- *   - Quick expiry buttons: 3m / 1y / 2y
- *   - Supplier dropdown: fetched via getActiveSuppliersByType('insurance') on mount
- *   - Dirty tracking via onEditingChange prop
+ * Shows insurance records list + add/edit/delete with file upload.
+ * Stripped fields: insurance_type, policy_number, supplier, start_date, cost
+ * (removed per contract tab redesign).
+ * Remaining: expiry_date + alert toggle + file upload + notes.
  */
 
 import { useState, useTransition, useRef, useEffect } from 'react'
@@ -27,14 +22,13 @@ import {
   addVehicleInsurance,
   deleteVehicleInsurance,
   updateVehicleInsurance,
-  getActiveSuppliersByType,
 } from '@/actions/fleet/vehicles'
-import { formatDate, daysUntil } from '@/lib/format'
+import { daysUntil } from '@/lib/format'
 import { FleetDateInput } from '../shared/FleetDateInput'
 import { AlertToggle } from '../shared/AlertToggle'
 import { ExpiryIndicator } from '../shared/ExpiryIndicator'
 import { FleetUploadZone } from '../shared/FleetUploadZone'
-import { INSURANCE_TYPE_LABELS, type VehicleInsurance } from '@/lib/fleet/vehicle-types'
+import type { VehicleInsurance } from '@/lib/fleet/vehicle-types'
 
 // ─────────────────────────────────────────────────────────────
 // Props
@@ -47,14 +41,6 @@ type Props = {
   onEditingChange?: (isDirty: boolean) => void
 }
 
-type SupplierOption = { id: string; name: string }
-
-const INSURANCE_TYPE_OPTIONS: { value: 'mandatory' | 'comprehensive' | 'third_party'; label: string }[] = [
-  { value: 'mandatory', label: INSURANCE_TYPE_LABELS['mandatory'] },
-  { value: 'comprehensive', label: INSURANCE_TYPE_LABELS['comprehensive'] },
-  { value: 'third_party', label: INSURANCE_TYPE_LABELS['third_party'] },
-]
-
 // ─────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────
@@ -64,16 +50,8 @@ export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
-  // Supplier options
-  const [suppliers, setSuppliers] = useState<SupplierOption[]>([])
-
-  // Form state
-  const [insuranceType, setInsuranceType] = useState<'mandatory' | 'comprehensive' | 'third_party'>('mandatory')
-  const [policyNumber, setPolicyNumber] = useState('')
-  const [supplierId, setSupplierId] = useState('')
-  const [startDate, setStartDate] = useState('')
+  // Form state (simplified — only expiry, alert, file, notes)
   const [expiryDate, setExpiryDate] = useState('')
-  const [cost, setCost] = useState('')
   const [fileUrl, setFileUrl] = useState('')
   const [alertEnabled, setAlertEnabled] = useState(true)
   const [notes, setNotes] = useState('')
@@ -87,24 +65,14 @@ export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance
   const [isSaving, startSaveTransition] = useTransition()
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  // Fetch insurance suppliers on mount
-  useEffect(() => {
-    void getActiveSuppliersByType('insurance').then(setSuppliers)
-  }, [])
-
   // Dirty tracking
   const isFormDirty = (() => {
-    if (showAddForm) return expiryDate !== '' || policyNumber !== '' || supplierId !== '' || cost !== '' || fileUrl !== '' || notes !== ''
+    if (showAddForm) return expiryDate !== '' || fileUrl !== '' || notes !== ''
     if (editingId) {
       const orig = policies.find((p) => p.id === editingId)
       if (!orig) return false
       return (
-        insuranceType !== orig.insuranceType ||
-        policyNumber !== (orig.policyNumber ?? '') ||
-        supplierId !== (orig.supplierId ?? '') ||
-        startDate !== (orig.startDate ?? '') ||
         expiryDate !== (orig.expiryDate ?? '') ||
-        cost !== (orig.cost?.toString() ?? '') ||
         fileUrl !== (orig.fileUrl ?? '') ||
         alertEnabled !== orig.alertEnabled ||
         notes !== (orig.notes ?? '')
@@ -166,12 +134,7 @@ export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance
   // ─────────────────────────────────────────────────────────
 
   function resetForm() {
-    setInsuranceType('mandatory')
-    setPolicyNumber('')
-    setSupplierId('')
-    setStartDate('')
     setExpiryDate('')
-    setCost('')
     setFileUrl('')
     setAlertEnabled(true)
     setNotes('')
@@ -179,12 +142,7 @@ export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance
 
   function startEdit(policy: VehicleInsurance) {
     setEditingId(policy.id)
-    setInsuranceType(policy.insuranceType as 'mandatory' | 'comprehensive' | 'third_party')
-    setPolicyNumber(policy.policyNumber ?? '')
-    setSupplierId(policy.supplierId ?? '')
-    setStartDate(policy.startDate ?? '')
     setExpiryDate(policy.expiryDate)
-    setCost(policy.cost?.toString() ?? '')
     setFileUrl(policy.fileUrl ?? '')
     setAlertEnabled(policy.alertEnabled)
     setNotes(policy.notes ?? '')
@@ -221,28 +179,27 @@ export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance
     startAddTransition(async () => {
       const result = await addVehicleInsurance({
         vehicleId,
-        insuranceType,
-        policyNumber: policyNumber || null,
-        supplierId: supplierId || null,
-        startDate: startDate || null,
+        insuranceType: 'mandatory',  // default (field hidden from UI)
+        policyNumber: null,
+        supplierId: null,
+        startDate: null,
         expiryDate,
-        cost: cost ? parseFloat(cost) : null,
+        cost: null,
         notes: notes || null,
         fileUrl: fileUrl || null,
         alertEnabled,
       })
       if (result.success && result.id) {
-        const supplierName = suppliers.find((s) => s.id === supplierId)?.name ?? null
         const newPolicy: VehicleInsurance = {
           id: result.id,
           vehicleId,
-          insuranceType,
-          policyNumber: policyNumber || null,
-          supplierId: supplierId || null,
-          supplierName,
-          startDate: startDate || null,
+          insuranceType: 'mandatory',
+          policyNumber: null,
+          supplierId: null,
+          supplierName: null,
+          startDate: null,
           expiryDate,
-          cost: cost ? parseFloat(cost) : null,
+          cost: null,
           notes: notes || null,
           fileUrl: fileUrl || null,
           alertEnabled,
@@ -261,37 +218,25 @@ export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance
   function handleUpdate() {
     if (!editingId || !expiryDate) return
     startSaveTransition(async () => {
+      const orig = policies.find((p) => p.id === editingId)
       const result = await updateVehicleInsurance({
         insuranceId: editingId,
         vehicleId,
-        insuranceType,
-        policyNumber: policyNumber || null,
-        supplierId: supplierId || null,
-        startDate: startDate || null,
+        insuranceType: (orig?.insuranceType ?? 'mandatory') as 'mandatory' | 'comprehensive' | 'third_party',
+        policyNumber: orig?.policyNumber ?? null,
+        supplierId: orig?.supplierId ?? null,
+        startDate: orig?.startDate ?? null,
         expiryDate,
-        cost: cost ? parseFloat(cost) : null,
+        cost: orig?.cost ?? null,
         notes: notes || null,
         fileUrl: fileUrl || null,
         alertEnabled,
       })
       if (result.success) {
-        const supplierName = suppliers.find((s) => s.id === supplierId)?.name ?? null
         setPolicies((prev) =>
           prev.map((p) =>
             p.id === editingId
-              ? {
-                  ...p,
-                  insuranceType,
-                  policyNumber: policyNumber || null,
-                  supplierId: supplierId || null,
-                  supplierName,
-                  startDate: startDate || null,
-                  expiryDate,
-                  cost: cost ? parseFloat(cost) : null,
-                  notes: notes || null,
-                  fileUrl: fileUrl || null,
-                  alertEnabled,
-                }
+              ? { ...p, expiryDate, notes: notes || null, fileUrl: fileUrl || null, alertEnabled }
               : p
           )
         )
@@ -325,61 +270,11 @@ export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance
   // Form render
   // ─────────────────────────────────────────────────────────
 
-  const selectClass =
-    'w-full border border-border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right appearance-none cursor-pointer'
-
   function renderForm(mode: 'add' | 'edit') {
     const isBusy = mode === 'add' ? isAdding : isSaving
 
     return (
       <div className="border rounded-xl p-4 space-y-4 bg-muted/20">
-
-        {/* סוג ביטוח */}
-        <div className="space-y-1.5">
-          <Label>סוג ביטוח *</Label>
-          <select
-            value={insuranceType}
-            onChange={(e) => setInsuranceType(e.target.value as 'mandatory' | 'comprehensive' | 'third_party')}
-            className={selectClass}
-          >
-            {INSURANCE_TYPE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* מספר פוליסה */}
-        <div className="space-y-1.5">
-          <Label>מספר פוליסה</Label>
-          <input
-            type="text"
-            value={policyNumber}
-            onChange={(e) => setPolicyNumber(e.target.value)}
-            className="w-full border border-border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right"
-            placeholder="מספר פוליסה..."
-          />
-        </div>
-
-        {/* חברת ביטוח */}
-        <div className="space-y-1.5">
-          <Label>חברת ביטוח</Label>
-          <select
-            value={supplierId}
-            onChange={(e) => setSupplierId(e.target.value)}
-            className={selectClass}
-          >
-            <option value="">— ללא —</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* תאריך התחלה */}
-        <div className="space-y-1.5">
-          <Label>תאריך התחלה</Label>
-          <FleetDateInput value={startDate} onChange={setStartDate} minYear={2000} />
-        </div>
 
         {/* תאריך תפוגה */}
         <div className="space-y-2">
@@ -422,19 +317,6 @@ export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance
               </p>
             )
           })()}
-        </div>
-
-        {/* עלות */}
-        <div className="space-y-1.5">
-          <Label>עלות (₪)</Label>
-          <input
-            type="number"
-            value={cost}
-            onChange={(e) => setCost(e.target.value)}
-            className="w-full border border-border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right"
-            placeholder="0"
-            min="0"
-          />
         </div>
 
         {/* File upload */}
@@ -503,7 +385,7 @@ export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance
             {mode === 'add' ? (
               <>
                 <Plus className="h-4 w-4 ms-1" />
-                הוסף פוליסה
+                הוסף ביטוח
               </>
             ) : (
               <>
@@ -544,8 +426,6 @@ export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance
             const isEditing = editingId === policy.id
             if (isEditing) return <div key={policy.id}>{renderForm('edit')}</div>
 
-            const typeLabel = INSURANCE_TYPE_LABELS[policy.insuranceType] ?? policy.insuranceType
-
             return (
               <div
                 key={policy.id}
@@ -556,26 +436,12 @@ export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance
                   <Shield className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium">{typeLabel}</span>
+                      <span className="text-sm font-medium">ביטוח</span>
                       {policy.alertEnabled && (
                         <Bell className="h-3.5 w-3.5 text-amber-500 shrink-0" aria-label="התראה פעילה" />
                       )}
-                      {policy.policyNumber && (
-                        <span className="text-xs text-muted-foreground font-mono">{policy.policyNumber}</span>
-                      )}
-                      {policy.cost != null && (
-                        <span className="text-xs text-muted-foreground">₪{policy.cost.toLocaleString()}</span>
-                      )}
                     </div>
-                    {policy.supplierName && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{policy.supplierName}</p>
-                    )}
                     <ExpiryIndicator expiryDate={policy.expiryDate} yellowDays={docYellowDays} />
-                    {policy.startDate && (
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        מ-{formatDate(policy.startDate)}
-                      </p>
-                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -621,7 +487,7 @@ export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance
           onClick={() => { setShowAddForm(true); resetForm() }}
         >
           <Plus className="h-4 w-4" />
-          הוסף פוליסה
+          הוסף ביטוח
         </Button>
       )}
     </div>

@@ -20,8 +20,7 @@ import {
   Trash2,
   ArrowRight,
   Car,
-  Building2,
-  ShieldCheck,
+  FileSignature,
   Shuffle,
   Paperclip,
   FileText,
@@ -43,8 +42,7 @@ import {
 } from '@/components/ui/dialog'
 import { VehicleFitnessLight } from '@/components/app/fleet/shared/VehicleFitnessLight'
 import { VehicleDetailsSection } from './VehicleDetailsSection'
-import { VehicleOwnershipSection } from './VehicleOwnershipSection'
-import { VehicleLicensingSection } from './VehicleLicensingSection'
+import { VehicleContractSection } from './VehicleContractSection'
 import { VehicleAssignmentSection } from './VehicleAssignmentSection'
 import { VehicleDocumentsSection } from './VehicleDocumentsSection'
 import { VehicleNotesSection } from './VehicleNotesSection'
@@ -111,11 +109,8 @@ export function VehicleCard({
   const onDetailsEditingChange = useCallback((dirty: boolean) => {
     dirtyStates.current.details = dirty
   }, [])
-  const onOwnershipEditingChange = useCallback((dirty: boolean) => {
-    dirtyStates.current.ownership = dirty
-  }, [])
-  const onLicensingEditingChange = useCallback((dirty: boolean) => {
-    dirtyStates.current.licensing = dirty
+  const onContractEditingChange = useCallback((dirty: boolean) => {
+    dirtyStates.current.contract = dirty
   }, [])
   const onDocumentsEditingChange = useCallback((dirty: boolean) => {
     dirtyStates.current.documents = dirty
@@ -129,8 +124,7 @@ export function VehicleCard({
 
   const TAB_LABELS: Record<string, string> = {
     details:    'פרטי הרכב',
-    ownership:  'בעלות',
-    licensing:  'רישוי וביטוח',
+    contract:   'חוזה',
     assignment: 'צמידות',
     documents:  'מסמכים',
     notes:      'הערות',
@@ -213,7 +207,7 @@ export function VehicleCard({
   // ─────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-4xl mx-auto w-full">
+    <div className="max-w-[calc(100%-6cm)] mx-auto w-full">
 
       {/* ── Breadcrumb ─────────────────────────────────────── */}
       <nav className="flex items-center gap-1 text-sm text-muted-foreground mb-4 justify-end">
@@ -284,11 +278,11 @@ export function VehicleCard({
                     </span>
                   )
                 })()}
-                <h1 className="text-2xl font-black text-foreground leading-tight tracking-tight" dir="ltr">
+                <h1 className="text-3xl font-black text-foreground leading-tight tracking-tight" dir="ltr">
                   {formatLicensePlate(vehicle.licensePlate)}
                 </h1>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-sm text-muted-foreground mt-0.5">
                 {vehicle.companyName && (
                   <>
                     <span className="font-semibold text-foreground/70">{vehicle.companyName}</span>
@@ -336,8 +330,7 @@ export function VehicleCard({
           >
             {[
               { value: 'details',    label: 'פרטי הרכב',    icon: Car },
-              { value: 'ownership',  label: 'בעלות',         icon: Building2 },
-              { value: 'licensing',  label: 'רישוי וביטוח', icon: ShieldCheck },
+              { value: 'contract',   label: 'חוזה',          icon: FileSignature },
               { value: 'assignment', label: 'צמידות',        icon: Shuffle },
               { value: 'documents',  label: 'מסמכים',        icon: Paperclip },
               { value: 'notes',      label: 'הערות',         icon: FileText },
@@ -346,7 +339,7 @@ export function VehicleCard({
               <TabsTrigger
                 key={value}
                 value={value}
-                className="flex items-center gap-1.5 px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary text-muted-foreground hover:text-foreground transition-all shrink-0 text-sm font-medium"
+                className="flex items-center gap-1.5 px-5 py-3.5 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary text-muted-foreground hover:text-foreground transition-all shrink-0 text-base font-medium"
               >
                 <Icon className="h-4 w-4" />
                 <span className="hidden sm:inline">{label}</span>
@@ -360,7 +353,7 @@ export function VehicleCard({
         <TabsContent value="details" className="mt-0">
           <div
             dir="rtl"
-            className="bg-white border-x border-b rounded-b-2xl p-5"
+            className="bg-white border-x border-b rounded-b-2xl p-6 md:p-8"
             style={{ borderColor: '#E2EBF4' }}
           >
             <VehicleDetailsSection
@@ -370,37 +363,23 @@ export function VehicleCard({
           </div>
         </TabsContent>
 
-        {/* ══ Tab 2 — בעלות ══════════════════════════════════ */}
-        <TabsContent value="ownership" className="mt-0">
-          <VehicleOwnershipSection
+        {/* ══ Tab 2 — חוזה ══════════════════════════════════ */}
+        <TabsContent value="contract" className="mt-0">
+          <VehicleContractSection
             vehicle={vehicle}
             costs={costs}
-            onEditingChange={onOwnershipEditingChange}
+            tests={tests}
+            insurance={insurance}
+            docYellowDays={docYellowDays}
+            onEditingChange={onContractEditingChange}
           />
-        </TabsContent>
-
-        {/* ══ Tab 3 — רישוי וביטוח ══════════════════════════ */}
-        <TabsContent value="licensing" className="mt-0">
-          <div
-            dir="rtl"
-            className="bg-white border-x border-b rounded-b-2xl p-5"
-            style={{ borderColor: '#E2EBF4' }}
-          >
-            <VehicleLicensingSection
-              vehicleId={vehicle.id}
-              tests={tests}
-              insurance={insurance}
-              docYellowDays={docYellowDays}
-              onEditingChange={onLicensingEditingChange}
-            />
-          </div>
         </TabsContent>
 
         {/* ══ Tab 4 — צמידות ═════════════════════════════════ */}
         <TabsContent value="assignment" className="mt-0">
           <div
             dir="rtl"
-            className="bg-white border-x border-b rounded-b-2xl p-5"
+            className="bg-white border-x border-b rounded-b-2xl p-6 md:p-8"
             style={{ borderColor: '#E2EBF4' }}
           >
             <VehicleAssignmentSection
@@ -417,7 +396,7 @@ export function VehicleCard({
         <TabsContent value="documents" className="mt-0">
           <div
             dir="rtl"
-            className="bg-white border-x border-b rounded-b-2xl p-5"
+            className="bg-white border-x border-b rounded-b-2xl p-6 md:p-8"
             style={{ borderColor: '#E2EBF4' }}
           >
             <VehicleDocumentsSection
@@ -433,7 +412,7 @@ export function VehicleCard({
         <TabsContent value="notes" className="mt-0">
           <div
             dir="rtl"
-            className="bg-white border-x border-b rounded-b-2xl p-5"
+            className="bg-white border-x border-b rounded-b-2xl p-6 md:p-8"
             style={{ borderColor: '#E2EBF4' }}
           >
             <VehicleNotesSection

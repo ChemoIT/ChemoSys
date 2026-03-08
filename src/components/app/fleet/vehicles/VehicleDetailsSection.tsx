@@ -38,11 +38,11 @@ import { ReplacementVehicleDialog } from './ReplacementVehicleDialog'
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div
-      className="flex items-start gap-3 py-2 border-b last:border-0"
+      className="flex items-start gap-3 py-2.5 border-b last:border-0"
       style={{ borderColor: '#EEF3F9' }}
     >
-      <span className="text-xs text-muted-foreground w-28 shrink-0 pt-0.5">{label}</span>
-      <span className="text-sm flex-1 text-right font-medium text-foreground/80">
+      <span className="text-sm text-muted-foreground w-32 shrink-0 pt-0.5">{label}</span>
+      <span className="text-base flex-1 text-right font-medium text-foreground/80">
         {value ?? '—'}
       </span>
     </div>
@@ -106,7 +106,7 @@ export function VehicleDetailsSection({ vehicle, onEditingChange }: Props) {
   // -- Editable form state --
   const [vehicleStatus, setVehicleStatus] = useState(vehicle.vehicleStatus ?? 'active')
 
-  // -- Lock state (derived from vehicleStatus) --
+  // -- Card lock state (returned/sold/decommissioned — user-set) --
   const isLocked = LOCKED_STATUSES.includes(vehicleStatus as LockedStatus)
 
   // -- Dialog state for add/edit replacement --
@@ -118,11 +118,18 @@ export function VehicleDetailsSection({ vehicle, onEditingChange }: Props) {
   const [isLoadingRecords, setIsLoadingRecords] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  // -- Derived: active replacement vehicle exists → auto-suspend --
+  const hasActiveReplacement = !isLoadingRecords && records.some(r => r.status === 'active')
+
+  // -- Effective display status (auto-suspended when replacement is active) --
+  const effectiveStatus = hasActiveReplacement ? 'suspended' : vehicleStatus
+  const statusStyle = getStatusStyle(effectiveStatus)
+
   // -- Transitions --
   const [isSaving, startSaveTransition] = useTransition()
   const [isSyncing, startSyncTransition] = useTransition()
 
-  // -- Dirty tracking --
+  // -- Dirty tracking (based on actual vehicleStatus, not effectiveStatus) --
   const isDirty = vehicleStatus !== (vehicle.vehicleStatus ?? 'active')
 
   useEffect(() => {
@@ -209,8 +216,6 @@ export function VehicleDetailsSection({ vehicle, onEditingChange }: Props) {
   const selectClass =
     'w-full border border-border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
 
-  const statusStyle = getStatusStyle(vehicleStatus)
-
   // ----------------------------------------------------------
   // Render
   // ----------------------------------------------------------
@@ -224,7 +229,7 @@ export function VehicleDetailsSection({ vehicle, onEditingChange }: Props) {
           className="rounded-xl p-3 mb-4"
           style={{ background: '#F7FAFD', border: '1px solid #E2EBF4' }}
         >
-          <p className="text-xs text-muted-foreground font-semibold mb-2">נתוני משרד הרישוי</p>
+          <p className="text-sm text-muted-foreground font-semibold mb-3">נתוני משרד הרישוי</p>
 
           <InfoRow
             label="מספר רישוי"
@@ -274,11 +279,19 @@ export function VehicleDetailsSection({ vehicle, onEditingChange }: Props) {
       {/* -- עמודה שמאלית -- שדות תפעוליים + רכבים חלופיים */}
       <div className="space-y-4">
 
-        {/* תג נעילה -- מוצג רק כשנעול */}
-        {isLocked && (
-          <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            <Lock className="h-3.5 w-3.5" />
-            הכרטיס נעול — שנה סטאטוס לפעיל/מושבת זמני כדי לערוך
+        {/* תג נעילה — רכב חלופי פעיל */}
+        {hasActiveReplacement && (
+          <div className="flex items-center gap-1.5 text-sm text-amber-700 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2.5">
+            <Lock className="h-4 w-4 shrink-0" />
+            קיים רכב חלופי פעיל — הסטטוס ישוחרר אוטומטית עם החזרת הרכב החלופי
+          </div>
+        )}
+
+        {/* תג נעילה — סטטוס הוחזר/נמכר/מושבת */}
+        {isLocked && !hasActiveReplacement && (
+          <div className="flex items-center gap-1.5 text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+            <Lock className="h-4 w-4 shrink-0" />
+            הכרטיס נעול — שנה סטאטוס לפעיל כדי לערוך
           </div>
         )}
 
@@ -287,79 +300,56 @@ export function VehicleDetailsSection({ vehicle, onEditingChange }: Props) {
           <VehicleImageGallery vehicleId={vehicle.id} isLocked={isLocked} />
         </div>
 
-        {/* סטאטוס רכב — badge גדול ובולט + select */}
+        {/* סטאטוס רכב — select צבעוני גדול (תא אחד בלבד) */}
         <div className="space-y-2">
-          <Label>סטאטוס רכב</Label>
-
-          {/* Badge בולט */}
-          <div
-            className="flex items-center justify-center rounded-xl px-4 py-3 text-lg font-bold"
+          <Label className="text-sm font-semibold">סטאטוס רכב</Label>
+          <select
+            value={effectiveStatus}
+            onChange={(e) => setVehicleStatus(e.target.value)}
+            disabled={hasActiveReplacement || isLoadingRecords}
+            className="w-full rounded-xl px-4 py-4 text-xl font-bold text-center border-2 focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all disabled:cursor-not-allowed"
             style={{
               background: statusStyle.bg,
               color: statusStyle.color,
-              border: `2px solid ${statusStyle.border}`,
+              borderColor: statusStyle.border,
+              cursor: hasActiveReplacement ? 'not-allowed' : 'pointer',
+              appearance: hasActiveReplacement ? 'none' : undefined,
             }}
           >
-            {VEHICLE_STATUS_LABELS[vehicleStatus as keyof typeof VEHICLE_STATUS_LABELS] ?? vehicleStatus}
-          </div>
-
-          {/* select לשינוי */}
-          <select
-            value={vehicleStatus}
-            onChange={(e) => setVehicleStatus(e.target.value)}
-            className={selectClass}
-          >
-            {Object.entries(VEHICLE_STATUS_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
+            {hasActiveReplacement ? (
+              /* נעול — מציג מושבת זמני בלבד */
+              <option value="suspended">מושבת זמני</option>
+            ) : (
+              /* זמין — כל הסטטוסים מלבד מושבת זמני */
+              Object.entries(VEHICLE_STATUS_LABELS)
+                .filter(([key]) => key !== 'suspended')
+                .map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))
+            )}
           </select>
-        </div>
-
-        {/* Save button */}
-        <div className="flex justify-start">
-          <button
-            onClick={handleSave}
-            disabled={isSaving || !isDirty}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all"
-            style={
-              isDirty
-                ? {
-                    background: 'linear-gradient(135deg, #4ECDC4, #3ABFB6)',
-                    color: '#fff',
-                    border: '1px solid #3ABFB6',
-                    boxShadow: '0 2px 6px rgb(78 205 196 / 0.35)',
-                  }
-                : {
-                    background: '#F0F5FB',
-                    color: '#637381',
-                    border: '1px solid #C8D5E2',
-                    cursor: 'not-allowed',
-                  }
-            }
-          >
-            {isSaving
-              ? <Loader2 className="h-4 w-4 animate-spin" />
-              : <Save className="h-4 w-4" />
-            }
-            שמור שינויים
-          </button>
+          {hasActiveReplacement && (
+            <p className="text-xs text-amber-600 text-center">
+              הסטטוס משתנה אוטומטית — לא ניתן לעריכה ידנית
+            </p>
+          )}
         </div>
 
         {/* ──────────────────────────────────────────────── */}
         {/* רכבים חלופיים — רשימה inline                      */}
         {/* ──────────────────────────────────────────────── */}
         <div
-          className="rounded-xl p-3"
+          className="rounded-xl p-4"
           style={{ background: '#F7FAFD', border: '1px solid #E2EBF4' }}
         >
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs text-muted-foreground font-semibold">רכבים חלופיים</p>
+            <p className="text-sm text-muted-foreground font-semibold">רכבים חלופיים</p>
             <button
               type="button"
               onClick={openAdd}
-              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors font-medium"
+              className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors font-medium"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
               הוסף
             </button>
           </div>
@@ -442,6 +432,35 @@ export function VehicleDetailsSection({ vehicle, onEditingChange }: Props) {
               })}
             </div>
           )}
+        </div>
+        {/* Save button — תחתית הטאב */}
+        <div className="flex justify-start pt-2">
+          <button
+            onClick={handleSave}
+            disabled={isSaving || !isDirty}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-base font-semibold transition-all"
+            style={
+              isDirty
+                ? {
+                    background: 'linear-gradient(135deg, #4ECDC4, #3ABFB6)',
+                    color: '#fff',
+                    border: '1px solid #3ABFB6',
+                    boxShadow: '0 2px 8px rgb(78 205 196 / 0.4)',
+                  }
+                : {
+                    background: '#F0F5FB',
+                    color: '#637381',
+                    border: '1px solid #C8D5E2',
+                    cursor: 'not-allowed',
+                  }
+            }
+          >
+            {isSaving
+              ? <Loader2 className="h-5 w-5 animate-spin" />
+              : <Save className="h-5 w-5" />
+            }
+            שמור שינויים
+          </button>
         </div>
       </div>
 

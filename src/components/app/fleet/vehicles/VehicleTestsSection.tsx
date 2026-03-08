@@ -1,23 +1,17 @@
 'use client'
 
 /**
- * VehicleTestsSection — Tab 2 of VehicleCard.
+ * VehicleTestsSection — Simplified licensing (tests) sub-section.
  *
- * Shows vehicle test history + add/edit/delete with file upload.
- * Mirrors DriverDocumentsSection pattern.
- *
- * Features:
- *   - List: test_date, expiry_date (ExpiryIndicator), passed badge, station, cost, file, alert bell
- *   - Add/Edit form: FleetDateInput, passed checkbox, station, cost, FleetUploadZone, AlertToggle, notes
- *   - Quick expiry buttons: 3m / 1y / 2y
- *   - Delete: confirm dialog-less (using window.confirm for simplicity)
- *   - Dirty tracking via onEditingChange prop
+ * Shows test records list + add/edit/delete with file upload.
+ * Stripped fields: test_date, passed, test_station, cost (removed per contract tab redesign).
+ * Remaining: expiry_date + alert toggle + file upload + notes.
  */
 
 import { useState, useTransition, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
 import {
-  Loader2, Plus, Trash2, CheckCircle2, XCircle,
+  Loader2, Plus, Trash2,
   Bell, Pencil, Save, ClipboardCheck,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -28,7 +22,7 @@ import {
   deleteVehicleTest,
   updateVehicleTest,
 } from '@/actions/fleet/vehicles'
-import { formatDate, daysUntil } from '@/lib/format'
+import { daysUntil } from '@/lib/format'
 import { FleetDateInput } from '../shared/FleetDateInput'
 import { AlertToggle } from '../shared/AlertToggle'
 import { ExpiryIndicator } from '../shared/ExpiryIndicator'
@@ -55,12 +49,8 @@ export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowD
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
-  // Form state
-  const [testDate, setTestDate] = useState('')
+  // Form state (simplified — only expiry, alert, file, notes)
   const [expiryDate, setExpiryDate] = useState('')
-  const [passed, setPassed] = useState(true)
-  const [testStation, setTestStation] = useState('')
-  const [cost, setCost] = useState('')
   const [fileUrl, setFileUrl] = useState('')
   const [alertEnabled, setAlertEnabled] = useState(true)
   const [notes, setNotes] = useState('')
@@ -76,16 +66,12 @@ export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowD
 
   // Dirty tracking
   const isFormDirty = (() => {
-    if (showAddForm) return testDate !== '' || expiryDate !== '' || testStation !== '' || cost !== '' || fileUrl !== '' || notes !== ''
+    if (showAddForm) return expiryDate !== '' || fileUrl !== '' || notes !== ''
     if (editingId) {
       const orig = tests.find((t) => t.id === editingId)
       if (!orig) return false
       return (
-        testDate !== (orig.testDate ?? '') ||
         expiryDate !== (orig.expiryDate ?? '') ||
-        passed !== orig.passed ||
-        testStation !== (orig.testStation ?? '') ||
-        cost !== (orig.cost?.toString() ?? '') ||
         fileUrl !== (orig.fileUrl ?? '') ||
         alertEnabled !== orig.alertEnabled ||
         notes !== (orig.notes ?? '')
@@ -147,11 +133,7 @@ export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowD
   // ─────────────────────────────────────────────────────────
 
   function resetForm() {
-    setTestDate('')
     setExpiryDate('')
-    setPassed(true)
-    setTestStation('')
-    setCost('')
     setFileUrl('')
     setAlertEnabled(true)
     setNotes('')
@@ -159,11 +141,7 @@ export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowD
 
   function startEdit(test: VehicleTest) {
     setEditingId(test.id)
-    setTestDate(test.testDate)
     setExpiryDate(test.expiryDate)
-    setPassed(test.passed)
-    setTestStation(test.testStation ?? '')
-    setCost(test.cost?.toString() ?? '')
     setFileUrl(test.fileUrl ?? '')
     setAlertEnabled(test.alertEnabled)
     setNotes(test.notes ?? '')
@@ -173,110 +151,6 @@ export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowD
   function cancelEdit() {
     setEditingId(null)
     resetForm()
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // CRUD
-  // ─────────────────────────────────────────────────────────
-
-  function handleAdd() {
-    if (!testDate || !expiryDate) {
-      toast.error('יש לבחור תאריך טסט ותאריך תפוגה')
-      return
-    }
-    startAddTransition(async () => {
-      const result = await addVehicleTest({
-        vehicleId,
-        testDate,
-        expiryDate,
-        passed,
-        testStation: testStation || null,
-        cost: cost ? parseFloat(cost) : null,
-        notes: notes || null,
-        fileUrl: fileUrl || null,
-        alertEnabled,
-      })
-      if (result.success && result.id) {
-        const newTest: VehicleTest = {
-          id: result.id,
-          vehicleId,
-          testDate,
-          expiryDate,
-          passed,
-          testStation: testStation || null,
-          cost: cost ? parseFloat(cost) : null,
-          notes: notes || null,
-          fileUrl: fileUrl || null,
-          alertEnabled,
-          createdAt: new Date().toISOString(),
-        }
-        setTests((prev) => [newTest, ...prev])
-        resetForm()
-        setShowAddForm(false)
-        toast.success('הטסט נוסף')
-      } else {
-        toast.error(result.error)
-      }
-    })
-  }
-
-  function handleUpdate() {
-    if (!editingId || !testDate || !expiryDate) return
-    startSaveTransition(async () => {
-      const result = await updateVehicleTest({
-        testId: editingId,
-        vehicleId,
-        testDate,
-        expiryDate,
-        passed,
-        testStation: testStation || null,
-        cost: cost ? parseFloat(cost) : null,
-        notes: notes || null,
-        fileUrl: fileUrl || null,
-        alertEnabled,
-      })
-      if (result.success) {
-        setTests((prev) =>
-          prev.map((t) =>
-            t.id === editingId
-              ? {
-                  ...t,
-                  testDate,
-                  expiryDate,
-                  passed,
-                  testStation: testStation || null,
-                  cost: cost ? parseFloat(cost) : null,
-                  notes: notes || null,
-                  fileUrl: fileUrl || null,
-                  alertEnabled,
-                }
-              : t
-          )
-        )
-        setEditingId(null)
-        resetForm()
-        toast.success('הטסט עודכן')
-      } else {
-        toast.error(result.error)
-      }
-    })
-  }
-
-  async function handleDelete(testId: string) {
-    if (!confirm('למחוק את הטסט?')) return
-    setDeletingId(testId)
-    const result = await deleteVehicleTest(testId, vehicleId)
-    if (result.success) {
-      setTests((prev) => prev.filter((t) => t.id !== testId))
-      if (editingId === testId) {
-        setEditingId(null)
-        resetForm()
-      }
-      toast.success('הטסט נמחק')
-    } else {
-      toast.error(result.error)
-    }
-    setDeletingId(null)
   }
 
   // ─────────────────────────────────────────────────────────
@@ -293,6 +167,103 @@ export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowD
   }
 
   // ─────────────────────────────────────────────────────────
+  // CRUD
+  // ─────────────────────────────────────────────────────────
+
+  function handleAdd() {
+    if (!expiryDate) {
+      toast.error('יש לבחור תאריך תפוגה')
+      return
+    }
+    startAddTransition(async () => {
+      // Pass today as testDate (required by DB) and defaults for stripped fields
+      const today = new Date().toISOString().slice(0, 10)
+      const result = await addVehicleTest({
+        vehicleId,
+        testDate: today,
+        expiryDate,
+        passed: true,
+        testStation: null,
+        cost: null,
+        notes: notes || null,
+        fileUrl: fileUrl || null,
+        alertEnabled,
+      })
+      if (result.success && result.id) {
+        const newTest: VehicleTest = {
+          id: result.id,
+          vehicleId,
+          testDate: today,
+          expiryDate,
+          passed: true,
+          testStation: null,
+          cost: null,
+          notes: notes || null,
+          fileUrl: fileUrl || null,
+          alertEnabled,
+          createdAt: new Date().toISOString(),
+        }
+        setTests((prev) => [newTest, ...prev])
+        resetForm()
+        setShowAddForm(false)
+        toast.success('הרישוי נוסף')
+      } else {
+        toast.error(result.error)
+      }
+    })
+  }
+
+  function handleUpdate() {
+    if (!editingId || !expiryDate) return
+    startSaveTransition(async () => {
+      const orig = tests.find((t) => t.id === editingId)
+      const result = await updateVehicleTest({
+        testId: editingId,
+        vehicleId,
+        testDate: orig?.testDate ?? new Date().toISOString().slice(0, 10),
+        expiryDate,
+        passed: orig?.passed ?? true,
+        testStation: orig?.testStation ?? null,
+        cost: orig?.cost ?? null,
+        notes: notes || null,
+        fileUrl: fileUrl || null,
+        alertEnabled,
+      })
+      if (result.success) {
+        setTests((prev) =>
+          prev.map((t) =>
+            t.id === editingId
+              ? { ...t, expiryDate, notes: notes || null, fileUrl: fileUrl || null, alertEnabled }
+              : t
+          )
+        )
+        setEditingId(null)
+        resetForm()
+        toast.success('הרישוי עודכן')
+      } else {
+        toast.error(result.error)
+      }
+    })
+  }
+
+  async function handleDelete(testId: string) {
+    if (!confirm('למחוק את הרישוי?')) return
+    setDeletingId(testId)
+    const result = await deleteVehicleTest(testId, vehicleId)
+    if (result.success) {
+      setTests((prev) => prev.filter((t) => t.id !== testId))
+      if (editingId === testId) {
+        setEditingId(null)
+        resetForm()
+      }
+      toast.success('הרישוי נמחק')
+    } else {
+      toast.error(result.error)
+    }
+    setDeletingId(null)
+  }
+
+  // ─────────────────────────────────────────────────────────
   // Form render
   // ─────────────────────────────────────────────────────────
 
@@ -301,16 +272,6 @@ export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowD
 
     return (
       <div className="border rounded-xl p-4 space-y-4 bg-muted/20">
-
-        {/* תאריך טסט */}
-        <div className="space-y-1.5">
-          <Label>תאריך טסט *</Label>
-          <FleetDateInput
-            value={testDate}
-            onChange={setTestDate}
-            minYear={2000}
-          />
-        </div>
 
         {/* תאריך תפוגה */}
         <div className="space-y-2">
@@ -353,50 +314,6 @@ export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowD
               </p>
             )
           })()}
-        </div>
-
-        {/* עבר / נכשל */}
-        <div className="flex items-center justify-end gap-3">
-          <Label>הטסט עבר</Label>
-          <button
-            type="button"
-            onClick={() => setPassed((v) => !v)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
-              passed
-                ? 'border-green-300 bg-green-50 text-green-700'
-                : 'border-red-300 bg-red-50 text-red-700'
-            }`}
-          >
-            {passed
-              ? <><CheckCircle2 className="h-4 w-4" /> עבר</>
-              : <><XCircle className="h-4 w-4" /> נכשל</>
-            }
-          </button>
-        </div>
-
-        {/* תחנת טסט */}
-        <div className="space-y-1.5">
-          <Label>תחנת טסט</Label>
-          <input
-            type="text"
-            value={testStation}
-            onChange={(e) => setTestStation(e.target.value)}
-            className="w-full border border-border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right"
-            placeholder="שם התחנה..."
-          />
-        </div>
-
-        {/* עלות */}
-        <div className="space-y-1.5">
-          <Label>עלות (₪)</Label>
-          <input
-            type="number"
-            value={cost}
-            onChange={(e) => setCost(e.target.value)}
-            className="w-full border border-border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right"
-            placeholder="0"
-            min="0"
-          />
         </div>
 
         {/* File upload */}
@@ -459,13 +376,13 @@ export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowD
           <Button
             size="sm"
             onClick={mode === 'add' ? handleAdd : handleUpdate}
-            disabled={isBusy || !testDate || !expiryDate}
+            disabled={isBusy || !expiryDate}
           >
             {isBusy && <Loader2 className="h-4 w-4 ms-2 animate-spin" />}
             {mode === 'add' ? (
               <>
                 <Plus className="h-4 w-4 ms-1" />
-                הוסף טסט
+                הוסף רישוי
               </>
             ) : (
               <>
@@ -495,7 +412,7 @@ export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowD
           >
             <ClipboardCheck className="h-6 w-6 text-muted-foreground/35" />
           </div>
-          <p className="text-sm text-muted-foreground">אין רשומות טסט עבור רכב זה</p>
+          <p className="text-sm text-muted-foreground">אין רשומות רישוי עבור רכב זה</p>
         </div>
       )}
 
@@ -513,32 +430,15 @@ export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowD
                 onClick={() => startEdit(test)}
               >
                 <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <div className="shrink-0 mt-0.5">
-                    {test.passed
-                      ? <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      : <XCircle className="h-4 w-4 text-red-500" />
-                    }
-                  </div>
+                  <ClipboardCheck className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium">
-                        טסט {formatDate(test.testDate)}
-                      </span>
+                      <span className="text-sm font-medium">רישוי</span>
                       {test.alertEnabled && (
                         <Bell className="h-3.5 w-3.5 text-amber-500 shrink-0" aria-label="התראה פעילה" />
                       )}
-                      {test.passed
-                        ? <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">עבר</span>
-                        : <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">נכשל</span>
-                      }
-                      {test.cost != null && (
-                        <span className="text-xs text-muted-foreground">₪{test.cost.toLocaleString()}</span>
-                      )}
                     </div>
                     <ExpiryIndicator expiryDate={test.expiryDate} yellowDays={docYellowDays} />
-                    {test.testStation && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{test.testStation}</p>
-                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -584,7 +484,7 @@ export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowD
           onClick={() => { setShowAddForm(true); resetForm() }}
         >
           <Plus className="h-4 w-4" />
-          הוסף טסט
+          הוסף רישוי
         </Button>
       )}
     </div>

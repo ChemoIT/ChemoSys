@@ -113,9 +113,12 @@ export type VehicleFull = {
   campResponsibleName: string | null
   campResponsiblePhone: string | null
 
-  // Vehicle status + fleet exit (migration 00027)
+  // Vehicle status + fleet entry/exit (migrations 00027 + 00030)
   vehicleStatus: string        // 'active'|'suspended'|'returned'|'sold'|'decommissioned'
-  fleetExitDate: string | null // yyyy-mm-dd
+  fleetEntryDate: string | null // yyyy-mm-dd
+  fleetEntryKm: number | null
+  fleetExitDate: string | null  // yyyy-mm-dd
+  fleetExitKm: number | null
 
   // Supplier FK fields (null = not linked)
   leasingCompanyId: string | null

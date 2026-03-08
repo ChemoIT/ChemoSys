@@ -140,7 +140,10 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
       moed_aliya_lakvish,
       mot_last_sync_at,
       vehicle_status,
+      fleet_entry_date,
+      fleet_entry_km,
       fleet_exit_date,
+      fleet_exit_km,
       vehicle_type,
       ownership_type,
       company_id,
@@ -206,7 +209,10 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
     moedAliyaLakvish: data.moed_aliya_lakvish,
     motLastSyncAt: data.mot_last_sync_at,
     vehicleStatus: data.vehicle_status ?? 'active',
+    fleetEntryDate: data.fleet_entry_date ?? null,
+    fleetEntryKm: data.fleet_entry_km ?? null,
     fleetExitDate: data.fleet_exit_date ?? null,
+    fleetExitKm: data.fleet_exit_km ?? null,
     vehicleType: data.vehicle_type,
     ownershipType: data.ownership_type,
     companyId: data.company_id,
@@ -292,7 +298,10 @@ export type UpdateVehicleInput = {
   ownershipType?: string | null
   companyId?: string | null
   vehicleStatus?: string       // 'active'|'suspended'|'returned'|'sold'|'decommissioned'
+  fleetEntryDate?: string | null
+  fleetEntryKm?: number | null
   fleetExitDate?: string | null
+  fleetExitKm?: number | null
   assignedDriverId?: string | null
   notes?: string | null
   leasingCompanyId?: string | null
@@ -324,7 +333,10 @@ export async function updateVehicleDetails(input: UpdateVehicleInput): Promise<A
       ownership_type: input.ownershipType ?? null,
       company_id: input.companyId ?? null,
       vehicle_status: input.vehicleStatus ?? 'active',
+      fleet_entry_date: input.fleetEntryDate ?? null,
+      fleet_entry_km: input.fleetEntryKm ?? null,
       fleet_exit_date: input.fleetExitDate ?? null,
+      fleet_exit_km: input.fleetExitKm ?? null,
       is_active: (input.vehicleStatus ?? 'active') === 'active',
       assigned_driver_id: input.assignedDriverId ?? null,
       notes: input.notes || null,
