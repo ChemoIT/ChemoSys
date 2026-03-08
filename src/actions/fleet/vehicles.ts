@@ -234,7 +234,8 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
 // ─────────────────────────────────────────────────────────────
 
 export async function createVehicle(
-  licensePlate: string
+  licensePlate: string,
+  companyId?: string | null,
 ): Promise<ActionResult & { vehicleId?: string }> {
   const { userId } = await verifyAppUser()
   const supabase = await createClient()
@@ -259,6 +260,7 @@ export async function createVehicle(
     .from('vehicles')
     .insert({
       license_plate: plate,
+      ...(companyId ? { company_id: companyId } : {}),
       created_by: userId,
       updated_by: userId,
     })

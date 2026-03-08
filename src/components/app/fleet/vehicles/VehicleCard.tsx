@@ -2,7 +2,7 @@
 
 /**
  * VehicleCard — tabs layout for the vehicle card page.
- * Tabs: פרטי הרכב | טסטים | ביטוח | שיוך נהג | עלויות | מסמכים | הערות | ק"מ
+ * Tabs: פרטי הרכב | טסטים | ביטוח | צמידות | מסמכים | הערות | ק"מ (7 tabs)
  *
  * Mirrors DriverCard.tsx pattern:
  *  - Header: avatar (plate chars), license plate, vehicle info, status badge, fitness light
@@ -10,7 +10,6 @@
  *  - No PDF, No SMS (vehicles don't have phone numbers)
  *  - Controlled Tabs with dirty tracking + unsaved changes Dialog
  *  - dir="rtl" on TabsList AND every TabsContent wrapper
- *  - Tabs 4-8: placeholders (populated in Plan 14-02)
  */
 
 import { useState, useTransition, useCallback, useRef } from 'react'
@@ -23,8 +22,7 @@ import {
   Car,
   ClipboardCheck,
   Shield,
-  User,
-  DollarSign,
+  Shuffle,
   Paperclip,
   FileText,
   Gauge,
@@ -48,7 +46,6 @@ import { VehicleDetailsSection } from './VehicleDetailsSection'
 import { VehicleTestsSection } from './VehicleTestsSection'
 import { VehicleInsuranceSection } from './VehicleInsuranceSection'
 import { VehicleAssignmentSection } from './VehicleAssignmentSection'
-import { VehicleCostsSection } from './VehicleCostsSection'
 import { VehicleDocumentsSection } from './VehicleDocumentsSection'
 import { VehicleNotesSection } from './VehicleNotesSection'
 import { deleteVehicleWithPassword } from '@/actions/fleet/vehicles'
@@ -58,6 +55,8 @@ import type {
   VehicleTest,
   VehicleInsurance,
   VehicleDocument,
+  VehicleDriverJournal,
+  VehicleProjectJournal,
 } from '@/lib/fleet/vehicle-types'
 
 // ─────────────────────────────────────────────────────────────
@@ -69,6 +68,8 @@ type VehicleCardProps = {
   tests: VehicleTest[]
   insurance: VehicleInsurance[]
   documents: VehicleDocument[]
+  driverJournal: VehicleDriverJournal[]
+  projectJournal: VehicleProjectJournal[]
   companies: { id: string; name: string }[]
   yellowDays: number
   docYellowDays: number
@@ -86,6 +87,8 @@ export function VehicleCard({
   tests,
   insurance,
   documents,
+  driverJournal,
+  projectJournal,
   companies,
   yellowDays,
   docYellowDays,
@@ -116,13 +119,15 @@ export function VehicleCard({
   const onNotesEditingChange = useCallback((dirty: boolean) => {
     dirtyStates.current.notes = dirty
   }, [])
+  const onAssignmentEditingChange = useCallback((dirty: boolean) => {
+    dirtyStates.current.assignment = dirty
+  }, [])
 
   const TAB_LABELS: Record<string, string> = {
     details:    'פרטי הרכב',
     tests:      'טסטים',
     insurance:  'ביטוח',
-    assignment: 'שיוך נהג',
-    costs:      'עלויות',
+    assignment: 'צמידות',
     documents:  'מסמכים',
     notes:      'הערות',
     km:         'ק"מ',
@@ -324,8 +329,7 @@ export function VehicleCard({
               { value: 'details',    label: 'פרטי הרכב',  icon: Car },
               { value: 'tests',      label: 'טסטים',      icon: ClipboardCheck },
               { value: 'insurance',  label: 'ביטוח',      icon: Shield },
-              { value: 'assignment', label: 'שיוך נהג',   icon: User },
-              { value: 'costs',      label: 'עלויות',     icon: DollarSign },
+              { value: 'assignment', label: 'צמידות',     icon: Shuffle },
               { value: 'documents',  label: 'מסמכים',     icon: Paperclip },
               { value: 'notes',      label: 'הערות',      icon: FileText },
               { value: 'km',         label: 'ק"מ',         icon: Gauge },
@@ -390,7 +394,7 @@ export function VehicleCard({
           </div>
         </TabsContent>
 
-        {/* ══ Tab 4 — שיוך נהג ═══════════════════════════════ */}
+        {/* ══ Tab 4 — צמידות ═════════════════════════════════ */}
         <TabsContent value="assignment" className="mt-0">
           <div
             dir="rtl"
@@ -399,18 +403,15 @@ export function VehicleCard({
           >
             <VehicleAssignmentSection
               vehicleId={vehicle.id}
-              assignedDriverId={vehicle.assignedDriverId}
-              assignedDriverName={vehicle.assignedDriverName}
+              vehicle={vehicle}
+              driverJournal={driverJournal}
+              projectJournal={projectJournal}
+              onEditingChange={onAssignmentEditingChange}
             />
           </div>
         </TabsContent>
 
-        {/* ══ Tab 5 — עלויות (Coming Soon) ════════════════════ */}
-        <TabsContent value="costs" className="mt-0">
-          <VehicleCostsSection />
-        </TabsContent>
-
-        {/* ══ Tab 6 — מסמכים ══════════════════════════════════ */}
+        {/* ══ Tab 5 — מסמכים ══════════════════════════════════ */}
         <TabsContent value="documents" className="mt-0">
           <div
             dir="rtl"
@@ -426,7 +427,7 @@ export function VehicleCard({
           </div>
         </TabsContent>
 
-        {/* ══ Tab 7 — הערות ═══════════════════════════════════ */}
+        {/* ══ Tab 6 — הערות ═══════════════════════════════════ */}
         <TabsContent value="notes" className="mt-0">
           <div
             dir="rtl"
@@ -441,7 +442,7 @@ export function VehicleCard({
           </div>
         </TabsContent>
 
-        {/* ══ Tab 8 — ק"מ (Coming Soon) ════════════════════════ */}
+        {/* ══ Tab 7 — ק"מ (Coming Soon) ════════════════════════ */}
         <TabsContent value="km" className="mt-0">
           <div dir="rtl">
             <div

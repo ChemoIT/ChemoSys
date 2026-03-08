@@ -121,7 +121,7 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
         vehicleType: vehicleType || null,
         ownershipType: ownershipType || null,
         companyId: companyId || null,
-        isActive,
+        vehicleStatus: isActive ? 'active' : 'suspended',
         leasingCompanyId: leasingCompanyId || null,
         insuranceCompanyId: insuranceCompanyId || null,
         fuelCardSupplierId: fuelCardSupplierId || null,
