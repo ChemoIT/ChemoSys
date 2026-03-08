@@ -20,6 +20,7 @@
  */
 
 import { useState, useEffect, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Loader2, RefreshCw, Save, Lock, Car } from 'lucide-react'
 import { Label } from '@/components/ui/label'
@@ -34,6 +35,7 @@ import {
 } from '@/lib/fleet/vehicle-types'
 import { VehicleImageGallery } from './VehicleImageGallery'
 import { FleetDateInput } from '@/components/app/fleet/shared/FleetDateInput'
+import { ReplacementVehicleDialog } from './ReplacementVehicleDialog'
 
 // ─────────────────────────────────────────────────────────────
 // InfoRow -- read-only display row
@@ -74,6 +76,8 @@ type LockedStatus = typeof LOCKED_STATUSES[number]
 // ─────────────────────────────────────────────────────────────
 
 export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: Props) {
+  const router = useRouter()
+
   // -- Editable form state --
   const [vehicleType, setVehicleType] = useState(vehicle.vehicleType ?? '')
   const [ownershipType, setOwnershipType] = useState(vehicle.ownershipType ?? '')
@@ -93,6 +97,9 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
   const [insuranceSuppliers, setInsuranceSuppliers] = useState<SupplierOption[]>([])
   const [fuelCardSuppliers, setFuelCardSuppliers] = useState<SupplierOption[]>([])
   const [garageSuppliers, setGarageSuppliers] = useState<SupplierOption[]>([])
+
+  // -- Dialog state --
+  const [showReplacementDialog, setShowReplacementDialog] = useState(false)
 
   // -- Transitions --
   const [isSaving, startSaveTransition] = useTransition()
@@ -389,11 +396,11 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
           </select>
         </div>
 
-        {/* כפתור ניהול רכב חלופי -- placeholder לחיבור ב-Plan 17-02 */}
+        {/* כפתור ניהול רכב חלופי */}
         <div className="space-y-1.5">
           <button
             type="button"
-            onClick={() => { /* ReplacementVehicleDialog -- יחובר ב-Plan 17-02 */ }}
+            onClick={() => setShowReplacementDialog(true)}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-muted/60 transition-colors"
           >
             <Car className="h-4 w-4" />
@@ -431,6 +438,16 @@ export function VehicleDetailsSection({ vehicle, companies, onEditingChange }: P
           </button>
         </div>
       </div>
+
+      {/* ReplacementVehicleDialog */}
+      <ReplacementVehicleDialog
+        vehicleId={vehicle.id}
+        open={showReplacementDialog}
+        onClose={() => {
+          setShowReplacementDialog(false)
+          router.refresh() // מרענן header badge + vehicleStatus לאחר שינוי
+        }}
+      />
     </div>
   )
 }
