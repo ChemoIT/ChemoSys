@@ -148,6 +148,8 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
       camp_responsible_type,
       camp_responsible_name,
       camp_responsible_phone,
+      vehicle_status,
+      fleet_exit_date,
       companies ( name ),
       drivers (
         employees ( first_name, last_name )
@@ -211,6 +213,8 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
     campResponsibleType: data.camp_responsible_type ?? null,
     campResponsibleName: data.camp_responsible_name ?? null,
     campResponsiblePhone: data.camp_responsible_phone ?? null,
+    vehicleStatus: data.vehicle_status ?? 'active',
+    fleetExitDate: data.fleet_exit_date ?? null,
     leasingCompanyId: data.leasing_company_id,
     leasingCompanyName: leasing?.name ?? null,
     insuranceCompanyId: data.insurance_company_id,
