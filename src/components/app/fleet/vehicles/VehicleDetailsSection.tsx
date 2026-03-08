@@ -24,6 +24,7 @@ import {
 import { formatLicensePlate, formatDate } from '@/lib/format'
 import {
   VEHICLE_STATUS_LABELS,
+  VEHICLE_TYPE_LABELS,
   REPLACEMENT_REASON_LABELS,
   type VehicleFull,
   type VehicleReplacementRecord,
@@ -104,6 +105,8 @@ export function VehicleDetailsSection({ vehicle, onEditingChange }: Props) {
   const router = useRouter()
 
   // -- Editable form state --
+  const [vehicleType, setVehicleType] = useState(vehicle.vehicleType ?? '')
+  const [vehicleTypeNote, setVehicleTypeNote] = useState(vehicle.vehicleTypeNote ?? '')
   const [vehicleStatus, setVehicleStatus] = useState(vehicle.vehicleStatus ?? 'active')
 
   // -- Card lock state (returned/sold/decommissioned — user-set) --
@@ -130,7 +133,10 @@ export function VehicleDetailsSection({ vehicle, onEditingChange }: Props) {
   const [isSyncing, startSyncTransition] = useTransition()
 
   // -- Dirty tracking (based on actual vehicleStatus, not effectiveStatus) --
-  const isDirty = vehicleStatus !== (vehicle.vehicleStatus ?? 'active')
+  const isDirty =
+    vehicleStatus !== (vehicle.vehicleStatus ?? 'active') ||
+    vehicleType !== (vehicle.vehicleType ?? '') ||
+    vehicleTypeNote !== (vehicle.vehicleTypeNote ?? '')
 
   useEffect(() => {
     onEditingChange?.(isDirty)
@@ -154,10 +160,17 @@ export function VehicleDetailsSection({ vehicle, onEditingChange }: Props) {
   // ----------------------------------------------------------
 
   function handleSave() {
+    // Validate: when type is 'other', note is required
+    if (vehicleType === 'other' && !vehicleTypeNote.trim()) {
+      toast.error('יש להזין הערה כאשר סוג הרכב הוא "אחר"')
+      return
+    }
     startSaveTransition(async () => {
       const result = await updateVehicleDetails({
         vehicleId: vehicle.id,
         vehicleStatus,
+        vehicleType: vehicleType || null,
+        vehicleTypeNote: vehicleType === 'other' ? vehicleTypeNote : null,
       })
       if (result.success) {
         toast.success('פרטי הרכב נשמרו בהצלחה')
@@ -278,6 +291,44 @@ export function VehicleDetailsSection({ vehicle, onEditingChange }: Props) {
 
       {/* -- עמודה שמאלית -- שדות תפעוליים + רכבים חלופיים */}
       <div className="space-y-4">
+
+        {/* ── סוג כלי הרכב ── */}
+        <div
+          className="rounded-xl p-4"
+          style={{ background: '#F0F5FB', border: '1px solid #D4E0ED' }}
+        >
+          <Label className="text-sm font-semibold mb-2 block">סוג כלי הרכב</Label>
+          <select
+            value={vehicleType}
+            onChange={(e) => {
+              setVehicleType(e.target.value)
+              if (e.target.value !== 'other') setVehicleTypeNote('')
+            }}
+            disabled={isLocked}
+            className={selectClass}
+          >
+            <option value="">— בחר סוג —</option>
+            {Object.entries(VEHICLE_TYPE_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+          {vehicleType === 'other' && (
+            <div className="mt-2">
+              <input
+                type="text"
+                value={vehicleTypeNote}
+                onChange={(e) => setVehicleTypeNote(e.target.value)}
+                placeholder="פרט את סוג הרכב (שדה חובה)"
+                disabled={isLocked}
+                className="w-full border rounded-lg px-3 py-2 text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 text-right"
+                style={{ borderColor: vehicleTypeNote.trim() ? '#C8D5E2' : '#EF4444' }}
+              />
+              {!vehicleTypeNote.trim() && (
+                <p className="text-xs text-red-500 mt-1">שדה חובה — יש לפרט את סוג הרכב</p>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* תג נעילה — רכב חלופי פעיל */}
         {hasActiveReplacement && (

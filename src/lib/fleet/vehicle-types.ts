@@ -17,6 +17,7 @@ export const VEHICLE_TYPE_LABELS: Record<string, string> = {
   commercial: 'מסחרי',
   truck:      'משאית',
   trailer:    'נגרר',
+  other:      'אחר',
 }
 
 export const OWNERSHIP_TYPE_LABELS: Record<string, string> = {
@@ -62,8 +63,16 @@ export type VehicleListItem = {
   /** Year of manufacture from MOT API */
   shnatYitzur: number | null
   companyName: string | null
+  /** Vehicle classification (private/commercial/truck/trailer/other) */
+  vehicleType: string | null
+  /** Detailed status: active | suspended | returned | sold | decommissioned */
+  vehicleStatus: string
   computedStatus: 'active' | 'inactive'
+  /** camp | assigned | null */
+  vehicleCategory: 'camp' | 'assigned' | null
   assignedDriverName: string | null
+  /** Current active project name (from vehicle_project_journal) */
+  activeProjectName: string | null
   /** Nearest upcoming vehicle test expiry date */
   testExpiryDate: string | null
   /** Nearest upcoming insurance expiry across all policies */
@@ -98,6 +107,7 @@ export type VehicleFull = {
 
   // Operational / classification fields
   vehicleType: string | null       // one of VEHICLE_TYPE_LABELS keys
+  vehicleTypeNote: string | null   // required when vehicleType='other'
   ownershipType: string | null     // one of OWNERSHIP_TYPE_LABELS keys
   companyId: string | null
   companyName: string | null

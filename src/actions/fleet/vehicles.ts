@@ -64,13 +64,17 @@ export async function getVehiclesList(): Promise<VehicleListItem[]> {
       degem_nm,
       shnat_yitzur,
       is_active,
+      vehicle_type,
+      vehicle_status,
+      vehicle_category,
       companies ( name ),
       drivers (
         employees ( first_name, last_name )
       ),
       vehicle_tests ( expiry_date ),
       vehicle_insurance ( expiry_date ),
-      vehicle_documents ( expiry_date )
+      vehicle_documents ( expiry_date ),
+      vehicle_project_journal ( project_id, end_date, projects ( name ) )
     `)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
@@ -94,17 +98,28 @@ export async function getVehiclesList(): Promise<VehicleListItem[]> {
 
     const computedStatus: 'active' | 'inactive' = row.is_active ? 'active' : 'inactive'
 
+    // Find active project (end_date IS NULL)
+    const journalEntries = (row.vehicle_project_journal ?? []) as unknown as {
+      project_id: string; end_date: string | null
+      projects: { name: string } | null
+    }[]
+    const activeProject = journalEntries.find((j) => j.end_date === null)
+
     return {
       id: row.id,
       licensePlate: row.license_plate,
       tozeret: row.tozeret_nm,
       degem: row.degem_nm,
       shnatYitzur: row.shnat_yitzur,
+      vehicleType: row.vehicle_type ?? null,
+      vehicleStatus: row.vehicle_status ?? 'active',
+      vehicleCategory: (row.vehicle_category as 'camp' | 'assigned' | null) ?? null,
       companyName: company?.name ?? null,
       computedStatus,
       assignedDriverName: driverEmployee
         ? `${driverEmployee.first_name} ${driverEmployee.last_name}`
         : null,
+      activeProjectName: activeProject?.projects?.name ?? null,
       testExpiryDate: testExpiries.sort()[0] ?? null,
       insuranceMinExpiry: insuranceExpiries.sort()[0] ?? null,
       documentMinExpiry: docExpiries.sort()[0] ?? null,
@@ -145,6 +160,7 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
       fleet_exit_date,
       fleet_exit_km,
       vehicle_type,
+      vehicle_type_note,
       ownership_type,
       company_id,
       is_active,
@@ -223,6 +239,7 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
     fleetExitDate: data.fleet_exit_date ?? null,
     fleetExitKm: data.fleet_exit_km ?? null,
     vehicleType: data.vehicle_type,
+    vehicleTypeNote: data.vehicle_type_note ?? null,
     ownershipType: data.ownership_type,
     companyId: data.company_id,
     companyName: company?.name ?? null,
@@ -313,6 +330,7 @@ export async function createVehicle(
 export type UpdateVehicleInput = {
   vehicleId: string
   vehicleType?: string | null
+  vehicleTypeNote?: string | null
   ownershipType?: string | null
   companyId?: string | null
   vehicleStatus?: string       // 'active'|'suspended'|'returned'|'sold'|'decommissioned'
@@ -358,7 +376,12 @@ export async function updateVehicleDetails(input: UpdateVehicleInput): Promise<A
   // to avoid overwriting values from other tabs (e.g. status from details tab)
   const updateObj: Record<string, unknown> = { updated_by: userId }
 
-  if (input.vehicleType !== undefined) updateObj.vehicle_type = input.vehicleType
+  if (input.vehicleType !== undefined) {
+    updateObj.vehicle_type = input.vehicleType
+    // Clear note when type is not 'other'
+    if (input.vehicleType !== 'other') updateObj.vehicle_type_note = null
+  }
+  if (input.vehicleTypeNote !== undefined) updateObj.vehicle_type_note = input.vehicleTypeNote || null
   if (input.ownershipType !== undefined) updateObj.ownership_type = input.ownershipType
   if (input.companyId !== undefined) updateObj.company_id = input.companyId
   if (input.vehicleStatus !== undefined) {

@@ -1,16 +1,18 @@
 'use client'
 
 /**
- * VehicleList — displays the list of all vehicle cards with fitness light,
- * status filter, fitness filter, search, and navigation to individual vehicle cards.
+ * VehicleList — displays the list of all vehicle cards with per-column filters,
+ * wider layout matching VehicleCard, and new columns:
+ *   כשירות | מספר רישוי | יצרן/דגם | שנה | קטגורית רכב | שם פרויקט | נהג | סטטוס
  *
- * Mirrors DriverList.tsx pattern exactly.
+ * Default filter: status = active + suspended (פעיל + מושבת זמני).
+ * Camp vehicles (vehicleCategory='camp') do NOT display a driver name.
  * RTL layout: dir="rtl" applied by parent page or root html.
  */
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Car, Plus, ChevronLeft, Building2, Search, Users, CheckCircle2 } from 'lucide-react'
+import { Car, Plus, ChevronLeft, Search, Users, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   VehicleFitnessLight,
@@ -18,6 +20,7 @@ import {
 } from '@/components/app/fleet/shared/VehicleFitnessLight'
 import { AddVehicleDialog } from '@/components/app/fleet/vehicles/AddVehicleDialog'
 import { formatLicensePlate } from '@/lib/format'
+import { VEHICLE_TYPE_LABELS, VEHICLE_STATUS_LABELS } from '@/lib/fleet/vehicle-types'
 import type { VehicleListItem } from '@/lib/fleet/vehicle-types'
 
 type Props = {
@@ -25,19 +28,90 @@ type Props = {
   yellowDays: number
 }
 
-type StatusFilter = 'all' | 'active' | 'inactive'
 type FitnessFilter = 'all' | 'red' | 'yellow' | 'green'
+
+// ─────────────────────────────────────────────────────────────
+// Segment button helper (DRY)
+// ─────────────────────────────────────────────────────────────
+
+function SegmentButton({
+  label,
+  active,
+  onClick,
+  dot,
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+  dot?: string // tailwind color class for dot
+}) {
+  return (
+    <button
+      onClick={onClick}
+      data-active={active}
+      className="px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 cursor-pointer select-none flex items-center gap-1.5 data-[active=true]:bg-white data-[active=true]:shadow-sm data-[active=true]:text-foreground text-muted-foreground hover:text-foreground whitespace-nowrap"
+      style={active ? { boxShadow: '0 1px 3px rgb(21 45 60 / 0.12)' } : {}}
+    >
+      {dot && <span className={`inline-block h-2 w-2 rounded-full shrink-0 ${dot}`} />}
+      {label}
+    </button>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// Status badge renderer
+// ─────────────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: string }) {
+  const config: Record<string, { bg: string; color: string; border: string; label: string }> = {
+    active:         { bg: '#DCFCE7', color: '#16A34A', border: '#BBF7D0', label: 'פעיל' },
+    suspended:      { bg: '#FEF3C7', color: '#B45309', border: '#FDE68A', label: 'מושבת זמני' },
+    returned:       { bg: '#F1F5F9', color: '#64748B', border: '#E2E8F0', label: 'הוחזר' },
+    sold:           { bg: '#F1F5F9', color: '#64748B', border: '#E2E8F0', label: 'נמכר' },
+    decommissioned: { bg: '#FEE2E2', color: '#DC2626', border: '#FECACA', label: 'מושבת' },
+  }
+  const c = config[status] ?? config.active
+  return (
+    <span
+      className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap"
+      style={{ background: c.bg, color: c.color, border: `1px solid ${c.border}` }}
+    >
+      {c.label}
+    </span>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// Main Component
+// ─────────────────────────────────────────────────────────────
 
 export function VehicleList({ vehicles, yellowDays }: Props) {
   const router = useRouter()
   const [addOpen, setAddOpen] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active')
-  const [fitnessFilter, setFitnessFilter] = useState<FitnessFilter>('all')
-  const [search, setSearch] = useState('')
 
+  // -- Filters --
+  const [search, setSearch] = useState('')
+  const [fitnessFilter, setFitnessFilter] = useState<FitnessFilter>('all')
+  const [vehicleTypeFilter, setVehicleTypeFilter] = useState<string>('all')
+  // Default: show active + suspended
+  const [statusFilter, setStatusFilter] = useState<string>('active_suspended')
+  const [projectFilter, setProjectFilter] = useState<string>('all')
+
+  // -- Unique project names for filter --
+  const projectNames = useMemo(() => {
+    const names = new Set<string>()
+    vehicles.forEach((v) => { if (v.activeProjectName) names.add(v.activeProjectName) })
+    return Array.from(names).sort()
+  }, [vehicles])
+
+  // -- Apply filters --
   const filtered = vehicles.filter((v) => {
     // Status filter
-    if (statusFilter !== 'all' && v.computedStatus !== statusFilter) return false
+    if (statusFilter === 'active_suspended') {
+      if (v.vehicleStatus !== 'active' && v.vehicleStatus !== 'suspended') return false
+    } else if (statusFilter !== 'all') {
+      if (v.vehicleStatus !== statusFilter) return false
+    }
 
     // Fitness filter
     if (fitnessFilter !== 'all') {
@@ -50,6 +124,18 @@ export function VehicleList({ vehicles, yellowDays }: Props) {
       if (fitness !== fitnessFilter) return false
     }
 
+    // Vehicle type filter
+    if (vehicleTypeFilter !== 'all') {
+      if ((v.vehicleType ?? '') !== vehicleTypeFilter) return false
+    }
+
+    // Project filter
+    if (projectFilter === 'none') {
+      if (v.activeProjectName) return false
+    } else if (projectFilter !== 'all') {
+      if (v.activeProjectName !== projectFilter) return false
+    }
+
     // Search filter
     if (search) {
       const q = search.toLowerCase()
@@ -58,7 +144,8 @@ export function VehicleList({ vehicles, yellowDays }: Props) {
         (v.tozeret?.toLowerCase().includes(q) ?? false) ||
         (v.degem?.toLowerCase().includes(q) ?? false) ||
         (v.companyName?.toLowerCase().includes(q) ?? false) ||
-        (v.assignedDriverName?.toLowerCase().includes(q) ?? false)
+        (v.assignedDriverName?.toLowerCase().includes(q) ?? false) ||
+        (v.activeProjectName?.toLowerCase().includes(q) ?? false)
       )
     }
 
@@ -67,12 +154,13 @@ export function VehicleList({ vehicles, yellowDays }: Props) {
 
   const counts = {
     total: vehicles.length,
-    active: vehicles.filter((v) => v.computedStatus === 'active').length,
-    inactive: vehicles.filter((v) => v.computedStatus !== 'active').length,
+    active: vehicles.filter((v) => v.vehicleStatus === 'active').length,
+    suspended: vehicles.filter((v) => v.vehicleStatus === 'suspended').length,
+    inactive: vehicles.filter((v) => v.vehicleStatus !== 'active' && v.vehicleStatus !== 'suspended').length,
   }
 
   return (
-    <div className="max-w-5xl mx-auto w-full space-y-5">
+    <div className="max-w-[calc(100%-6cm)] mx-auto w-full space-y-5">
       {/* ── Header ──────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
@@ -87,6 +175,11 @@ export function VehicleList({ vehicles, yellowDays }: Props) {
               <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
               <span className="text-xs font-medium text-green-700">{counts.active} פעילים</span>
             </div>
+            {counts.suspended > 0 && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200">
+                <span className="text-xs font-medium text-amber-700">{counts.suspended} מושבתים זמנית</span>
+              </div>
+            )}
             {counts.inactive > 0 && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/40 border border-border">
                 <span className="text-xs font-medium text-muted-foreground">{counts.inactive} לא פעילים</span>
@@ -117,48 +210,49 @@ export function VehicleList({ vehicles, yellowDays }: Props) {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="לוחית / יצרן / דגם / חברה..."
-            className="border border-border rounded-full pr-9 pl-3 py-2 text-base sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 w-full sm:w-52 shadow-sm"
+            placeholder="חיפוש חופשי..."
+            className="border border-border rounded-full pr-9 pl-3 py-2 text-base sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 w-full sm:w-48 shadow-sm"
             style={{ transition: 'box-shadow 150ms, border-color 150ms' }}
           />
         </div>
 
-        {/* Status segment control */}
+        {/* Status filter */}
         <div className="flex items-center gap-0.5 bg-muted/50 border border-border rounded-full p-0.5">
-          {(['all', 'active', 'inactive'] as StatusFilter[]).map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              data-active={statusFilter === s}
-              className="px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 cursor-pointer select-none data-[active=true]:bg-white data-[active=true]:shadow-sm data-[active=true]:text-foreground text-muted-foreground hover:text-foreground"
-              style={statusFilter === s ? { boxShadow: '0 1px 3px rgb(21 45 60 / 0.12)' } : {}}
-            >
-              {s === 'all' ? 'כולם' : s === 'active' ? 'פעילים' : 'לא פעילים'}
-            </button>
+          <SegmentButton label="כולם" active={statusFilter === 'all'} onClick={() => setStatusFilter('all')} />
+          <SegmentButton label="פעיל+מושבת" active={statusFilter === 'active_suspended'} onClick={() => setStatusFilter('active_suspended')} />
+          {Object.entries(VEHICLE_STATUS_LABELS).map(([key, label]) => (
+            <SegmentButton key={key} label={label} active={statusFilter === key} onClick={() => setStatusFilter(key)} />
           ))}
         </div>
 
-        {/* Fitness segment control */}
+        {/* Fitness filter */}
         <div className="flex items-center gap-0.5 bg-muted/50 border border-border rounded-full p-0.5">
-          {(['all', 'green', 'yellow', 'red'] as FitnessFilter[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFitnessFilter(f)}
-              data-active={fitnessFilter === f}
-              className="px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 cursor-pointer select-none flex items-center gap-1.5 data-[active=true]:bg-white data-[active=true]:shadow-sm data-[active=true]:text-foreground text-muted-foreground hover:text-foreground"
-              style={fitnessFilter === f ? { boxShadow: '0 1px 3px rgb(21 45 60 / 0.12)' } : {}}
-            >
-              {f !== 'all' && (
-                <span
-                  className={`inline-block h-2 w-2 rounded-full shrink-0 ${
-                    f === 'red' ? 'bg-red-500' : f === 'yellow' ? 'bg-yellow-400' : 'bg-green-500'
-                  }`}
-                />
-              )}
-              {f === 'all' ? 'כל הכשירויות' : f === 'green' ? 'כשיר' : f === 'yellow' ? 'טעון בדיקה' : 'לא כשיר'}
-            </button>
+          <SegmentButton label="כל הכשירויות" active={fitnessFilter === 'all'} onClick={() => setFitnessFilter('all')} />
+          <SegmentButton label="כשיר" active={fitnessFilter === 'green'} onClick={() => setFitnessFilter('green')} dot="bg-green-500" />
+          <SegmentButton label="טעון בדיקה" active={fitnessFilter === 'yellow'} onClick={() => setFitnessFilter('yellow')} dot="bg-yellow-400" />
+          <SegmentButton label="לא כשיר" active={fitnessFilter === 'red'} onClick={() => setFitnessFilter('red')} dot="bg-red-500" />
+        </div>
+
+        {/* Vehicle type filter */}
+        <div className="flex items-center gap-0.5 bg-muted/50 border border-border rounded-full p-0.5">
+          <SegmentButton label="כל הסוגים" active={vehicleTypeFilter === 'all'} onClick={() => setVehicleTypeFilter('all')} />
+          {Object.entries(VEHICLE_TYPE_LABELS).map(([key, label]) => (
+            <SegmentButton key={key} label={label} active={vehicleTypeFilter === key} onClick={() => setVehicleTypeFilter(key)} />
           ))}
         </div>
+
+        {/* Project filter — dropdown style (too many options for segment) */}
+        <select
+          value={projectFilter}
+          onChange={(e) => setProjectFilter(e.target.value)}
+          className="border border-border rounded-full px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm cursor-pointer text-muted-foreground font-medium"
+        >
+          <option value="all">כל הפרויקטים</option>
+          <option value="none">ללא פרויקט</option>
+          {projectNames.map((name) => (
+            <option key={name} value={name}>{name}</option>
+          ))}
+        </select>
       </div>
 
       {/* ── Table / Empty state ───────────────────────────────── */}
@@ -181,28 +275,31 @@ export function VehicleList({ vehicles, yellowDays }: Props) {
                 className="text-right border-b"
                 style={{ background: '#F8FAFC', borderColor: '#E8EEF4' }}
               >
-                <th className="px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide w-14">
+                <th className="px-3 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide w-14">
                   כשירות
                 </th>
-                <th className="px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide">
+                <th className="px-3 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide">
                   מספר רישוי
                 </th>
-                <th className="px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide">
+                <th className="px-3 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide">
                   יצרן / דגם
                 </th>
-                <th className="px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide hidden md:table-cell">
-                  חברה
-                </th>
-                <th className="px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide hidden lg:table-cell w-16">
+                <th className="px-3 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide w-16 hidden md:table-cell">
                   שנה
                 </th>
-                <th className="px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide hidden lg:table-cell">
+                <th className="px-3 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide hidden md:table-cell">
+                  קטגוריה
+                </th>
+                <th className="px-3 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide hidden lg:table-cell">
+                  פרויקט
+                </th>
+                <th className="px-3 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide hidden lg:table-cell">
                   נהג
                 </th>
-                <th className="px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide w-20">
+                <th className="px-3 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide w-24">
                   סטטוס
                 </th>
-                <th className="px-4 py-3 w-10" />
+                <th className="px-3 py-3 w-10" />
               </tr>
             </thead>
             <tbody>
@@ -217,7 +314,7 @@ export function VehicleList({ vehicles, yellowDays }: Props) {
                   onClick={() => router.push(`/app/fleet/vehicle-card/${vehicle.id}`)}
                 >
                   {/* Fitness light */}
-                  <td className="px-4 py-3.5">
+                  <td className="px-3 py-3.5">
                     <VehicleFitnessLight
                       testExpiryDate={vehicle.testExpiryDate}
                       insuranceMinExpiry={vehicle.insuranceMinExpiry}
@@ -227,56 +324,44 @@ export function VehicleList({ vehicles, yellowDays }: Props) {
                   </td>
 
                   {/* License plate */}
-                  <td className="px-4 py-3.5">
+                  <td className="px-3 py-3.5">
                     <span className="font-mono font-semibold text-foreground" dir="ltr">
                       {formatLicensePlate(vehicle.licensePlate)}
                     </span>
                   </td>
 
                   {/* Manufacturer / model */}
-                  <td className="px-4 py-3.5 text-muted-foreground">
+                  <td className="px-3 py-3.5 text-muted-foreground">
                     {[vehicle.tozeret, vehicle.degem].filter(Boolean).join(' / ') || '—'}
                   </td>
 
-                  {/* Company — hidden on mobile */}
-                  <td className="px-4 py-3.5 text-muted-foreground hidden md:table-cell">
-                    <span className="flex items-center gap-1.5">
-                      <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-                      {vehicle.companyName ?? '—'}
-                    </span>
-                  </td>
-
-                  {/* Year — hidden on mobile + tablet */}
-                  <td className="px-4 py-3.5 text-muted-foreground hidden lg:table-cell">
+                  {/* Year */}
+                  <td className="px-3 py-3.5 text-muted-foreground hidden md:table-cell">
                     {vehicle.shnatYitzur ?? '—'}
                   </td>
 
-                  {/* Assigned driver — hidden on mobile + tablet */}
-                  <td className="px-4 py-3.5 text-muted-foreground hidden lg:table-cell">
-                    {vehicle.assignedDriverName ?? '—'}
+                  {/* Vehicle type (קטגוריה) */}
+                  <td className="px-3 py-3.5 text-muted-foreground hidden md:table-cell">
+                    {vehicle.vehicleType ? (VEHICLE_TYPE_LABELS[vehicle.vehicleType] ?? vehicle.vehicleType) : '—'}
+                  </td>
+
+                  {/* Active project */}
+                  <td className="px-3 py-3.5 text-muted-foreground hidden lg:table-cell">
+                    {vehicle.activeProjectName ?? '—'}
+                  </td>
+
+                  {/* Driver — hide for camp vehicles */}
+                  <td className="px-3 py-3.5 text-muted-foreground hidden lg:table-cell">
+                    {vehicle.vehicleCategory === 'camp' ? '—' : (vehicle.assignedDriverName ?? '—')}
                   </td>
 
                   {/* Status badge */}
-                  <td className="px-4 py-3.5">
-                    {vehicle.computedStatus === 'active' ? (
-                      <span
-                        className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold"
-                        style={{ background: '#DCFCE7', color: '#16A34A', border: '1px solid #BBF7D0' }}
-                      >
-                        פעיל
-                      </span>
-                    ) : (
-                      <span
-                        className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold"
-                        style={{ background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0' }}
-                      >
-                        לא פעיל
-                      </span>
-                    )}
+                  <td className="px-3 py-3.5">
+                    <StatusBadge status={vehicle.vehicleStatus} />
                   </td>
 
                   {/* Chevron */}
-                  <td className="px-4 py-3.5">
+                  <td className="px-3 py-3.5">
                     <div className="flex items-center justify-center h-8 w-8 rounded-lg text-muted-foreground/50 hover:text-primary hover:bg-primary/8 transition-colors">
                       <ChevronLeft className="h-4 w-4" />
                     </div>
