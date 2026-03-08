@@ -21,6 +21,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { verifyAppUser } from '@/lib/dal'
+import { normalizePhone } from '@/lib/format'
 import type {
   VehicleListItem,
   VehicleFull,
@@ -28,6 +29,8 @@ import type {
   VehicleInsurance,
   VehicleDocument,
   DriverOptionForAssignment,
+  VehicleDriverJournal,
+  VehicleProjectJournal,
 } from '@/lib/fleet/vehicle-types'
 
 // ─────────────────────────────────────────────────────────────
@@ -141,6 +144,10 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
       is_active,
       assigned_driver_id,
       notes,
+      vehicle_category,
+      camp_responsible_type,
+      camp_responsible_name,
+      camp_responsible_phone,
       companies ( name ),
       drivers (
         employees ( first_name, last_name )
@@ -200,6 +207,10 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
       : null,
     notes: data.notes,
     computedStatus,
+    vehicleCategory: data.vehicle_category ?? null,
+    campResponsibleType: data.camp_responsible_type ?? null,
+    campResponsibleName: data.camp_responsible_name ?? null,
+    campResponsiblePhone: data.camp_responsible_phone ?? null,
     leasingCompanyId: data.leasing_company_id,
     leasingCompanyName: leasing?.name ?? null,
     insuranceCompanyId: data.insurance_company_id,
@@ -272,6 +283,10 @@ export type UpdateVehicleInput = {
   insuranceCompanyId?: string | null
   fuelCardSupplierId?: string | null
   garageId?: string | null
+  vehicleCategory?: 'camp' | 'assigned' | null
+  campResponsibleType?: 'project_manager' | 'other' | null
+  campResponsibleName?: string | null
+  campResponsiblePhone?: string | null
 }
 
 /**
@@ -295,6 +310,12 @@ export async function updateVehicleDetails(input: UpdateVehicleInput): Promise<A
       insurance_company_id: input.insuranceCompanyId ?? null,
       fuel_card_supplier_id: input.fuelCardSupplierId ?? null,
       garage_id: input.garageId ?? null,
+      vehicle_category: input.vehicleCategory,
+      camp_responsible_type: input.campResponsibleType,
+      camp_responsible_name: input.campResponsibleName,
+      camp_responsible_phone: input.campResponsiblePhone != null
+        ? normalizePhone(input.campResponsiblePhone) ?? null
+        : null,
       updated_by: userId,
     })
     .eq('id', input.vehicleId)
@@ -882,6 +903,236 @@ export async function getCompaniesForSelect(): Promise<{ id: string; name: strin
   }
 
   return (data ?? []).map((c) => ({ id: c.id, name: c.name }))
+}
+
+// ─────────────────────────────────────────────────────────────
+// VEHICLE DRIVER JOURNAL
+// Activity log: one active record at a time (end_date IS NULL = active).
+// Historical facts — records are closed, never deleted.
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns driver journal entries for a vehicle, ordered by start_date desc.
+ * Includes driver full name joined from drivers → employees.
+ */
+export async function getVehicleDriverJournal(vehicleId: string): Promise<VehicleDriverJournal[]> {
+  await verifyAppUser()
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('vehicle_driver_journal')
+    .select(`
+      id, vehicle_id, driver_id, start_date, end_date, created_at,
+      drivers ( employees ( first_name, last_name ) )
+    `)
+    .eq('vehicle_id', vehicleId)
+    .order('start_date', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((row) => {
+    const driver = (row.drivers as unknown) as {
+      employees: { first_name: string; last_name: string } | null
+    } | null
+    return {
+      id: row.id,
+      vehicleId: row.vehicle_id,
+      driverId: row.driver_id,
+      driverName: driver?.employees
+        ? `${driver.employees.first_name} ${driver.employees.last_name}`
+        : null,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      createdAt: row.created_at,
+    }
+  })
+}
+
+/**
+ * Assigns a driver to a vehicle:
+ * 1. Closes the current active record (if any) by setting end_date = startDate.
+ * 2. Inserts a new active record.
+ * 3. Syncs vehicles.assigned_driver_id (required for driver_computed_status view).
+ */
+export async function assignDriverJournal(
+  vehicleId: string,
+  driverId: string,
+  startDate: string   // yyyy-mm-dd
+): Promise<ActionResult> {
+  const { userId } = await verifyAppUser()
+  const supabase = await createClient()
+
+  // Step 1: Close current active record (if any)
+  await supabase
+    .from('vehicle_driver_journal')
+    .update({ end_date: startDate })
+    .eq('vehicle_id', vehicleId)
+    .is('end_date', null)
+
+  // Step 2: Insert new active record
+  const { error } = await supabase
+    .from('vehicle_driver_journal')
+    .insert({
+      vehicle_id: vehicleId,
+      driver_id: driverId,
+      start_date: startDate,
+      end_date: null,
+      created_by: userId,
+    })
+
+  if (error) return { success: false, error: 'שגיאה בשיוך הנהג' }
+
+  // Step 3: Sync vehicles.assigned_driver_id (required for driver_computed_status view)
+  await supabase
+    .from('vehicles')
+    .update({ assigned_driver_id: driverId })
+    .eq('id', vehicleId)
+
+  revalidatePath(`/app/fleet/vehicle-card/${vehicleId}`)
+  return { success: true }
+}
+
+/**
+ * Ends the current active driver assignment:
+ * Closes the active journal record and clears vehicles.assigned_driver_id.
+ */
+export async function endDriverJournal(vehicleId: string): Promise<ActionResult> {
+  await verifyAppUser()
+  const supabase = await createClient()
+  const today = new Date().toISOString().split('T')[0]
+
+  await supabase
+    .from('vehicle_driver_journal')
+    .update({ end_date: today })
+    .eq('vehicle_id', vehicleId)
+    .is('end_date', null)
+
+  // Sync: no active driver
+  await supabase
+    .from('vehicles')
+    .update({ assigned_driver_id: null })
+    .eq('id', vehicleId)
+
+  revalidatePath(`/app/fleet/vehicle-card/${vehicleId}`)
+  return { success: true }
+}
+
+// ─────────────────────────────────────────────────────────────
+// VEHICLE PROJECT JOURNAL
+// Activity log: one active record at a time (end_date IS NULL = active).
+// Historical facts — records are closed, never deleted.
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns project journal entries for a vehicle, ordered by start_date desc.
+ * Includes project name and number joined from projects.
+ */
+export async function getVehicleProjectJournal(vehicleId: string): Promise<VehicleProjectJournal[]> {
+  await verifyAppUser()
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('vehicle_project_journal')
+    .select(`
+      id, vehicle_id, project_id, start_date, end_date, created_at,
+      projects ( name, project_number )
+    `)
+    .eq('vehicle_id', vehicleId)
+    .order('start_date', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((row) => {
+    const project = (row.projects as unknown) as {
+      name: string; project_number: string
+    } | null
+    return {
+      id: row.id,
+      vehicleId: row.vehicle_id,
+      projectId: row.project_id,
+      projectName: project?.name ?? '—',
+      projectNumber: project?.project_number ?? '',
+      startDate: row.start_date,
+      endDate: row.end_date,
+      createdAt: row.created_at,
+    }
+  })
+}
+
+/**
+ * Assigns a project to a vehicle:
+ * 1. Closes the current active record (if any) by setting end_date = startDate.
+ * 2. Inserts a new active record.
+ */
+export async function assignProjectJournal(
+  vehicleId: string,
+  projectId: string,
+  startDate: string   // yyyy-mm-dd
+): Promise<ActionResult> {
+  const { userId } = await verifyAppUser()
+  const supabase = await createClient()
+
+  // Step 1: Close current active record (if any)
+  await supabase
+    .from('vehicle_project_journal')
+    .update({ end_date: startDate })
+    .eq('vehicle_id', vehicleId)
+    .is('end_date', null)
+
+  // Step 2: Insert new active record
+  const { error } = await supabase
+    .from('vehicle_project_journal')
+    .insert({
+      vehicle_id: vehicleId,
+      project_id: projectId,
+      start_date: startDate,
+      end_date: null,
+      created_by: userId,
+    })
+
+  if (error) return { success: false, error: 'שגיאה בשיוך הפרויקט' }
+
+  revalidatePath(`/app/fleet/vehicle-card/${vehicleId}`)
+  return { success: true }
+}
+
+/**
+ * Ends the current active project assignment:
+ * Closes the active journal record with today's date.
+ */
+export async function endProjectJournal(vehicleId: string): Promise<ActionResult> {
+  await verifyAppUser()
+  const supabase = await createClient()
+  const today = new Date().toISOString().split('T')[0]
+
+  await supabase
+    .from('vehicle_project_journal')
+    .update({ end_date: today })
+    .eq('vehicle_id', vehicleId)
+    .is('end_date', null)
+
+  revalidatePath(`/app/fleet/vehicle-card/${vehicleId}`)
+  return { success: true }
+}
+
+// ─────────────────────────────────────────────────────────────
+// ACTIVE PROJECTS FOR SELECT (project assignment dropdown)
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns active projects for use in the Assignment tab project dropdown.
+ * Filters: status='active' AND deleted_at IS NULL.
+ */
+export async function getActiveProjectsForSelect(): Promise<
+  { id: string; name: string; projectNumber: string }[]
+> {
+  await verifyAppUser()
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('projects')
+    .select('id, name, project_number')
+    .eq('status', 'active')
+    .is('deleted_at', null)
+    .order('name')
+  return (data ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    projectNumber: p.project_number,
+  }))
 }
 
 /**
