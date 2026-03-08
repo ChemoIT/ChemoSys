@@ -165,8 +165,8 @@ Plans:
 | 14. Phase 10E — VehicleCard Full UI (8 Tabs) | v2.0 | 2/2 | Complete | 2026-03-07 |
 | 15. Phase 10F — VehicleList + AddVehicleDialog | v2.0 | 1/2 | In progress | - |
 | 16. Vehicle Card Redesign — DB Migration | v2.0 | 2/2 | Complete | 2026-03-08 |
-| 17. Vehicle Card Redesign — Details + Images + Replacement | v2.0 | 0/? | Not started | - |
-| 18. Vehicle Card Redesign — Ownership + Licensing & Insurance | v2.0 | 0/? | Not started | - |
+| 17. Vehicle Card Redesign — Details + Images + Replacement | v2.0 | 0/2 | Not started | - |
+| 18. Vehicle Card Redesign — Ownership + Licensing & Insurance | v2.0 | 0/3 | Not started | - |
 | 19. Vehicle Card Redesign — Assignment (צמידות) + Documents | v2.0 | 0/2 | Not started | - |
 
 ## Coverage
@@ -252,7 +252,12 @@ Plans:
 **Goal:** טאב בעלות חדש (תצורת רכב, ספק בעלות מ-vehicle_suppliers, מספר חוזה, PDF חוזה, יומן עלויות חודשיות, קבוצת רכב) + טאב רישוי וביטוח מאוחד (2 חלקים זהים עם PDF, תפוגה, והתראה).
 **Depends on:** Phase 16
 **Requirements doc:** [vehicle-card-redesign-requirements.md](vehicle-card-redesign-requirements.md)
-**Plans:** TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 18-01-PLAN.md — Migration 00029 (contract_file_url) + vehicle-types.ts (constants + VehicleFull + VehicleMonthlyCost) + vehicles.ts (extend getVehicleById + updateVehicleDetails) + vehicle-ownership.ts (3 monthly cost actions)
+- [ ] 18-02-PLAN.md — VehicleOwnershipSection (Tab 2: fields + contract PDF + journal) + VehicleOwnershipJournal (activity journal sub-component)
+- [ ] 18-03-PLAN.md — VehicleLicensingSection (merged Tab 3 wrapper) + VehicleCard.tsx (8→7 tabs) + page.tsx (monthly costs fetch) + VehicleCostsSection deletion
 
 ### Phase 19: Vehicle Card Redesign — Assignment Tab (צמידות) + Documents + Cleanup
 
@@ -268,4 +273,4 @@ Plans:
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-08 — Phase 19 planned (2 plans)*
+*Last updated: 2026-03-08 — Phase 18 planned (3 plans)*
