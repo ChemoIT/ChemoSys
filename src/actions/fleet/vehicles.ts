@@ -161,10 +161,15 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
       insurance_co:vehicle_suppliers!insurance_company_id ( name ),
       fuel_card:vehicle_suppliers!fuel_card_supplier_id ( name ),
       garage:vehicle_suppliers!garage_id ( name ),
+      ownership_co:vehicle_suppliers!ownership_supplier_id ( name ),
       leasing_company_id,
       insurance_company_id,
       fuel_card_supplier_id,
-      garage_id
+      garage_id,
+      ownership_supplier_id,
+      contract_number,
+      contract_file_url,
+      vehicle_group
     `)
     .eq('id', vehicleId)
     .is('deleted_at', null)
@@ -182,6 +187,7 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
   const insuranceCo = (data.insurance_co as unknown) as { name: string } | null
   const fuelCard = (data.fuel_card as unknown) as { name: string } | null
   const garage = (data.garage as unknown) as { name: string } | null
+  const ownershipCo = (data.ownership_co as unknown) as { name: string } | null
 
   const computedStatus: 'active' | 'inactive' = data.is_active ? 'active' : 'inactive'
 
@@ -226,6 +232,11 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
     fuelCardSupplierName: fuelCard?.name ?? null,
     garageId: data.garage_id,
     garageName: garage?.name ?? null,
+    ownershipSupplierId: data.ownership_supplier_id,
+    ownershipSupplierName: ownershipCo?.name ?? null,
+    contractNumber: data.contract_number,
+    contractFileUrl: data.contract_file_url,
+    vehicleGroup: data.vehicle_group,
   }
 }
 
@@ -294,6 +305,10 @@ export type UpdateVehicleInput = {
   campResponsibleType?: 'project_manager' | 'other' | null
   campResponsibleName?: string | null
   campResponsiblePhone?: string | null
+  ownershipSupplierId?: string | null
+  contractNumber?: string | null
+  contractFileUrl?: string | null
+  vehicleGroup?: number | null
 }
 
 /**
@@ -325,6 +340,10 @@ export async function updateVehicleDetails(input: UpdateVehicleInput): Promise<A
       camp_responsible_phone: input.campResponsiblePhone != null
         ? normalizePhone(input.campResponsiblePhone) ?? null
         : null,
+      ...(input.ownershipSupplierId !== undefined && { ownership_supplier_id: input.ownershipSupplierId }),
+      ...(input.contractNumber !== undefined && { contract_number: input.contractNumber }),
+      ...(input.contractFileUrl !== undefined && { contract_file_url: input.contractFileUrl }),
+      ...(input.vehicleGroup !== undefined && { vehicle_group: input.vehicleGroup }),
       updated_by: userId,
     })
     .eq('id', input.vehicleId)
