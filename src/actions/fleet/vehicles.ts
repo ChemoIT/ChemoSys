@@ -151,8 +151,6 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
       camp_responsible_type,
       camp_responsible_name,
       camp_responsible_phone,
-      vehicle_status,
-      fleet_exit_date,
       companies ( name ),
       drivers (
         employees ( first_name, last_name )

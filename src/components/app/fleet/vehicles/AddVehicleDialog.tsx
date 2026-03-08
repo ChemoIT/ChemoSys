@@ -117,7 +117,7 @@ export function AddVehicleDialog({ open, onClose }: Props) {
           </DialogTitle>
           <DialogDescription>
             {step === 'input'
-              ? 'הזן מספר רישוי, לאחר מכן בדוק נתונים ב-MOT.'
+              ? 'הזן מספר רישוי, לאחר מכן בדוק נתונים במשרד הרישוי.'
               : 'נתוני הרכב שהתקבלו ממשרד הרישוי. אשר כדי לפתוח כרטיס.'}
           </DialogDescription>
         </DialogHeader>
@@ -154,7 +154,7 @@ export function AddVehicleDialog({ open, onClose }: Props) {
                   ? <Loader2 className="h-4 w-4 ms-2 animate-spin" />
                   : <RefreshCw className="h-4 w-4 ms-2" />
                 }
-                בדוק ב-MOT
+                בדוק במשרד הרישוי
               </Button>
             </div>
           </div>
@@ -201,9 +201,11 @@ export function AddVehicleDialog({ open, onClose }: Props) {
                 <ChevronLeft className="h-4 w-4 ms-1" />
                 חזור
               </Button>
-              <Button onClick={handleCreate} disabled={isCreating}>
-                {isCreating && <Loader2 className="h-4 w-4 ms-2 animate-spin" />}
-                פתח כרטיס רכב
+              <Button onClick={handleCreate} disabled={isCreating} style={!isCreating ? { background: 'linear-gradient(135deg, #4ECDC4, #3ABFB6)', border: 'none' } : {}}>
+                {isCreating
+                  ? <><Loader2 className="h-4 w-4 ms-2 animate-spin" />יוצר כרטיס...</>
+                  : 'פתח כרטיס רכב'
+                }
               </Button>
             </div>
           </div>
