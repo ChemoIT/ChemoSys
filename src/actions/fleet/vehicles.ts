@@ -31,6 +31,7 @@ import type {
   DriverOptionForAssignment,
   VehicleDriverJournal,
   VehicleProjectJournal,
+  VehicleImage,
 } from '@/lib/fleet/vehicle-types'
 
 // ─────────────────────────────────────────────────────────────
@@ -138,6 +139,8 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
       baalut,
       moed_aliya_lakvish,
       mot_last_sync_at,
+      vehicle_status,
+      fleet_exit_date,
       vehicle_type,
       ownership_type,
       company_id,
@@ -198,6 +201,8 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
     baalut: data.baalut,
     moedAliyaLakvish: data.moed_aliya_lakvish,
     motLastSyncAt: data.mot_last_sync_at,
+    vehicleStatus: data.vehicle_status ?? 'active',
+    fleetExitDate: data.fleet_exit_date ?? null,
     vehicleType: data.vehicle_type,
     ownershipType: data.ownership_type,
     companyId: data.company_id,
@@ -213,8 +218,6 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
     campResponsibleType: data.camp_responsible_type ?? null,
     campResponsibleName: data.camp_responsible_name ?? null,
     campResponsiblePhone: data.camp_responsible_phone ?? null,
-    vehicleStatus: data.vehicle_status ?? 'active',
-    fleetExitDate: data.fleet_exit_date ?? null,
     leasingCompanyId: data.leasing_company_id,
     leasingCompanyName: leasing?.name ?? null,
     insuranceCompanyId: data.insurance_company_id,
@@ -231,8 +234,7 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleFull | n
 // ─────────────────────────────────────────────────────────────
 
 export async function createVehicle(
-  licensePlate: string,
-  companyId: string
+  licensePlate: string
 ): Promise<ActionResult & { vehicleId?: string }> {
   const { userId } = await verifyAppUser()
   const supabase = await createClient()
@@ -240,7 +242,6 @@ export async function createVehicle(
   const plate = licensePlate.trim().toUpperCase().replace(/\s+/g, '-')
 
   if (!plate) return { success: false, error: 'מספר רישוי נדרש' }
-  if (!companyId) return { success: false, error: 'חברה נדרשת' }
 
   // Guard: no existing active vehicle with this plate
   const { data: existing } = await supabase
@@ -258,7 +259,6 @@ export async function createVehicle(
     .from('vehicles')
     .insert({
       license_plate: plate,
-      company_id: companyId,
       created_by: userId,
       updated_by: userId,
     })
@@ -280,7 +280,8 @@ export type UpdateVehicleInput = {
   vehicleType?: string | null
   ownershipType?: string | null
   companyId?: string | null
-  isActive?: boolean
+  vehicleStatus?: string       // 'active'|'suspended'|'returned'|'sold'|'decommissioned'
+  fleetExitDate?: string | null
   assignedDriverId?: string | null
   notes?: string | null
   leasingCompanyId?: string | null
@@ -307,7 +308,9 @@ export async function updateVehicleDetails(input: UpdateVehicleInput): Promise<A
       vehicle_type: input.vehicleType ?? null,
       ownership_type: input.ownershipType ?? null,
       company_id: input.companyId ?? null,
-      is_active: input.isActive ?? true,
+      vehicle_status: input.vehicleStatus ?? 'active',
+      fleet_exit_date: input.fleetExitDate ?? null,
+      is_active: (input.vehicleStatus ?? 'active') === 'active',
       assigned_driver_id: input.assignedDriverId ?? null,
       notes: input.notes || null,
       leasing_company_id: input.leasingCompanyId ?? null,
@@ -1137,6 +1140,101 @@ export async function getActiveProjectsForSelect(): Promise<
     name: p.name,
     projectNumber: p.project_number,
   }))
+}
+
+
+// ─────────────────────────────────────────────────────────────
+// VEHICLE IMAGES
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns all images for a vehicle with signed URLs (1-year TTL).
+ * Called client-side to avoid caching stale signed URLs.
+ */
+export async function getVehicleImages(vehicleId: string): Promise<VehicleImage[]> {
+  await verifyAppUser()
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('vehicle_images')
+    .select('id, vehicle_id, storage_path, position, created_at')
+    .eq('vehicle_id', vehicleId)
+    .order('position', { ascending: true })
+
+  if (error || !data) return []
+
+  return Promise.all(
+    data.map(async (img) => {
+      const { data: signed } = await supabase.storage
+        .from('vehicle-images')
+        .createSignedUrl(img.storage_path, 60 * 60 * 24 * 365)
+      return {
+        id: img.id,
+        vehicleId: img.vehicle_id,
+        storagePath: img.storage_path,
+        position: img.position,
+        signedUrl: signed?.signedUrl ?? null,
+        createdAt: img.created_at,
+      }
+    })
+  )
+}
+
+/**
+ * Saves image metadata after client-side upload to storage.
+ * If slot already occupied — deletes old storage file + DB row first.
+ */
+export async function addVehicleImage(
+  vehicleId: string,
+  storagePath: string,
+  position: number
+): Promise<ActionResult & { id?: string }> {
+  const { userId } = await verifyAppUser()
+  const supabase = await createClient()
+
+  // Handle position conflict: delete old DB row + storage file
+  const { data: existing } = await supabase
+    .from('vehicle_images')
+    .select('id, storage_path')
+    .eq('vehicle_id', vehicleId)
+    .eq('position', position)
+    .maybeSingle()
+
+  if (existing) {
+    await supabase.storage.from('vehicle-images').remove([existing.storage_path])
+    await supabase.from('vehicle_images').delete().eq('id', existing.id)
+  }
+
+  const { data, error } = await supabase
+    .from('vehicle_images')
+    .insert({ vehicle_id: vehicleId, storage_path: storagePath, position, created_by: userId })
+    .select('id')
+    .single()
+
+  if (error) return { success: false, error: 'שגיאה בשמירת התמונה' }
+
+  revalidatePath(`/app/fleet/vehicle-card/${vehicleId}`)
+  return { success: true, id: data.id }
+}
+
+/**
+ * Hard-deletes an image from storage + DB (no soft-delete — decision [16-01]).
+ */
+export async function deleteVehicleImage(
+  imageId: string,
+  storagePath: string,
+  vehicleId: string
+): Promise<ActionResult> {
+  await verifyAppUser()
+  const supabase = await createClient()
+
+  await supabase.storage.from('vehicle-images').remove([storagePath])
+  const { error } = await supabase.from('vehicle_images').delete().eq('id', imageId)
+
+  if (error) return { success: false, error: 'שגיאה במחיקת התמונה' }
+
+  revalidatePath(`/app/fleet/vehicle-card/${vehicleId}`)
+  return { success: true }
 }
 
 /**

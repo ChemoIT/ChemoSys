@@ -29,7 +29,7 @@ export const OWNERSHIP_TYPE_LABELS: Record<string, string> = {
 export const INSURANCE_TYPE_LABELS: Record<string, string> = {
   mandatory:    'חובה',
   comprehensive: 'מקיף',
-  third_party:  'צד ג׳',
+  third_party:  'צד גי׳',
 }
 
 export const VEHICLE_STATUS_LABELS: Record<string, string> = {
@@ -186,6 +186,54 @@ export type VehicleDocument = {
 }
 
 // ─────────────────────────────────────────────────────────────
+// VEHICLE IMAGE TYPE
+// Up to 5 images per vehicle, stored in Supabase storage bucket 'vehicle-images'.
+// ─────────────────────────────────────────────────────────────
+
+export type VehicleImage = {
+  id: string
+  vehicleId: string
+  storagePath: string
+  position: number           // 1-5
+  signedUrl: string | null
+  createdAt: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// VEHICLE FUEL CARD TYPE
+// Fuel cards linked to a replacement record.
+// ─────────────────────────────────────────────────────────────
+
+export type VehicleFuelCard = {
+  id: string
+  replacementRecordId: string
+  cardNumber: string
+  createdAt: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// VEHICLE REPLACEMENT RECORD TYPE
+// Tracks replacement vehicles issued while primary vehicle is out of service.
+// ─────────────────────────────────────────────────────────────
+
+export type VehicleReplacementRecord = {
+  id: string
+  vehicleId: string
+  licensePlate: string
+  motData: Record<string, unknown> | null
+  entryDate: string
+  entryKm: number | null
+  returnDate: string | null
+  returnKm: number | null
+  reason: 'maintenance' | 'test' | 'accident' | 'other'
+  reasonOther: string | null
+  status: 'active' | 'returned'
+  notes: string | null
+  fuelCards: VehicleFuelCard[]
+  createdAt: string
+}
+
+// ─────────────────────────────────────────────────────────────
 // VEHICLE DRIVER JOURNAL TYPE
 // Activity journal for driver assignments — one active record at a time
 // (end_date IS NULL = currently active). Historical facts, never deleted.
@@ -215,54 +263,6 @@ export type VehicleProjectJournal = {
   projectNumber: string      // joined from projects
   startDate: string          // yyyy-mm-dd
   endDate: string | null     // null = currently active
-  createdAt: string
-}
-
-// -----------------------------------------------------------------
-// VEHICLE IMAGE TYPE
-// Up to 5 images per vehicle, stored in Supabase storage bucket 'vehicle-images'.
-// -----------------------------------------------------------------
-
-export type VehicleImage = {
-  id: string
-  vehicleId: string
-  storagePath: string
-  position: number           // 1-5
-  signedUrl: string | null
-  createdAt: string
-}
-
-// -----------------------------------------------------------------
-// VEHICLE FUEL CARD TYPE
-// Fuel cards linked to a replacement record.
-// -----------------------------------------------------------------
-
-export type VehicleFuelCard = {
-  id: string
-  replacementRecordId: string
-  cardNumber: string
-  createdAt: string
-}
-
-// -----------------------------------------------------------------
-// VEHICLE REPLACEMENT RECORD TYPE
-// Tracks replacement vehicles issued while primary vehicle is out of service.
-// -----------------------------------------------------------------
-
-export type VehicleReplacementRecord = {
-  id: string
-  vehicleId: string
-  licensePlate: string
-  motData: Record<string, unknown> | null
-  entryDate: string
-  entryKm: number | null
-  returnDate: string | null
-  returnKm: number | null
-  reason: 'maintenance' | 'test' | 'accident' | 'other'
-  reasonOther: string | null
-  status: 'active' | 'returned'
-  notes: string | null
-  fuelCards: VehicleFuelCard[]
   createdAt: string
 }
 
