@@ -167,7 +167,7 @@ Plans:
 | 16. Vehicle Card Redesign — DB Migration | v2.0 | 2/2 | Complete | 2026-03-08 |
 | 17. Vehicle Card Redesign — Details + Images + Replacement | v2.0 | 0/? | Not started | - |
 | 18. Vehicle Card Redesign — Ownership + Licensing & Insurance | v2.0 | 0/? | Not started | - |
-| 19. Vehicle Card Redesign — Assignment (צמידות) + Documents | v2.0 | 0/? | Not started | - |
+| 19. Vehicle Card Redesign — Assignment (צמידות) + Documents | v2.0 | 0/2 | Not started | - |
 
 ## Coverage
 
@@ -255,9 +255,13 @@ Plans:
 **Goal:** טאב צמידות מחודש — קטגוריית רכב (מחנה/צמוד), אחראי רכב, יומן פעילות לנהגים, יומן פעילות לפרויקטים. טאב מסמכים (העתקה מכרטיס נהג). הסרת טאב עלויות. VehicleCard shell update (7 טאבים במקום 8).
 **Depends on:** Phase 16
 **Requirements doc:** [vehicle-card-redesign-requirements.md](vehicle-card-redesign-requirements.md)
-**Plans:** TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 19-01-PLAN.md — Data layer: vehicle-types.ts journal types + getVehicleById/updateVehicleDetails extensions + 6 journal server actions
+- [ ] 19-02-PLAN.md — VehicleAssignmentSection rewrite (category + camp form + driver/project journals) + VehicleCard shell cleanup (8→7 tabs) + page.tsx journal fetches
 
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-07 — Phases 16-19 added (Vehicle Card Redesign)*
+*Last updated: 2026-03-08 — Phase 19 planned (2 plans)*
