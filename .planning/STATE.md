@@ -5,15 +5,15 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** v2.0 — Phase 16 COMPLETE. Migrations 00027+00028 verified in Supabase. Phase 17 (Vehicle Card Redesign UI — Tab 1 + Tab 2) is next.
+**Current focus:** v2.0 — Phase 19 Plan 01 COMPLETE. Data layer for Assignment tab: journal types + 7 server actions. Phase 19 Plan 02 (VehicleAssignmentSection UI rewrite) is next.
 
 ## Current Position
 
-Phase: 16 (Vehicle Card Redesign DB Migration) — 2/2 plans complete (PHASE DONE)
-Status: **Vehicle Card Redesign DB** — COMPLETE. Migrations 00027+00028 verified in production Supabase. 6 new tables, 9 new vehicles columns, vehicle-images bucket live.
-Last activity: 2026-03-08 — Session #37 (execute-phase 16-02 — migration verification + phase complete)
+Phase: 19 (Vehicle Card Redesign — Assignment Tab + Documents + Cleanup) — 1/? plans complete
+Status: **Phase 19 Plan 01 COMPLETE** — Data layer: VehicleDriverJournal + VehicleProjectJournal types, 7 new server actions, VehicleFull extended with 4 camp fields + vehicleStatus + fleetExitDate.
+Last activity: 2026-03-08 — Session #38 (execute-phase 19-01 — assignment data layer)
 
-Progress: v2.0 [██████████████████████░░░] Phase 16 DONE — Phase 17 next
+Progress: v2.0 [███████████████████████░░] Phase 19 Plan 01 DONE — Plan 02 next
 
 ## Strategic Decision (Session #18)
 
@@ -116,6 +116,10 @@ Progress: v2.0 [█████████████████████�
 - **[16-01]** Single-active-record-per-vehicle rule enforced in Server Actions, NOT in DB triggers — follows project pattern
 - **[16-01]** 00028 storage policies created in same plan as 00027 — matches established 00025+00026 two-file split pattern
 - **[16-02]** Migrations 00027+00028 verified in production Supabase (2026-03-08) — schema stable, ready for Phase 17-19 UI
+- **[19-01]** getVehicleDriverJournal + getVehicleProjectJournal use verifyAppUser (ChemoSys context) — consistent with all fleet read actions
+- **[19-01]** assignDriverJournal syncs vehicles.assigned_driver_id after journal write — driver_computed_status view requires this field
+- **[19-01]** campResponsiblePhone normalizePhone returns null on invalid — invalid phone stored as null, never as raw string (IRON RULE)
+- **[19-01]** vehicleStatus + fleetExitDate added to getVehicleById() (Phase 17 added to VehicleFull type) — auto-fixed TS error
 
 ### Roadmap Evolution
 
@@ -144,8 +148,8 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-08 (session #37)
-Stopped at: Phase 16 Plan 02 COMPLETE — migrations 00027+00028 verified in Supabase. Phase 16 is DONE. Phase 17 is next.
+Last session: 2026-03-08 (session #38)
+Stopped at: Phase 19 Plan 01 COMPLETE — assignment data layer built. Plan 02 (VehicleAssignmentSection UI) is next.
 
 ### Context for next session:
 
