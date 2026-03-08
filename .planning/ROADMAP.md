@@ -241,7 +241,11 @@ Plans:
 **Goal:** טאב פרטי רכב מחודש — גלריית תמונות (עד 5), סוג רכב, סטטוס רכב עם נעילת כרטיס אוטומטית, תאריך יציאה מהצי, דיאלוג ניהול רכב חלופי מלא (כניסה/יציאה/כרטיסי תדלוק/סיבה). תיקון AddVehicleDialog (הסרת בחירת חברה).
 **Depends on:** Phase 16
 **Requirements doc:** [vehicle-card-redesign-requirements.md](vehicle-card-redesign-requirements.md)
-**Plans:** TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 17-01-PLAN.md — Types + Server Actions (images + replacement + fix createVehicle) + AddVehicleDialog fix + VehicleDetailsSection overhaul + VehicleImageGallery
+- [ ] 17-02-PLAN.md — ReplacementVehicleDialog (list + form + fuel cards) + integration + visual verification
 
 ### Phase 18: Vehicle Card Redesign — Ownership Tab + Licensing & Insurance Tab
 
