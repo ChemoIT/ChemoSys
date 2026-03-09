@@ -3,13 +3,13 @@
 /**
  * FuelTable — data table for fuel records.
  * Matches VehicleList table styling (rounded-2xl, shadow-card, same colors).
- * Server-side pagination with page controls.
+ * Server-side pagination and sorting with page controls.
  */
 
-import { Fuel, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Fuel, AlertTriangle, ChevronLeft, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react'
 import { formatDate, formatTime, formatLicensePlate, formatCurrency, formatNumber } from '@/lib/format'
 import { FUEL_SUPPLIER_LABELS, FUEL_TYPE_LABELS, FUELING_METHOD_LABELS, FUEL_RECORDS_PER_PAGE } from '@/lib/fleet/fuel-types'
-import type { FuelRecord } from '@/lib/fleet/fuel-types'
+import type { FuelRecord, FuelSortField } from '@/lib/fleet/fuel-types'
 
 type Props = {
   records: FuelRecord[]
@@ -17,9 +17,12 @@ type Props = {
   page: number
   onPageChange: (page: number) => void
   isPending: boolean
+  sortBy: FuelSortField
+  sortDir: 'asc' | 'desc'
+  onSort: (field: FuelSortField) => void
 }
 
-export function FuelTable({ records, total, page, onPageChange, isPending }: Props) {
+export function FuelTable({ records, total, page, onPageChange, isPending, sortBy, sortDir, onSort }: Props) {
   const totalPages = Math.max(1, Math.ceil(total / FUEL_RECORDS_PER_PAGE))
   const from = (page - 1) * FUEL_RECORDS_PER_PAGE + 1
   const to = Math.min(page * FUEL_RECORDS_PER_PAGE, total)
@@ -48,17 +51,18 @@ export function FuelTable({ records, total, page, onPageChange, isPending }: Pro
             className="text-right border-b"
             style={{ background: '#F8FAFC', borderColor: '#E8EEF4' }}
           >
-            <Th>תאריך</Th>
-            <Th className="hidden sm:table-cell">שעה</Th>
-            <Th>מספר רישוי</Th>
-            <Th className="hidden md:table-cell">ספק</Th>
-            <Th className="hidden md:table-cell">סוג דלק</Th>
-            <Th className="hidden lg:table-cell">אמצעי</Th>
-            <Th>כמות (ליטר)</Th>
-            <Th className="hidden lg:table-cell">תחנה</Th>
-            <Th className="hidden sm:table-cell">ברוטו ₪</Th>
-            <Th>נטו ₪</Th>
-            <Th className="hidden xl:table-cell">מונה ק״מ</Th>
+            <SortTh field="fueling_date" current={sortBy} dir={sortDir} onSort={onSort}>תאריך</SortTh>
+            <SortTh field="fueling_time" current={sortBy} dir={sortDir} onSort={onSort} className="hidden sm:table-cell">שעה</SortTh>
+            <SortTh field="license_plate" current={sortBy} dir={sortDir} onSort={onSort}>מספר רישוי</SortTh>
+            <Th className="hidden md:table-cell">נהג</Th>
+            <Th className="hidden md:table-cell">פרויקט</Th>
+            <SortTh field="fuel_supplier" current={sortBy} dir={sortDir} onSort={onSort} className="hidden lg:table-cell">ספק</SortTh>
+            <SortTh field="fuel_type" current={sortBy} dir={sortDir} onSort={onSort} className="hidden lg:table-cell">סוג דלק</SortTh>
+            <SortTh field="fueling_method" current={sortBy} dir={sortDir} onSort={onSort} className="hidden xl:table-cell">אמצעי</SortTh>
+            <SortTh field="quantity_liters" current={sortBy} dir={sortDir} onSort={onSort}>כמות (ליטר)</SortTh>
+            <SortTh field="station_name" current={sortBy} dir={sortDir} onSort={onSort} className="hidden lg:table-cell">תחנה</SortTh>
+            <SortTh field="net_amount" current={sortBy} dir={sortDir} onSort={onSort} className="hidden sm:table-cell">נטו ₪</SortTh>
+            <SortTh field="odometer_km" current={sortBy} dir={sortDir} onSort={onSort} className="hidden xl:table-cell">מונה ק״מ</SortTh>
           </tr>
         </thead>
         <tbody>
@@ -71,49 +75,58 @@ export function FuelTable({ records, total, page, onPageChange, isPending }: Pro
                 minHeight: '44px',
               }}
             >
-              {/* Date */}
+              {/* תאריך */}
               <Td>{formatDate(r.fuelingDate)}</Td>
 
-              {/* Time */}
+              {/* שעה */}
               <Td className="hidden sm:table-cell">{formatTime(r.fuelingTime)}</Td>
 
-              {/* License plate */}
+              {/* מספר רישוי */}
               <Td>
                 <span className="font-mono font-semibold text-foreground" dir="ltr">
                   {formatLicensePlate(r.licensePlate)}
                 </span>
               </Td>
 
-              {/* Supplier */}
-              <Td className="hidden md:table-cell">
+              {/* נהג (בזמן התדלוק) */}
+              <Td className="hidden md:table-cell max-w-[120px] truncate">
+                {r.driverName ?? '—'}
+              </Td>
+
+              {/* פרויקט (בזמן התדלוק) */}
+              <Td className="hidden md:table-cell max-w-[140px] truncate">
+                {r.projectName ?? '—'}
+              </Td>
+
+              {/* ספק */}
+              <Td className="hidden lg:table-cell">
                 {FUEL_SUPPLIER_LABELS[r.fuelSupplier] ?? r.fuelSupplier}
               </Td>
 
-              {/* Fuel type */}
-              <Td className="hidden md:table-cell">
+              {/* סוג דלק */}
+              <Td className="hidden lg:table-cell">
                 {FUEL_TYPE_LABELS[r.fuelType] ?? r.fuelType}
               </Td>
 
-              {/* Fueling method */}
-              <Td className="hidden lg:table-cell">
-                {r.fuelingMethod ? (FUELING_METHOD_LABELS[r.fuelingMethod] ?? r.fuelingMethod) : '—'}
+              {/* אמצעי */}
+              <Td className="hidden xl:table-cell">
+                {r.fuelingMethod === 'card' && r.fuelCardNumber
+                  ? `${FUELING_METHOD_LABELS['card']} ${r.fuelCardNumber}`
+                  : r.fuelingMethod ? (FUELING_METHOD_LABELS[r.fuelingMethod] ?? r.fuelingMethod) : '—'}
               </Td>
 
-              {/* Quantity */}
+              {/* כמות */}
               <Td>{formatNumber(r.quantityLiters, 1)}</Td>
 
-              {/* Station */}
+              {/* תחנה */}
               <Td className="hidden lg:table-cell max-w-[140px] truncate">
                 {r.stationName ?? '—'}
               </Td>
 
-              {/* Gross amount */}
-              <Td className="hidden sm:table-cell">{formatCurrency(r.grossAmount)}</Td>
+              {/* עלות נטו */}
+              <Td className="hidden sm:table-cell">{formatCurrency(r.netAmount)}</Td>
 
-              {/* Net amount */}
-              <Td>{formatCurrency(r.netAmount)}</Td>
-
-              {/* Odometer */}
+              {/* מונה ק"מ */}
               <Td className="hidden xl:table-cell">
                 {r.odometerKm != null ? (
                   <span className="flex items-center gap-1">
@@ -167,6 +180,41 @@ export function FuelTable({ records, total, page, onPageChange, isPending }: Pro
 }
 
 // ── Table cell helpers ───────────────────────────────────
+
+function SortTh({
+  field,
+  current,
+  dir,
+  onSort,
+  children,
+  className = '',
+}: {
+  field: FuelSortField
+  current: FuelSortField
+  dir: 'asc' | 'desc'
+  onSort: (field: FuelSortField) => void
+  children: React.ReactNode
+  className?: string
+}) {
+  const isActive = current === field
+  return (
+    <th
+      className={`px-3 py-3 font-semibold text-xs uppercase tracking-wide select-none cursor-pointer hover:text-foreground transition-colors ${isActive ? 'text-foreground' : 'text-muted-foreground'} ${className}`}
+      onClick={() => onSort(field)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {children}
+        {isActive ? (
+          dir === 'asc'
+            ? <ArrowUp className="h-3 w-3" />
+            : <ArrowDown className="h-3 w-3" />
+        ) : (
+          <ArrowDown className="h-3 w-3 opacity-0 group-hover:opacity-30" />
+        )}
+      </span>
+    </th>
+  )
+}
 
 function Th({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (

@@ -115,10 +115,17 @@ export async function getFuelRecords(
   const from = (filters.page - 1) * pageSize
   const to = from + pageSize - 1
 
+  const ascending = filters.sortDir === 'asc'
   query = query
-    .order('fueling_date', { ascending: false })
-    .order('fueling_time', { ascending: false, nullsFirst: false })
-    .range(from, to)
+    .order(filters.sortBy, { ascending, nullsFirst: false })
+  // Secondary sort for stability
+  if (filters.sortBy !== 'fueling_date') {
+    query = query.order('fueling_date', { ascending: false })
+  }
+  if (filters.sortBy !== 'fueling_time') {
+    query = query.order('fueling_time', { ascending: false, nullsFirst: false })
+  }
+  query = query.range(from, to)
 
   const { data, error, count } = await query
 
@@ -127,7 +134,55 @@ export async function getFuelRecords(
     return { records: [], total: 0 }
   }
 
-  const records: FuelRecord[] = (data ?? []).map(row => ({
+  const rows = data ?? []
+
+  // ── Enrich with driver & project names at time of fueling ──
+  const vehicleIds = [...new Set(rows.map(r => r.vehicle_id).filter(Boolean))]
+
+  // Batch-fetch driver journal entries that overlap the page's date range
+  let driverMap = new Map<string, { driverId: string; startDate: string; endDate: string | null; driverName: string }[]>()
+  let projectMap = new Map<string, { startDate: string; endDate: string | null; projectName: string }[]>()
+
+  if (vehicleIds.length > 0) {
+    // Driver journal + driver names (drivers → employees for name)
+    const { data: driverJournals } = await supabase
+      .from('vehicle_driver_journal')
+      .select('vehicle_id, start_date, end_date, drivers ( employees ( first_name, last_name ) )')
+      .in('vehicle_id', vehicleIds)
+
+    for (const j of driverJournals ?? []) {
+      const d = j.drivers as unknown as { employees: { first_name: string; last_name: string } | null } | null
+      const emp = d?.employees
+      const name = emp ? `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() : null
+      if (!name) continue
+      const list = driverMap.get(j.vehicle_id) ?? []
+      list.push({ driverId: '', startDate: j.start_date, endDate: j.end_date, driverName: name })
+      driverMap.set(j.vehicle_id, list)
+    }
+
+    // Project journal + project names
+    const { data: projectJournals } = await supabase
+      .from('vehicle_project_journal')
+      .select('vehicle_id, start_date, end_date, projects ( name )')
+      .in('vehicle_id', vehicleIds)
+
+    for (const j of projectJournals ?? []) {
+      const p = j.projects as unknown as { name: string } | null
+      const name = p?.name ?? null
+      if (!name) continue
+      const list = projectMap.get(j.vehicle_id) ?? []
+      list.push({ startDate: j.start_date, endDate: j.end_date, projectName: name })
+      projectMap.set(j.vehicle_id, list)
+    }
+  }
+
+  /** Find journal entry that covers the given date */
+  function findAtDate<T extends { startDate: string; endDate: string | null }>(entries: T[] | undefined, date: string): T | undefined {
+    if (!entries) return undefined
+    return entries.find(e => e.startDate <= date && (e.endDate == null || e.endDate >= date))
+  }
+
+  const records: FuelRecord[] = rows.map(row => ({
     id: row.id,
     vehicleId: row.vehicle_id,
     licensePlate: row.license_plate,
@@ -146,6 +201,8 @@ export async function getFuelRecords(
     matchStatus: row.match_status,
     importBatchId: row.import_batch_id,
     createdAt: row.created_at,
+    driverName: row.vehicle_id ? (findAtDate(driverMap.get(row.vehicle_id), row.fueling_date)?.driverName ?? null) : null,
+    projectName: row.vehicle_id ? (findAtDate(projectMap.get(row.vehicle_id), row.fueling_date)?.projectName ?? null) : null,
   }))
 
   return { records, total: count ?? 0 }

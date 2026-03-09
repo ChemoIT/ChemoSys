@@ -18,6 +18,8 @@ export default async function FleetFuelPage() {
     projectId: null,
     vehicleType: null,
     page: 1,
+    sortBy: 'fueling_date',
+    sortDir: 'desc',
   }
 
   const [{ records, total }, stats, projects] = await Promise.all([

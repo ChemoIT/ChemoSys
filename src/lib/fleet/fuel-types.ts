@@ -47,11 +47,11 @@ export const HEBREW_MONTHS: Record<number, string> = {
 // CARLOG MAPPING CONSTANTS
 // ─────────────────────────────────────────────────────────────
 
-/** CarLog column [11] → fuel_supplier */
+/** CarLog column [1] (field 2) → fuel_supplier */
 export const CARLOG_SUPPLIER_MAP: Record<string, string> = {
-  '1': 'delek',
-  '2': 'tapuz',
-  '3': 'dalkal',
+  '': 'delek',
+  '1': 'tapuz',
+  '2': 'dalkal',
 }
 
 /** CarLog column [6] → fuel_type (supports both numeric codes and Hebrew text) */
@@ -74,12 +74,20 @@ export const CARLOG_DEVICE_CODE_MAP: Record<string, string> = {
   '3': 'card',    // כרטיס — card cash
 }
 
-/** CarLog column [19] → km source for vehicle_km_log */
+/** CarLog column [19] (field 20) → km report source */
 export const CARLOG_SOURCE_MAP: Record<string, string> = {
-  '1': 'fuel_device',  // device output
-  '2': 'sms',          // employee message
-  '3': 'manual',       // manual entry
-  '4': 'import',       // external API / n8n
+  '1': 'fuel_device',  // קריאה אוטומטית מדלקן
+  '2': 'sms',          // דיווח SMS מהנהג
+  '3': 'manual',       // עדכון ידני במערכת
+  '4': 'fuel_device',  // קריאה אוטומטית מדלקן (API)
+  '5': 'whatsapp_ai',  // דיווח דרך סוכן AI בוואטסאפ
+}
+
+export const KM_SOURCE_LABELS: Record<string, string> = {
+  fuel_device:  'דלקן (אוטומטי)',
+  sms:          'SMS נהג',
+  manual:       'עדכון ידני',
+  whatsapp_ai:  'WhatsApp AI',
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -105,11 +113,25 @@ export type FuelRecord = {
   matchStatus: string          // 'matched' | 'unmatched'
   importBatchId: string | null
   createdAt: string
+  driverName: string | null    // enriched from vehicle_driver_journal + drivers
+  projectName: string | null   // enriched from vehicle_project_journal + projects
 }
 
 // ─────────────────────────────────────────────────────────────
 // FUEL FILTERS — query parameters for the fuel records page
 // ─────────────────────────────────────────────────────────────
+
+export type FuelSortField =
+  | 'fueling_date'
+  | 'fueling_time'
+  | 'license_plate'
+  | 'fuel_supplier'
+  | 'fuel_type'
+  | 'fueling_method'
+  | 'quantity_liters'
+  | 'station_name'
+  | 'net_amount'
+  | 'odometer_km'
 
 export type FuelFilters = {
   fromMonth: number     // 1-12
@@ -122,6 +144,8 @@ export type FuelFilters = {
   projectId: string | null      // null = all
   vehicleType: string | null    // null = all
   page: number                  // 1-based
+  sortBy: FuelSortField         // default: 'fueling_date'
+  sortDir: 'asc' | 'desc'      // default: 'desc'
 }
 
 // ─────────────────────────────────────────────────────────────

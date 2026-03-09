@@ -16,6 +16,7 @@ import type {
   FuelRecord,
   FuelFilters as FuelFiltersType,
   FuelStats,
+  FuelSortField,
   ProjectOptionForFilter,
 } from '@/lib/fleet/fuel-types'
 
@@ -61,6 +62,11 @@ export function FuelRecordsPage({
   const handlePageChange = (page: number) => {
     const newFilters = { ...filters, page }
     applyFilters(newFilters)
+  }
+
+  const handleSort = (field: FuelSortField) => {
+    const newDir = filters.sortBy === field && filters.sortDir === 'desc' ? 'asc' : 'desc'
+    applyFilters({ ...filters, sortBy: field, sortDir: newDir, page: 1 })
   }
 
   return (
@@ -118,6 +124,9 @@ export function FuelRecordsPage({
         page={filters.page}
         onPageChange={handlePageChange}
         isPending={isPending}
+        sortBy={filters.sortBy}
+        sortDir={filters.sortDir}
+        onSort={handleSort}
       />
     </div>
   )

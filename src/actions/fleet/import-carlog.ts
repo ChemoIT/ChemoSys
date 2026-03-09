@@ -168,8 +168,8 @@ function parseCarLogFile(buffer: Buffer): {
     const fuelTypeRaw = (f[6] ?? '').trim()
     const fuelType = CARLOG_FUEL_TYPE_MAP[fuelTypeRaw] ?? null
 
-    // Parse fuel supplier
-    const supplierCodeRaw = (f[11] ?? '').trim()
+    // Parse fuel supplier (field 2 = f[1])
+    const supplierCodeRaw = (f[1] ?? '').trim()
     const fuelSupplier = CARLOG_SUPPLIER_MAP[supplierCodeRaw] ?? null
 
     // Parse amounts
