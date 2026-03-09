@@ -2,18 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-04)
+See: .planning/PROJECT.md (updated 2026-03-09)
 
 **Core value:** ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים.
-**Current focus:** v2.0 — Phase 19 Plan 02 IN PROGRESS. Plans 19-01 ✓ + 19-02 tasks 1+2 ✓. Checkpoint (Task 3) pending — multiple UI issues found during verification. Migration 00029 must be run in Supabase before vehicle card works.
+**Current focus:** v2.1 Performance & UX — Defining requirements
 
 ## Current Position
 
-Phase: 19 (Vehicle Card Redesign — Assignment Tab + Documents + Cleanup) — Plan 01 ✓, Plan 02 tasks 1+2 ✓, Task 3 (checkpoint) PENDING
-Status: **Phase 19 IN PROGRESS** — 19-01 complete (journal types + 7 server actions). 19-02 tasks 1+2 committed (VehicleAssignmentSection rewrite + VehicleCard 7-tab). Checkpoint pending — UI issues found during verification, new session needed.
-Last activity: 2026-03-08 — Session #42 (execute-phase 19 — data layer + UI rewrite + bug fixes)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-09 — Milestone v2.1 started
 
-Progress: v2.0 [█████████████████████████] Phase 18 COMPLETE — Phase 19 next (or new phase TBD)
+Progress: v2.1 [░░░░░░░░░░░░░░░░░░░░░░░░░] 0%
 
 ## Strategic Decision (Session #18)
 
@@ -162,48 +163,12 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-08 (session #41)
-Stopped at: Phase 18 Plan 03 COMPLETE — VehicleLicensingSection + VehicleCard 7-tab restructure complete. Phase 18 fully done.
+Last session: 2026-03-09 (milestone v2.1 started)
+Stopped at: Defining requirements for v2.1 Performance & UX
 
 ### Context for next session:
 
-**מה קיים:** Phase 18 COMPLETE (all 3 plans). VehicleCard has final 7-tab structure: פרטי הרכב, בעלות, רישוי וביטוח, צמידות, מסמכים, הערות, ק"מ. All tabs functional except ק"מ (placeholder). Monthly costs fetched server-side.
-
-**מה הבא:** Phase 19 (next phase TBD — KM tab, replacement vehicles, or other). No active blockers.
-
-**Key new files (Phase 14-02):**
-
-**Key new files (Phase 13-02):**
-- `src/components/app/fleet/shared/FleetDateInput.tsx` — moved from drivers/ (3-select date picker)
-- `src/components/app/fleet/shared/AlertToggle.tsx` — extracted from DriverDocumentsSection + DriverLicenseSection
-- `src/components/app/fleet/shared/ExpiryIndicator.tsx` — extracted from DriverDocumentsSection
-- `src/components/app/fleet/shared/FleetFilePreview.tsx` — extracted from DriverDocumentsSection + DriverViolationsSection
-- `src/components/app/fleet/shared/FleetUploadZone.tsx` — extracted from DriverDocumentsSection
-- `src/components/app/fleet/shared/VehicleFitnessLight.tsx` — new component for vehicle card/list
-
-**Key new files (Phase 13-01):**
-- `src/lib/fleet/vehicle-types.ts` — VehicleListItem, VehicleFull, VehicleTest, VehicleInsurance, VehicleDocument, DriverOptionForAssignment types + VEHICLE_TYPE_LABELS, OWNERSHIP_TYPE_LABELS, INSURANCE_TYPE_LABELS constants
-- `src/actions/fleet/vehicles.ts` — 21 complete vehicle CRUD server actions (verifyAppUser guard, RPCs for soft-delete)
-
-- `src/components/app/fleet/vehicles/VehicleAssignmentSection.tsx` — Tab 4: driver assignment + remove
-- `src/components/app/fleet/vehicles/VehicleCostsSection.tsx` — Tab 5: Coming Soon placeholder
-- `src/components/app/fleet/vehicles/VehicleDocumentsSection.tsx` — Tab 6: document CRUD (mirror of DriverDocumentsSection)
-- `src/components/app/fleet/vehicles/VehicleNotesSection.tsx` — Tab 7: notes textarea with dirty tracking
-- `src/app/(app)/app/fleet/vehicle-card/page.tsx` — vehicle list (table + mobile cards, replaced ComingSoon)
-
-**Key new files (Phase 14-01):**
-- `src/app/(app)/app/fleet/vehicle-card/[id]/page.tsx` — server page with parallel data fetch + companies query
-- `src/components/app/fleet/vehicles/VehicleCard.tsx` — 8-tab shell, header, dirty tracking, delete dialog, unsaved dialog
-- `src/components/app/fleet/vehicles/VehicleDetailsSection.tsx` — Tab 1: MOT read-only + operational editable
-- `src/components/app/fleet/vehicles/VehicleTestsSection.tsx` — Tab 2: test history CRUD + file upload
-- `src/components/app/fleet/vehicles/VehicleInsuranceSection.tsx` — Tab 3: insurance policies CRUD + supplier dropdown
-
-**Key fleet files:**
-- `src/actions/fleet/mot-sync.ts` — syncVehicleFromMot(), testMotApiConnection(), parseMoedAliya()
-- `src/lib/fleet/supplier-types.ts` — VehicleSupplier type + SUPPLIER_TYPE_LABELS (shared constants)
-- `src/app/(app)/app/fleet/layout.tsx` — FleetLayout (auth + app_fleet guard)
-- `src/components/app/fleet/FleetSidebar.tsx` — FleetSidebar (shell: SidebarProvider + 12 items)
-- `supabase/migrations/00025_fleet_vehicles.sql` — vehicle module tables, views, RPCs, RLS
-- `supabase/migrations/00026_fleet_vehicles_storage_policies.sql` — storage policies
+**מה קיים:** v2.0 shipped. דף דלק = רפרנס לתבנית ביצועים (Suspense + FuelPageSkeleton + React.cache + DB view + RPC).
+**מה הבא:** Define requirements → roadmap → execute performance optimization on all pages.
 
 Resume file: None

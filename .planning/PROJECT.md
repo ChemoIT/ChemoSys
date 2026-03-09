@@ -5,23 +5,24 @@
 מערכת ניהול פנימית מבוססת ווב לחברת חמו אהרון בע"מ (תשתיות אנרגיה). המערכת מחולקת לשני אזורים: **ממשק ניהול** (Admin Panel — שרון בלבד) ו-**ChemoSys** (מערכת ליבה לוגיסטית — מנהלים ועובדי שטח נבחרים). שניהם חיים באותו פרויקט Next.js כ-route groups נפרדים, חולקים DB, auth ותשתית משותפת.
 
 v1.0 שולח: ממשק ניהול מלא — עובדים, חברות, מחלקות, פרויקטים, יוזרים, הרשאות, audit log, dashboard, הגדרות אינטגרציה.
-v2.0 בונה: שלד ChemoSys — דף כניסה חדש + 2 דפי בית למודולי רכב וצמ"ה + חיווט הרשאות.
+v2.0 בונה: שלד ChemoSys + מודול צי רכב מלא — כרטיס נהג, כרטיס רכב (7 טאבים), מערכת דלק, ספקי רכב, MOT API.
+v2.1 בונה: ביצועים ו-UX גלובלי — Suspense, Skeleton, DB optimization, loading indicators על כל דפי המערכת.
 
 ## Core Value
 
 ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים. אם האדמין לא עובד, שום דבר לא עובד.
 
-## Current Milestone: v2.0 שלד ChemoSys
+## Current Milestone: v2.1 Performance & UX
 
-**Goal:** בניית שלד מערכת ChemoSys — דף כניסה חדש עם בחירת מודול, ושני דפי בית (צי רכב + צמ"ה) עם דשבורד ותפריטי תתי-מודולים. מהווה בסיס לכל הפיתוח העתידי של מודולי התפעול.
+**Goal:** החלת תבנית ביצועים מלאה (Suspense + Skeleton + DB optimization + loading indicators + React.cache) על כל דפי המערכת, והגדרת IRON RULE שכל פיתוח עתידי עומד באותו סטנדרט. דף הדלק משמש כרפרנס.
 
 **Target features:**
-- דף כניסה ChemoSys (מייל + סיסמה + זכור אותי + כפתורי מודולים לפי הרשאות)
-- דף בית מודול צי רכב (דשבורד + 16 תתי-מודולים כתפריט)
-- דף בית מודול צמ"ה (דשבורד + placeholder — יאופיין בהמשך)
-- תשתית (app) route group + layout + ניווט + מעבר בין מודולים
-- הגדרת מודולים חדשים ב-DB (fleet, equipment + sub-module keys)
-- חיווט מערכת ההרשאות הקיימת לכל דפי ChemoSys
+- Suspense boundaries + Skeleton components על כל דף עם data fetching
+- DB optimization — views, RPCs, composite indexes לדפים כבדים
+- Loading indicators (spinner + text) על כל state change / filter
+- React.cache() על server actions שנקראים ממספר מקומות
+- IRON RULE חדש: תבנית ביצועים חובה לכל פיתוח עתידי
+- תיקון חוסר עקביות: מעבר מ-loading.tsx ישן ל-Suspense+Skeleton אחיד
 
 ## Requirements
 
@@ -43,12 +44,12 @@ v2.0 בונה: שלד ChemoSys — דף כניסה חדש + 2 דפי בית למ
 
 ### Active
 
-- [ ] שלד ChemoSys: (app) route group + layout + ניווט + module switching
-- [ ] דף כניסה ChemoSys עם בחירת מודול לפי הרשאות
-- [ ] דף בית מודול צי רכב (דשבורד + 16 תתי-מודולים)
-- [ ] דף בית מודול צמ"ה (דשבורד + placeholder)
-- [ ] חיווט מערכת הרשאות קיימת לדפי ChemoSys
-- [ ] הגדרת מודולים חדשים (fleet, equipment) ב-DB
+- [ ] Suspense + Skeleton על כל דפי App (רכבים, נהגים, דלק)
+- [ ] Suspense + Skeleton על כל דפי Admin (dashboard, projects, users, audit-log, settings, templates)
+- [ ] DB optimization — views/RPCs/indexes לדפים כבדים (dashboard, vehicle card, driver card)
+- [ ] Loading indicators על כל state change / filter change / tab switch
+- [ ] React.cache() על server actions נפוצים
+- [ ] IRON RULE: Performance Standard — תבנית חובה לכל דף חדש
 
 ### Out of Scope
 
@@ -62,7 +63,8 @@ v2.0 בונה: שלד ChemoSys — דף כניסה חדש + 2 דפי בית למ
 ## Current State
 
 - **v1.0 Shipped:** 106 TypeScript files, 17,440 LOC + 1,558 SQL, 18 tables, 102 commits
-- **v2.0 In Progress:** שלד ChemoSys — login + 2 module home pages
+- **v2.0 Shipped:** שלד ChemoSys + מודול צי רכב מלא (כרטיס נהג, כרטיס רכב 7 טאבים, מערכת דלק)
+- **v2.1 In Progress:** ביצועים ו-UX — Suspense, Skeleton, DB optimization על כל הדפים
 
 ## Context
 
@@ -138,4 +140,4 @@ src/app/
 | מודולים כ-route groups מקוננים | /app/fleet/, /app/equipment/ — כל מודול תיקייה עצמאית | — Pending (v2.0) |
 
 ---
-*Last updated: 2026-03-04 after v2.0 milestone started*
+*Last updated: 2026-03-09 after v2.1 milestone started*
