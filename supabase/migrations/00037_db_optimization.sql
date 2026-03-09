@@ -73,7 +73,7 @@ CREATE INDEX IF NOT EXISTS employees_status_active_idx
   WHERE deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS vehicles_active_status_idx
-  ON public.vehicles (status, deleted_at)
+  ON public.vehicles (vehicle_status, deleted_at)
   WHERE deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS projects_active_status_idx
