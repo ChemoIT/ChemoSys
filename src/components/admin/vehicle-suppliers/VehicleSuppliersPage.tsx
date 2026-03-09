@@ -13,9 +13,8 @@
  */
 
 import * as React from 'react'
-import { startTransition } from 'react'
+import { Loader2, Plus, Pencil, Trash2, ToggleLeft, ToggleRight } from 'lucide-react'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
 
 import type { VehicleSupplier } from '@/lib/fleet/supplier-types'
@@ -75,7 +74,7 @@ interface SupplierFormDialogProps {
 
 function SupplierFormDialog({ open, onClose, supplier }: SupplierFormDialogProps) {
   const isEdit = !!supplier
-  const [loading, setLoading] = React.useState(false)
+  const [isPending, startTransition] = React.useTransition()
   const [error, setError] = React.useState<string | null>(null)
   const [supplierType, setSupplierType] = React.useState<string>(supplier?.supplier_type ?? '')
 
@@ -85,29 +84,24 @@ function SupplierFormDialog({ open, onClose, supplier }: SupplierFormDialogProps
     setError(null)
   }, [supplier, open])
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    setLoading(true)
     setError(null)
 
     const formData = new FormData(e.currentTarget)
     // Inject the Select value (not a native input)
     formData.set('supplier_type', supplierType)
 
-    startTransition(() => {
-      const action = isEdit
-        ? updateVehicleSupplier(supplier!.id, formData)
-        : createVehicleSupplier(formData)
-
-      action.then((result) => {
-        setLoading(false)
-        if (result.success) {
-          toast.success(isEdit ? 'הספק עודכן בהצלחה' : 'הספק נוסף בהצלחה')
-          onClose()
-        } else {
-          setError(result.error ?? 'שגיאה לא ידועה')
-        }
-      })
+    startTransition(async () => {
+      const result = isEdit
+        ? await updateVehicleSupplier(supplier!.id, formData)
+        : await createVehicleSupplier(formData)
+      if (result.success) {
+        toast.success(isEdit ? 'הספק עודכן בהצלחה' : 'הספק נוסף בהצלחה')
+        onClose()
+      } else {
+        setError(result.error ?? 'שגיאה לא ידועה')
+      }
     })
   }
 
@@ -218,11 +212,12 @@ function SupplierFormDialog({ open, onClose, supplier }: SupplierFormDialogProps
           )}
 
           <DialogFooter className="pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
               ביטול
             </Button>
-            <Button type="submit" disabled={loading || !supplierType}>
-              {loading ? 'שומר...' : isEdit ? 'עדכן ספק' : 'הוסף ספק'}
+            <Button type="submit" disabled={isPending || !supplierType}>
+              {isEdit ? 'עדכן ספק' : 'הוסף ספק'}
+              {isPending && <Loader2 className="h-4 w-4 ms-2 animate-spin" />}
             </Button>
           </DialogFooter>
         </form>
