@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 ## Current Position
 
 Phase: 23 of 23 (DB Optimization)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-03-09 — Plan 23-01 complete (Dashboard RPC + composite indexes)
+Last activity: 2026-03-09 — Plan 23-02 complete (useTransition audit + VehicleSuppliersPage fix + React.cache audit)
 
-Progress: v2.1 [████████████████████░░░░░] 80% (Phases 20-22 complete, 23 in progress — 1/3 plans done)
+Progress: v2.1 [█████████████████████░░░░] 85% (Phases 20-22 complete, 23 in progress — 2/3 plans done)
 
 ## Strategic Decision (Session #18)
 
@@ -46,7 +46,7 @@ Progress: v2.1 [████████████████████░�
 | 20 | IRON RULE + מסמך סטנדרט + boilerplate | RULE-01, -02, -03 | ✓ Complete |
 | 21 | App pages — Suspense + Skeleton + loading | SKEL-APP-01–04, LOAD-01–04 | ✓ Complete |
 | 22 | Admin pages — Suspense + Skeleton + loading | SKEL-ADM-01–08, LOAD-05 | ✓ Complete |
-| 23 | DB optimization + React.cache + save states | DBOPT-01–05, LOAD-06 | Not started |
+| 23 | DB optimization + React.cache + save states | DBOPT-01–05, LOAD-06 | In progress (2/3 plans done) |
 
 ## Accumulated Context
 
@@ -75,6 +75,9 @@ Progress: v2.1 [████████████████████░�
 - **[23-01]** getDashboardStats() server action = verifySession + rpc() + array[0] + camelCase mapping + zero fallback — reference wrapper pattern
 - **[23-01]** SECURITY INVOKER for read-only stats RPC — no privilege escalation needed, RLS applies normally
 - **[23-01]** Activity feed entity resolution stays inline in page.tsx — complex 8-entity lookup chain, too risky to abstract
+- **[23-02]** deleting/blocking useState in Table components passed to DeleteConfirmDialog = false positives (dialog manages spinner) — NOT anti-patterns
+- **[23-02]** Form submit anti-pattern: only standalone form-submit handler with useState loading is anti-pattern; DeleteConfirmDialog prop pattern is acceptable
+- **[23-02]** React.cache() audit complete: verifySession + verifyAppUser + getProjectsForFuelFilter already cached; all other server actions called once per render — no new candidates
 
 ### Pending Todos
 
@@ -90,7 +93,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-09 (Phase 23 Plan 01 executed — Dashboard RPC + composite indexes)
-Stopped at: Completed 23-01-PLAN.md — migration 00037 ready to run, dashboard refactored to single RPC call
+Last session: 2026-03-09 (Phase 23 Plan 02 executed — useTransition audit + VehicleSuppliersPage fix)
+Stopped at: Completed 23-02-PLAN.md — VehicleSuppliersPage save button fixed, full codebase audit documented
 
 Resume file: None
