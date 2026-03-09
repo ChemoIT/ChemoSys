@@ -60,6 +60,8 @@ Progress: v2.1 [██████░░░░░░░░░░░░░░░�
 - **[20-02]** PageSkeleton is a starting point — custom skeletons still needed for unique layouts (tabs, etc.)
 - **[20-02]** LoadingIndicator marked 'use client' — receives client state (isPending) as prop
 - **[20-02]** PageSkeleton default maxWidth = max-w-[calc(100%-6cm)] (matches all fleet pages)
+- **[21-02]** VehicleCard page split: thin page.tsx (auth+Suspense only) + VehicleCardContent inner async component owns all data fetching
+- **[21-02]** No tab-switch loading indicator needed for VehicleCard — all tab data fetched upfront via Promise.all (LOAD-03 satisfied by design)
 - **[21-04]** DriverCard uses max-w-4xl (not max-w-[calc(100%-6cm)]) — skeleton must match this specific container width
 - **[21-04]** Tab loading indicators NOT needed for DriverCard — all tab data fetched upfront via Promise.all; add only if tabs lazy-loaded later
 - **[22-02]** Admin pages use maxWidth: max-w-full — admin layout is full-width unlike fleet app pages
@@ -81,7 +83,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-09 (Phase 21 Plan 04 executed — DriverCard Suspense + Skeleton; Phase 22 Plans 01-02 also executed)
-Stopped at: Completed 21-04-PLAN.md — DriverCard Suspense boundary + DriverCardSkeleton component
+Last session: 2026-03-09 (Phase 21 Plans 02-04 executed; Phase 22 Plans 01-02 also executed)
+Stopped at: Completed 21-02-PLAN.md — VehicleCardSkeleton + Suspense boundary for vehicle-card detail page
 
 Resume file: None
