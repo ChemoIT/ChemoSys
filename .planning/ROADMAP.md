@@ -41,7 +41,7 @@
 
 - [x] **Phase 20: Performance Standards** — IRON RULE + מסמך סטנדרט + boilerplate generator — completed 2026-03-09
 - [x] **Phase 21: App Pages Suspense + Loading** — Skeleton לרשימות/כרטיסי רכב ונהגים + loading indicators — completed 2026-03-09
-- [ ] **Phase 22: Admin Pages Suspense + Loading** — Skeleton ל-7 דפי אדמין + הסרת loading.tsx ישנים
+- [x] **Phase 22: Admin Pages Suspense + Loading** — Skeleton ל-7 דפי אדמין + הסרת loading.tsx ישנים — completed 2026-03-09
 - [ ] **Phase 23: DB Optimization** — Dashboard RPC + indexes + React.cache() + save button states
 
 ---
@@ -313,13 +313,13 @@ Plans:
 3. לא קיים אף `loading.tsx` ישן בפרויקט (companies, departments, employees, role-tags הוסרו)
 4. שינוי filter או pagination בדפי admin מציג spinner + טקסט — לא refresh שקט ללא feedback
 
-**Plans:** TBD
+**Plans:** 4 plans
 
 Plans:
-- [ ] 22-01-PLAN.md — Dashboard Suspense + custom DashboardSkeleton (6 stat cards + activity feed)
-- [ ] 22-02-PLAN.md — Projects + Users + Templates + VehicleSuppliers — Suspense + PageSkeleton
-- [ ] 22-03-PLAN.md — Audit Log Suspense + AuditLogSkeleton + loading indicator on filter/pagination
-- [ ] 22-04-PLAN.md — Settings + Data Updates Suspense + remove old loading.tsx files
+- [x] 22-01-PLAN.md — Dashboard Suspense + custom DashboardSkeleton (6 stat cards + activity feed)
+- [x] 22-02-PLAN.md — Projects + Users + Templates + VehicleSuppliers — Suspense + PageSkeleton
+- [x] 22-03-PLAN.md — Audit Log Suspense + AuditLogSkeleton + loading indicator on filter/pagination
+- [x] 22-04-PLAN.md — Settings + Data Updates Suspense + remove old loading.tsx files
 
 ---
 
@@ -372,7 +372,7 @@ Plans:
 | 19. Vehicle Card Redesign — Assignment | v2.0 | 0/2 | Not started | - |
 | 20. Performance Standards | v2.1 | 2/2 | Complete | 2026-03-09 |
 | 21. App Pages Suspense + Loading | v2.1 | 4/4 | Complete | 2026-03-09 |
-| 22. Admin Pages Suspense + Loading | v2.1 | 0/4 | Not started | - |
+| 22. Admin Pages Suspense + Loading | v2.1 | 4/4 | Complete | 2026-03-09 |
 | 23. DB Optimization | v2.1 | 0/3 | Not started | - |
 
 ## Coverage
