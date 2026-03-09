@@ -7,20 +7,20 @@
  *
  * Uses parallel fetch with Promise.all for performance.
  * First call: verifySession() — redirects to /login if unauthenticated.
+ * verifySession() runs OUTSIDE Suspense so auth redirect fires immediately.
  */
 
+import { Suspense } from 'react'
 import { verifySession } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
 import { ProjectsTable } from '@/components/admin/projects/ProjectsTable'
 import { RefreshButton } from '@/components/shared/RefreshButton'
+import { PageSkeleton } from '@/components/shared/PageSkeleton'
 import { Badge } from '@/components/ui/badge'
 
 const EMPLOYEES_PAGE_SIZE = 1000
 
-export default async function ProjectsPage() {
-  // Auth guard — redirects to /login if no valid session
-  await verifySession()
-
+async function ProjectsContent() {
   const supabase = await createClient()
 
   // Step 1: Fetch projects, employee count, and attendance clocks in parallel
@@ -118,5 +118,20 @@ export default async function ProjectsPage() {
         clocks={clocksMap}
       />
     </div>
+  )
+}
+
+export default async function ProjectsPage() {
+  // Auth guard — redirects to /login if no valid session (must run OUTSIDE Suspense)
+  await verifySession()
+
+  return (
+    <Suspense fallback={<PageSkeleton config={{
+      titleWidth: 120,
+      table: { columns: [100, 120, 80, 80, 80, 80, 60], rows: 8 },
+      maxWidth: 'max-w-full',
+    }} />}>
+      <ProjectsContent />
+    </Suspense>
   )
 }

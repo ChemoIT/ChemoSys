@@ -8,19 +8,21 @@
  *
  * Computes linkedEmployeeIds to prevent linking the same employee twice.
  * Passes all data down to UsersTable (client component).
+ *
+ * verifySession() runs OUTSIDE Suspense so auth redirect fires immediately.
  */
 
+import { Suspense } from 'react'
 import { verifySession } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { UsersTable } from '@/components/admin/users/UsersTable'
+import { PageSkeleton } from '@/components/shared/PageSkeleton'
 import { Badge } from '@/components/ui/badge'
 
 const EMPLOYEES_PAGE_SIZE = 1000
 
-export default async function UsersPage() {
-  await verifySession()
-
+async function UsersContent() {
   const supabase = await createClient()
 
   // Step 1: Fetch users, employee count, and templates in parallel
@@ -118,5 +120,20 @@ export default async function UsersPage() {
         templates={templatesRes.data ?? []}
       />
     </div>
+  )
+}
+
+export default async function UsersPage() {
+  // Auth guard — redirects to /login if no valid session (must run OUTSIDE Suspense)
+  await verifySession()
+
+  return (
+    <Suspense fallback={<PageSkeleton config={{
+      titleWidth: 110,
+      table: { columns: [100, 80, 100, 80, 60, 80], rows: 8 },
+      maxWidth: 'max-w-full',
+    }} />}>
+      <UsersContent />
+    </Suspense>
   )
 }
