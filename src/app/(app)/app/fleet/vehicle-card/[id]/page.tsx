@@ -1,16 +1,20 @@
 /**
  * /app/fleet/vehicle-card/[id] — Full vehicle card page.
  *
- * Server Component: fetches all vehicle data sections in parallel,
- * passes to VehicleCard client component.
- * Auth guard: verifyAppUser() (ChemoSys).
+ * Pattern: Suspense wrapper (page.tsx) + async inner component (VehicleCardContent).
+ * - page.tsx: auth check only → renders Suspense with VehicleCardSkeleton fallback
+ * - VehicleCardContent: all data fetching + expiry computations → renders VehicleCard
  *
- * Expiry dates computed here for VehicleFitnessLight:
+ * Auth guard: verifyAppUser() (ChemoSys).
+ * User sees VehicleCardSkeleton immediately — never a blank screen.
+ *
+ * Expiry dates computed inside VehicleCardContent for VehicleFitnessLight:
  *   testExpiryDate      — nearest test expiry across all tests
  *   insuranceMinExpiry  — nearest insurance expiry across all policies
  *   documentMinExpiry   — nearest document expiry across all documents
  */
 
+import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import { verifyAppUser } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
@@ -24,25 +28,28 @@ import {
 } from '@/actions/fleet/vehicles'
 import { getVehicleMonthlyCosts } from '@/actions/fleet/vehicle-ownership'
 import { VehicleCard } from '@/components/app/fleet/vehicles/VehicleCard'
+import { VehicleCardSkeleton } from '@/components/app/fleet/vehicles/VehicleCardSkeleton'
 
 type Props = {
   params: Promise<{ id: string }>
 }
 
-export default async function VehicleCardDetailPage({ params }: Props) {
-  await verifyAppUser()
-  const { id } = await params
+// ─────────────────────────────────────────────────────────────
+// Inner async component — all data fetching happens here
+// ─────────────────────────────────────────────────────────────
 
+async function VehicleCardContent({ id }: { id: string }) {
   // Fetch all vehicle data in parallel
-  const [vehicle, tests, insurance, documents, driverJournal, projectJournal, costs] = await Promise.all([
-    getVehicleById(id),
-    getVehicleTests(id),
-    getVehicleInsurance(id),
-    getVehicleDocuments(id),
-    getVehicleDriverJournal(id),
-    getVehicleProjectJournal(id),
-    getVehicleMonthlyCosts(id),
-  ])
+  const [vehicle, tests, insurance, documents, driverJournal, projectJournal, costs] =
+    await Promise.all([
+      getVehicleById(id),
+      getVehicleTests(id),
+      getVehicleInsurance(id),
+      getVehicleDocuments(id),
+      getVehicleDriverJournal(id),
+      getVehicleProjectJournal(id),
+      getVehicleMonthlyCosts(id),
+    ])
 
   if (!vehicle) notFound()
 
@@ -65,8 +72,8 @@ export default async function VehicleCardDetailPage({ params }: Props) {
   const documentMinExpiry = docExpiries.sort()[0] ?? null
 
   // Fleet alert thresholds from .env.local
-  const yellowDays    = parseInt(process.env['FLEET_LICENSE_YELLOW_DAYS']   ?? '60', 10)
-  const docYellowDays = parseInt(process.env['FLEET_DOCUMENT_YELLOW_DAYS']  ?? '60', 10)
+  const yellowDays = parseInt(process.env['FLEET_LICENSE_YELLOW_DAYS'] ?? '60', 10)
+  const docYellowDays = parseInt(process.env['FLEET_DOCUMENT_YELLOW_DAYS'] ?? '60', 10)
 
   return (
     <VehicleCard
@@ -84,5 +91,20 @@ export default async function VehicleCardDetailPage({ params }: Props) {
       insuranceMinExpiry={insuranceMinExpiry}
       documentMinExpiry={documentMinExpiry}
     />
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// Page — auth check + Suspense wrapper only
+// ─────────────────────────────────────────────────────────────
+
+export default async function VehicleCardDetailPage({ params }: Props) {
+  await verifyAppUser()
+  const { id } = await params
+
+  return (
+    <Suspense fallback={<VehicleCardSkeleton />}>
+      <VehicleCardContent id={id} />
+    </Suspense>
   )
 }
