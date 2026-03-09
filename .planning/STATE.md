@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 ## Current Position
 
 Phase: 20 of 23 (Performance Standards)
-Plan: 0 of 2 in current phase
-Status: Ready to plan
-Last activity: 2026-03-09 — Roadmap v2.1 created (phases 20-23 defined)
+Plan: 2 of 2 in current phase
+Status: Phase complete — both plans executed
+Last activity: 2026-03-09 — Phase 20 plans 01+02 executed (IRON RULE doc + shared boilerplate)
 
-Progress: v2.1 [░░░░░░░░░░░░░░░░░░░░░░░░░] 0%
+Progress: v2.1 [███░░░░░░░░░░░░░░░░░░░░░░] 12% (Phase 20 complete)
 
 ## Strategic Decision (Session #18)
 
@@ -57,6 +57,9 @@ Progress: v2.1 [░░░░░░░░░░░░░░░░░░░░░�
 - **[fuel-session40]** React.cache() on getProjectsForFuelFilter = reference pattern for deduplication
 - **[fuel-session40]** FuelPageSkeleton = animated shimmer bar at top of page = reference skeleton pattern
 - **[fuel-session40]** Loading indicator = spinner + "מעדכן נתונים..." text (replaces opacity-only) = reference pattern
+- **[20-02]** PageSkeleton is a starting point — custom skeletons still needed for unique layouts (tabs, etc.)
+- **[20-02]** LoadingIndicator marked 'use client' — receives client state (isPending) as prop
+- **[20-02]** PageSkeleton default maxWidth = max-w-[calc(100%-6cm)] (matches all fleet pages)
 
 ### Pending Todos
 
@@ -72,7 +75,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-09 (milestone v2.1 roadmap created)
-Stopped at: Roadmap phases 20-23 written, requirements mapped, STATE.md updated
+Last session: 2026-03-09 (Phase 20 plans 01+02 executed)
+Stopped at: Completed 20-02-PLAN.md — PageSkeleton + LoadingIndicator boilerplate created
 
 Resume file: None
