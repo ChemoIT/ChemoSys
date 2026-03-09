@@ -4,25 +4,22 @@
 
 מערכת ניהול פנימית מבוססת ווב לחברת חמו אהרון בע"מ (תשתיות אנרגיה). המערכת מחולקת לשני אזורים: **ממשק ניהול** (Admin Panel — שרון בלבד) ו-**ChemoSys** (מערכת ליבה לוגיסטית — מנהלים ועובדי שטח נבחרים). שניהם חיים באותו פרויקט Next.js כ-route groups נפרדים, חולקים DB, auth ותשתית משותפת.
 
-v1.0 שולח: ממשק ניהול מלא — עובדים, חברות, מחלקות, פרויקטים, יוזרים, הרשאות, audit log, dashboard, הגדרות אינטגרציה.
+v1.0 שלח: ממשק ניהול מלא — עובדים, חברות, מחלקות, פרויקטים, יוזרים, הרשאות, audit log, dashboard, הגדרות אינטגרציה.
 v2.0 בונה: שלד ChemoSys + מודול צי רכב מלא — כרטיס נהג, כרטיס רכב (7 טאבים), מערכת דלק, ספקי רכב, MOT API.
-v2.1 בונה: ביצועים ו-UX גלובלי — Suspense, Skeleton, DB optimization, loading indicators על כל דפי המערכת.
+v2.1 שלח: ביצועים ו-UX גלובלי — Suspense, Skeleton, DB optimization, loading indicators על כל דפי המערכת.
 
 ## Core Value
 
 ממשק אדמין שמאפשר לנהל עובדים, יוזרים, חברות, פרויקטים והרשאות — התשתית שעליה כל המודולים העתידיים נבנים. אם האדמין לא עובד, שום דבר לא עובד.
 
-## Current Milestone: v2.1 Performance & UX
+## Current Milestone: v2.0 שלד ChemoSys (In Progress)
 
-**Goal:** החלת תבנית ביצועים מלאה (Suspense + Skeleton + DB optimization + loading indicators + React.cache) על כל דפי המערכת, והגדרת IRON RULE שכל פיתוח עתידי עומד באותו סטנדרט. דף הדלק משמש כרפרנס.
+**Goal:** שלד מערכת ChemoSys — תשתית כניסה, ניווט והרשאות שעליה ייבנו כל מודולי התפעול. מנהלים ועובדי שטח יכולים להתחבר, לבחור מודול, ולנווט בין דפי הבית של צי רכב וצמ"ה. כולל מודול צי רכב מלא — כרטיס רכב עם redesign, כרטיס נהג, מערכת דלק.
 
-**Target features:**
-- Suspense boundaries + Skeleton components על כל דף עם data fetching
-- DB optimization — views, RPCs, composite indexes לדפים כבדים
-- Loading indicators (spinner + text) על כל state change / filter
-- React.cache() על server actions שנקראים ממספר מקומות
-- IRON RULE חדש: תבנית ביצועים חובה לכל פיתוח עתידי
-- תיקון חוסר עקביות: מעבר מ-loading.tsx ישן ל-Suspense+Skeleton אחיד
+**Remaining work (Phases 10, 15, 17-19):**
+- Phase 10: Equipment module + mobile polish
+- Phase 15: VehicleList page completion (plan 15-02)
+- Phase 17-19: Vehicle card redesign — details, ownership, assignment tabs
 
 ## Requirements
 
@@ -41,15 +38,18 @@ v2.1 בונה: ביצועים ו-UX גלובלי — Suspense, Skeleton, DB opti
 - ✓ Security hardening (CSP, HSTS, rate limiting, RLS) — v1.0
 - ✓ Dashboard (6 stat cards + activity feed) — v1.0
 - ✓ הגדרות אינטגרציה (SMS, WhatsApp, FTP, Telegram, LLM) — v1.0
+- ✓ Suspense + Skeleton על כל דפי App (רכבים, נהגים, דלק) — v2.1
+- ✓ Suspense + Skeleton על כל דפי Admin (dashboard, projects, users, audit-log, settings, templates) — v2.1
+- ✓ DB optimization — Dashboard RPC, composite indexes, React.cache() — v2.1
+- ✓ Loading indicators על filter/search/save changes — v2.1
+- ✓ IRON RULE: Performance Standard — תבנית חובה לכל דף חדש — v2.1
+- ✓ PageSkeleton + LoadingIndicator boilerplate components — v2.1
 
 ### Active
 
-- [ ] Suspense + Skeleton על כל דפי App (רכבים, נהגים, דלק)
-- [ ] Suspense + Skeleton על כל דפי Admin (dashboard, projects, users, audit-log, settings, templates)
-- [ ] DB optimization — views/RPCs/indexes לדפים כבדים (dashboard, vehicle card, driver card)
-- [ ] Loading indicators על כל state change / filter change / tab switch
-- [ ] React.cache() על server actions נפוצים
-- [ ] IRON RULE: Performance Standard — תבנית חובה לכל דף חדש
+- [ ] מודול צמ"ה (Equipment) — placeholder + mobile polish
+- [ ] השלמת כרטיס רכב redesign (טאבים: details, ownership, assignment)
+- [ ] השלמת רשימת רכבים (VehicleList page component)
 
 ### Out of Scope
 
@@ -62,9 +62,10 @@ v2.1 בונה: ביצועים ו-UX גלובלי — Suspense, Skeleton, DB opti
 
 ## Current State
 
-- **v1.0 Shipped:** 106 TypeScript files, 17,440 LOC + 1,558 SQL, 18 tables, 102 commits
-- **v2.0 Shipped:** שלד ChemoSys + מודול צי רכב מלא (כרטיס נהג, כרטיס רכב 7 טאבים, מערכת דלק)
-- **v2.1 In Progress:** ביצועים ו-UX — Suspense, Skeleton, DB optimization על כל הדפים
+- **v1.0 Shipped:** ממשק ניהול מלא — 106 TS files, 17,440 LOC, 102 commits
+- **v2.0 In Progress:** שלד ChemoSys + מודול צי רכב (שלבים 6-9 done, 10+15+17-19 remaining)
+- **v2.1 Shipped:** ביצועים ו-UX — Suspense+Skeleton על כל הדפים, Dashboard RPC, IRON RULE
+- **Codebase:** 205 TypeScript files, 44,176 LOC + 4,269 SQL
 
 ## Context
 
@@ -134,10 +135,15 @@ src/app/
 | Static CSP (לא nonce-based) | Admin panel, no 3rd-party scripts, avoids dynamic rendering | ✓ Good |
 | Rate limiting in-memory | Free tier constraint — no Upstash/Redis | ✓ Good (switch at production scale) |
 | Admin shell = no permission checks | Sharon-only — requirePermission() saved for ChemoSys | ✓ Good |
-| ChemoSys in same project | Shared DB, auth, components — route groups for separation | — Pending (v2.0) |
-| ChemoSys login נפרד מ-admin | UI נפרד, אותו Supabase Auth backend | — Pending (v2.0) |
-| כפתורי מודול בדף כניסה | יוזר בוחר מודול בלוגין, כפתור אפור אם אין הרשאה | — Pending (v2.0) |
-| מודולים כ-route groups מקוננים | /app/fleet/, /app/equipment/ — כל מודול תיקייה עצמאית | — Pending (v2.0) |
+| ChemoSys in same project | Shared DB, auth, components — route groups for separation | ✓ Good |
+| ChemoSys login נפרד מ-admin | UI נפרד, אותו Supabase Auth backend | ✓ Good |
+| כפתורי מודול בדף כניסה | יוזר בוחר מודול בלוגין, כפתור אפור אם אין הרשאה | ✓ Good |
+| מודולים כ-route groups מקוננים | /app/fleet/, /app/equipment/ — כל מודול תיקייה עצמאית | ✓ Good |
+| Suspense+Skeleton (לא loading.tsx) | Streaming SSR, instant feedback, no blank screens | ✓ Good — v2.1 |
+| SECURITY INVOKER for read-only RPCs | RLS applies normally, no privilege escalation | ✓ Good — v2.1 |
+| Dashboard RPC (get_dashboard_stats) | Single query replaces 7, no-arg RETURNS TABLE | ✓ Good — v2.1 |
+| verifySession() outside Suspense | Auth redirect fires immediately, not deferred | ✓ Good — v2.1 |
+| PageSkeleton configurable component | Reusable skeleton generator from config object | ✓ Good — v2.1 |
 
 ---
-*Last updated: 2026-03-09 after v2.1 milestone started*
+*Last updated: 2026-03-09 after v2.1 milestone shipped*

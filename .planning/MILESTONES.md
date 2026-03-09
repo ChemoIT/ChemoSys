@@ -18,3 +18,21 @@
 
 ---
 
+
+## v2.1 Performance & UX (Shipped: 2026-03-09)
+
+**Phases completed:** 4 phases (20-23), 12 plans
+**Timeline:** 2026-03-09 (1 day)
+**Commits:** 32
+**Codebase:** 205 TypeScript files, 44,176 LOC + 4,269 SQL lines
+
+**Key accomplishments:**
+1. IRON RULE ביצועים — 7 כללים חובה לכל דף חדש + מסמך performance-standard.md עם דוגמאות קוד מלאות
+2. PageSkeleton + LoadingIndicator — רכיבי boilerplate ליצירת Skeleton components חדשים תוך דקות
+3. Suspense על 4 דפי App — VehicleList, VehicleCard, DriverList, DriverCard עם Skeleton ייעודי לכל דף
+4. Suspense על 7 דפי Admin — Dashboard, Projects, Users, AuditLog, Templates, Settings, VehicleSuppliers
+5. Dashboard RPC — get_dashboard_stats() מחליף 7 queries נפרדים ב-query יחיד + 5 composite indexes חדשים
+6. הסרת 4 loading.tsx ישנים — מעבר מלא ל-Suspense+Skeleton pattern אחיד בכל המערכת
+
+---
+
