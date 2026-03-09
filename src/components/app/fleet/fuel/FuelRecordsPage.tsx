@@ -7,7 +7,7 @@
  */
 
 import { useState, useTransition } from 'react'
-import { Fuel, Droplets, Receipt, Banknote } from 'lucide-react'
+import { Fuel, Droplets, Receipt, Banknote, Loader2 } from 'lucide-react'
 import { FuelFilters } from './FuelFilters'
 import { FuelTable } from './FuelTable'
 import { getFuelRecords, getFuelStats } from '@/actions/fleet/fuel'
@@ -116,6 +116,14 @@ export function FuelRecordsPage({
         onChange={handleFilterChange}
         isPending={isPending}
       />
+
+      {/* ── Loading indicator ──────────────────────────── */}
+      {isPending && (
+        <div className="flex items-center justify-center gap-2 py-2">
+          <Loader2 className="h-4 w-4 text-sky-600 animate-spin" />
+          <span className="text-sm text-muted-foreground">מעדכן נתונים...</span>
+        </div>
+      )}
 
       {/* ── Table ────────────────────────────────────────── */}
       <FuelTable

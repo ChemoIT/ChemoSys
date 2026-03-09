@@ -14,6 +14,7 @@
  *   - Vehicle type filter joins the vehicles table.
  */
 
+import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { verifyAppUser } from '@/lib/dal'
 import type {
@@ -46,6 +47,7 @@ function periodEndDate(year: number, month: number): string {
 
 /**
  * Get paginated fuel records with filters.
+ * Uses fuel_records_enriched view — driver & project names resolved via LATERAL JOIN in DB.
  * Returns { records, total } for the current page.
  */
 export async function getFuelRecords(
@@ -57,9 +59,9 @@ export async function getFuelRecords(
   const fromDate = periodStartDate(filters.fromYear, filters.fromMonth)
   const toDate = periodEndDate(filters.toYear, filters.toMonth)
 
-  // Start building the query
+  // Query the enriched view — driver_name & project_name come from DB LATERAL JOINs
   let query = supabase
-    .from('fuel_records')
+    .from('fuel_records_enriched')
     .select('*', { count: 'exact' })
     .gte('fueling_date', fromDate)
     .lte('fueling_date', toDate)
@@ -134,55 +136,7 @@ export async function getFuelRecords(
     return { records: [], total: 0 }
   }
 
-  const rows = data ?? []
-
-  // ── Enrich with driver & project names at time of fueling ──
-  const vehicleIds = [...new Set(rows.map(r => r.vehicle_id).filter(Boolean))]
-
-  // Batch-fetch driver journal entries that overlap the page's date range
-  let driverMap = new Map<string, { driverId: string; startDate: string; endDate: string | null; driverName: string }[]>()
-  let projectMap = new Map<string, { startDate: string; endDate: string | null; projectName: string }[]>()
-
-  if (vehicleIds.length > 0) {
-    // Driver journal + driver names (drivers → employees for name)
-    const { data: driverJournals } = await supabase
-      .from('vehicle_driver_journal')
-      .select('vehicle_id, start_date, end_date, drivers ( employees ( first_name, last_name ) )')
-      .in('vehicle_id', vehicleIds)
-
-    for (const j of driverJournals ?? []) {
-      const d = j.drivers as unknown as { employees: { first_name: string; last_name: string } | null } | null
-      const emp = d?.employees
-      const name = emp ? `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() : null
-      if (!name) continue
-      const list = driverMap.get(j.vehicle_id) ?? []
-      list.push({ driverId: '', startDate: j.start_date, endDate: j.end_date, driverName: name })
-      driverMap.set(j.vehicle_id, list)
-    }
-
-    // Project journal + project names
-    const { data: projectJournals } = await supabase
-      .from('vehicle_project_journal')
-      .select('vehicle_id, start_date, end_date, projects ( name )')
-      .in('vehicle_id', vehicleIds)
-
-    for (const j of projectJournals ?? []) {
-      const p = j.projects as unknown as { name: string } | null
-      const name = p?.name ?? null
-      if (!name) continue
-      const list = projectMap.get(j.vehicle_id) ?? []
-      list.push({ startDate: j.start_date, endDate: j.end_date, projectName: name })
-      projectMap.set(j.vehicle_id, list)
-    }
-  }
-
-  /** Find journal entry that covers the given date */
-  function findAtDate<T extends { startDate: string; endDate: string | null }>(entries: T[] | undefined, date: string): T | undefined {
-    if (!entries) return undefined
-    return entries.find(e => e.startDate <= date && (e.endDate == null || e.endDate >= date))
-  }
-
-  const records: FuelRecord[] = rows.map(row => ({
+  const records: FuelRecord[] = (data ?? []).map(row => ({
     id: row.id,
     vehicleId: row.vehicle_id,
     licensePlate: row.license_plate,
@@ -201,8 +155,8 @@ export async function getFuelRecords(
     matchStatus: row.match_status,
     importBatchId: row.import_batch_id,
     createdAt: row.created_at,
-    driverName: row.vehicle_id ? (findAtDate(driverMap.get(row.vehicle_id), row.fueling_date)?.driverName ?? null) : null,
-    projectName: row.vehicle_id ? (findAtDate(projectMap.get(row.vehicle_id), row.fueling_date)?.projectName ?? null) : null,
+    driverName: row.driver_name || null,
+    projectName: row.project_name || null,
   }))
 
   return { records, total: count ?? 0 }
@@ -210,6 +164,7 @@ export async function getFuelRecords(
 
 /**
  * Get aggregate stats for the current filter set.
+ * Uses get_fuel_stats RPC — SUM computed in DB, not JS.
  */
 export async function getFuelStats(filters: FuelFilters): Promise<FuelStats> {
   await verifyAppUser()
@@ -218,70 +173,71 @@ export async function getFuelStats(filters: FuelFilters): Promise<FuelStats> {
   const fromDate = periodStartDate(filters.fromYear, filters.fromMonth)
   const toDate = periodEndDate(filters.toYear, filters.toMonth)
 
-  let query = supabase
-    .from('fuel_records')
-    .select('quantity_liters, gross_amount, net_amount', { count: 'exact' })
-    .gte('fueling_date', fromDate)
-    .lte('fueling_date', toDate)
-
-  if (filters.supplier) query = query.eq('fuel_supplier', filters.supplier)
-  if (filters.fuelType) query = query.eq('fuel_type', filters.fuelType)
-
-  if (filters.licensePlateSearch) {
-    const searchTerm = filters.licensePlateSearch.replace(/\D/g, '')
-    if (searchTerm) query = query.ilike('license_plate', `%${searchTerm}%`)
-  }
+  // Resolve vehicle IDs for vehicleType/project filters (still needed as pre-filter)
+  let vehicleIds: string[] | null = null
 
   if (filters.vehicleType) {
-    const { data: vehicleIds } = await supabase
+    const { data } = await supabase
       .from('vehicles')
       .select('id')
       .eq('vehicle_type', filters.vehicleType)
       .is('deleted_at', null)
-    if (vehicleIds && vehicleIds.length > 0) {
-      query = query.in('vehicle_id', vehicleIds.map(v => v.id))
+    if (data && data.length > 0) {
+      vehicleIds = data.map(v => v.id)
     } else {
       return { totalRecords: 0, totalLiters: 0, totalGrossAmount: 0, totalNetAmount: 0 }
     }
   }
 
   if (filters.projectId) {
-    const { data: journalVehicles } = await supabase
+    const { data } = await supabase
       .from('vehicle_project_journal')
       .select('vehicle_id')
       .eq('project_id', filters.projectId)
       .is('end_date', null)
-    if (journalVehicles && journalVehicles.length > 0) {
-      query = query.in('vehicle_id', journalVehicles.map(v => v.vehicle_id))
+    if (data && data.length > 0) {
+      const projectVehicleIds = data.map(v => v.vehicle_id)
+      // Intersect with vehicleType filter if both present
+      vehicleIds = vehicleIds
+        ? vehicleIds.filter(id => projectVehicleIds.includes(id))
+        : projectVehicleIds
+      if (vehicleIds.length === 0) {
+        return { totalRecords: 0, totalLiters: 0, totalGrossAmount: 0, totalNetAmount: 0 }
+      }
     } else {
       return { totalRecords: 0, totalLiters: 0, totalGrossAmount: 0, totalNetAmount: 0 }
     }
   }
 
-  // Fetch all rows for aggregation (limit 10000)
-  const { data, count } = await query.limit(10000)
+  const plateSearch = filters.licensePlateSearch?.replace(/\D/g, '') || null
 
-  let totalLiters = 0
-  let totalGrossAmount = 0
-  let totalNetAmount = 0
-  for (const row of (data ?? [])) {
-    totalLiters += Number(row.quantity_liters) || 0
-    totalGrossAmount += Number(row.gross_amount) || 0
-    totalNetAmount += Number(row.net_amount) || 0
+  const { data, error } = await supabase.rpc('get_fuel_stats', {
+    p_from_date: fromDate,
+    p_to_date: toDate,
+    p_supplier: filters.supplier ?? null,
+    p_fuel_type: filters.fuelType ?? null,
+    p_plate_search: plateSearch,
+    p_vehicle_ids: vehicleIds,
+  })
+
+  if (error || !data || (Array.isArray(data) && data.length === 0)) {
+    return { totalRecords: 0, totalLiters: 0, totalGrossAmount: 0, totalNetAmount: 0 }
   }
 
+  const row = Array.isArray(data) ? data[0] : data
   return {
-    totalRecords: count ?? (data?.length ?? 0),
-    totalLiters: Math.round(totalLiters * 100) / 100,
-    totalGrossAmount: Math.round(totalGrossAmount * 100) / 100,
-    totalNetAmount: Math.round(totalNetAmount * 100) / 100,
+    totalRecords: Number(row.total_records) || 0,
+    totalLiters: Math.round((Number(row.total_liters) || 0) * 100) / 100,
+    totalGrossAmount: Math.round((Number(row.total_gross) || 0) * 100) / 100,
+    totalNetAmount: Math.round((Number(row.total_net) || 0) * 100) / 100,
   }
 }
 
 /**
  * Get active project assignments for the fuel filter dropdown.
+ * Wrapped in React.cache() — deduplicated within a single server render pass.
  */
-export async function getProjectsForFuelFilter(): Promise<ProjectOptionForFilter[]> {
+export const getProjectsForFuelFilter = cache(async function getProjectsForFuelFilter(): Promise<ProjectOptionForFilter[]> {
   await verifyAppUser()
   const supabase = await createClient()
 
@@ -307,4 +263,4 @@ export async function getProjectsForFuelFilter(): Promise<ProjectOptionForFilter
   }
 
   return projects.sort((a, b) => a.name.localeCompare(b.name, 'he'))
-}
+})
