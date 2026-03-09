@@ -63,13 +63,17 @@ GRANT EXECUTE ON FUNCTION public.get_dashboard_stats TO authenticated, anon, ser
 -- These partial indexes (WHERE deleted_at IS NULL) support the most common
 -- admin list queries: list active records + order by created_at or status.
 -- Verified as NOT existing in migrations 00001–00036.
+--
+-- NOTE: drivers table has no status column (status computed via VIEW).
+--       vehicles table uses vehicle_status (from migration 00027).
+--       users table has no status column.
 
 CREATE INDEX IF NOT EXISTS drivers_active_idx
   ON public.drivers (deleted_at, created_at DESC)
   WHERE deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS employees_status_active_idx
-  ON public.employees (status, deleted_at)
+  ON public.employees ("status", deleted_at)
   WHERE deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS vehicles_active_status_idx
@@ -77,7 +81,7 @@ CREATE INDEX IF NOT EXISTS vehicles_active_status_idx
   WHERE deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS projects_active_status_idx
-  ON public.projects (deleted_at, status)
+  ON public.projects (deleted_at, "status")
   WHERE deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS users_active_idx
