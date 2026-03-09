@@ -6,12 +6,17 @@
  *
  * Security: verifySession() as first line — same guard as all Server Actions.
  * Data: audit_log rows + public.users display name merge + filter dropdown options.
+ *
+ * Performance: Suspense boundary with AuditLogSkeleton fallback —
+ * user sees skeleton immediately, content streams in when DB queries complete.
  */
 
+import { Suspense } from 'react'
 import { verifySession } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
 import { AuditLogTable } from '@/components/admin/audit-log/AuditLogTable'
 import { RefreshButton } from '@/components/shared/RefreshButton'
+import { AuditLogSkeleton } from '@/components/admin/audit-log/AuditLogSkeleton'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,29 +45,26 @@ type AuditRow = {
 }
 
 // ---------------------------------------------------------------------------
-// Page Component
+// Content Component (async — all DB work happens here, inside Suspense)
 // ---------------------------------------------------------------------------
 
-export default async function AuditLogPage({
+async function AuditLogContent({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>
 }) {
-  // 1. Auth guard — MUST be first
-  await verifySession()
-
   const supabase = await createClient()
 
-  // 2. Await searchParams (Next.js 16 Promise pattern — Pitfall 7)
+  // 1. Await searchParams (Next.js 16 Promise pattern — Pitfall 7)
   const params = await searchParams
 
-  // 3. Pagination
+  // 2. Pagination
   const PAGE_SIZE = 50
   const page = Math.max(1, parseInt(params.page ?? '1', 10))
   const rangeFrom = (page - 1) * PAGE_SIZE
   const rangeTo = rangeFrom + PAGE_SIZE - 1
 
-  // 4. Build filtered Supabase query
+  // 3. Build filtered Supabase query
   let query = supabase
     .from('audit_log')
     .select('id, created_at, action, entity_type, entity_id, user_id, old_data, new_data', {
@@ -86,7 +88,7 @@ export default async function AuditLogPage({
   const { data: rawRows, count } = await query
   const rows = rawRows ?? []
 
-  // 5. Resolve user display names — two-step pattern (Pitfall 2)
+  // 4. Resolve user display names — two-step pattern (Pitfall 2)
   // audit_log.user_id → auth.users(id). Display names via users → employees join.
   // No deleted_at filter — resolve names for historical entries too.
   const distinctUserIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))]
@@ -110,7 +112,7 @@ export default async function AuditLogPage({
     }
   }
 
-  // 5b. Resolve entity names per entity_type
+  // 4b. Resolve entity names per entity_type
   const entityGroups = new Map<string, Set<string>>()
   for (const row of rows) {
     if (!row.entity_id) continue
@@ -175,7 +177,7 @@ export default async function AuditLogPage({
 
   await Promise.all(lookupPromises)
 
-  // 6. Merge userName + entityName into each row
+  // 5. Merge userName + entityName into each row
   const mergedRows: AuditRow[] = rows.map((r) => ({
     ...r,
     old_data: r.old_data as Record<string, unknown> | null,
@@ -184,7 +186,7 @@ export default async function AuditLogPage({
     entityName: entityNameMap.get(r.entity_id) ?? r.entity_id?.substring(0, 8) ?? '—',
   }))
 
-  // 7. Fetch distinct entity types for filter dropdown
+  // 6. Fetch distinct entity types for filter dropdown
   const { data: entityTypeRows } = await supabase
     .from('audit_log')
     .select('entity_type')
@@ -194,7 +196,7 @@ export default async function AuditLogPage({
     Boolean
   )
 
-  // 8. Fetch distinct action types for filter dropdown
+  // 7. Fetch distinct action types for filter dropdown
   const { data: actionTypeRows } = await supabase
     .from('audit_log')
     .select('action')
@@ -202,7 +204,7 @@ export default async function AuditLogPage({
 
   const actionTypes = [...new Set((actionTypeRows ?? []).map((r) => r.action))].filter(Boolean)
 
-  // 9. Render
+  // 8. Render
   return (
     <div className="space-y-6">
       {/* Page header */}
@@ -228,5 +230,24 @@ export default async function AuditLogPage({
         }}
       />
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Page Component — thin shell with auth + Suspense boundary
+// ---------------------------------------------------------------------------
+
+export default async function AuditLogPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>
+}) {
+  // Auth guard — MUST be first, outside Suspense
+  await verifySession()
+
+  return (
+    <Suspense fallback={<AuditLogSkeleton />}>
+      <AuditLogContent searchParams={searchParams} />
+    </Suspense>
   )
 }
