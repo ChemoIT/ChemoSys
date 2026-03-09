@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 ## Current Position
 
 Phase: 22 of 23 (Admin Pages Suspense + Loading)
-Plan: 1 of 4 in current phase complete
-Status: Plan 22-01 complete — Dashboard Suspense + DashboardSkeleton
-Last activity: 2026-03-09 — Phase 22 Plan 01 complete (Dashboard Suspense + DashboardSkeleton)
+Plan: 2 of 4 in current phase complete
+Status: Plan 22-02 complete — Projects, Users, Templates, VehicleSuppliers Suspense + PageSkeleton
+Last activity: 2026-03-09 — Phase 22 Plan 02 complete (4 admin table pages with Suspense + PageSkeleton)
 
 Progress: v2.1 [██████░░░░░░░░░░░░░░░░░░░] 25% (Phase 20 complete, 21-23 remaining)
 
@@ -60,6 +60,10 @@ Progress: v2.1 [██████░░░░░░░░░░░░░░░�
 - **[20-02]** PageSkeleton is a starting point — custom skeletons still needed for unique layouts (tabs, etc.)
 - **[20-02]** LoadingIndicator marked 'use client' — receives client state (isPending) as prop
 - **[20-02]** PageSkeleton default maxWidth = max-w-[calc(100%-6cm)] (matches all fleet pages)
+- **[21-04]** DriverCard uses max-w-4xl (not max-w-[calc(100%-6cm)]) — skeleton must match this specific container width
+- **[21-04]** Tab loading indicators NOT needed for DriverCard — all tab data fetched upfront via Promise.all; add only if tabs lazy-loaded later
+- **[22-02]** Admin pages use maxWidth: max-w-full — admin layout is full-width unlike fleet app pages
+- **[22-02]** verifySession() must run OUTSIDE Suspense boundary — auth redirect must fire immediately
 - **[22-01]** DashboardSkeleton custom (not PageSkeleton) — two-section layout (stat grid + activity feed) requires dedicated component
 - **[22-01]** verifySession() always outside Suspense boundary — auth redirect must not be deferred
 
@@ -77,7 +81,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-09 (Phase 22 Plan 01 executed)
-Stopped at: Completed 22-01-PLAN.md — Dashboard page Suspense boundary + DashboardSkeleton component
+Last session: 2026-03-09 (Phase 21 Plan 04 executed — DriverCard Suspense + Skeleton; Phase 22 Plans 01-02 also executed)
+Stopped at: Completed 21-04-PLAN.md — DriverCard Suspense boundary + DriverCardSkeleton component
 
 Resume file: None
