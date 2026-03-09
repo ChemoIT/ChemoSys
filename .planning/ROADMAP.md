@@ -3,7 +3,8 @@
 ## Milestones
 
 - ✅ **v1.0 Admin Panel MVP** — Phases 1-5 + 3.1 (shipped 2026-03-04) — [Archive](milestones/v1.0-ROADMAP.md)
-- 🚧 **v2.0 שלד ChemoSys** — Phases 6-10 (in progress)
+- 🚧 **v2.0 שלד ChemoSys** — Phases 6-19 (in progress)
+- 📋 **v2.1 Performance & UX** — Phases 20-23 (planned)
 
 ## Phases
 
@@ -30,6 +31,18 @@
 - [x] **Phase 8: (app) Shell** — route group + layout + header + module switcher — completed 2026-03-04
 - [x] **Phase 9: Fleet Home** — דף בית צי רכב עם sidebar ו-9 תתי-מודולים — completed 2026-03-05
 - [ ] **Phase 10: Equipment + Mobile Polish** — דף בית צמ"ה + רספונסיביות + וריפיקציה
+- [ ] **Phase 11–19: Vehicle Card + Fuel System** — DB, Server Actions, UI מלא לכרטיס רכב + מערכת דלק
+
+---
+
+### 📋 v2.1 Performance & UX (Planned)
+
+**Milestone Goal:** החלת תבנית ביצועים מלאה (Suspense + Skeleton + DB optimization + loading indicators) על כל דפי המערכת, והגדרת IRON RULE לפיתוח עתידי. דף הדלק משמש כרפרנס.
+
+- [ ] **Phase 20: Performance Standards** — IRON RULE + מסמך סטנדרט + boilerplate generator
+- [ ] **Phase 21: App Pages Suspense + Loading** — Skeleton לרשימות/כרטיסי רכב ונהגים + loading indicators
+- [ ] **Phase 22: Admin Pages Suspense + Loading** — Skeleton ל-7 דפי אדמין + הסרת loading.tsx ישנים
+- [ ] **Phase 23: DB Optimization** — Dashboard RPC + indexes + React.cache() + save button states
 
 ---
 
@@ -144,37 +157,6 @@ Plans:
 
 ---
 
-## Progress
-
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 1. Foundation | v1.0 | 4/4 | Complete | 2026-03-01 |
-| 2. Employees | v1.0 | 2/2 | Complete | 2026-03-01 |
-| 3. Access Control | v1.0 | 3/3 | Complete | 2026-03-03 |
-| 03.1. Security Hardening | v1.0 | 3/3 | Complete | 2026-03-03 |
-| 4. Projects | v1.0 | 4/4 | Complete | 2026-03-03 |
-| 5. Settings and Observability | v1.0 | 4/4 | Complete | 2026-03-04 |
-| 6. DB + Auth Foundation | v2.0 | 2/2 | Complete | 2026-03-04 |
-| 7. ChemoSys Login | v2.0 | 2/2 | Complete | 2026-03-04 |
-| 8. (app) Shell | v2.0 | 1/1 | Complete | 2026-03-04 |
-| 9. Fleet Home | v2.0 | 2/2 | Complete | 2026-03-05 |
-| 10. Equipment + Mobile Polish | v2.0 | 0/1 | Not started | - |
-| 11. Phase 10A — Vehicle Card DB | v2.0 | 2/2 | Complete | 2026-03-07 |
-| 12. Phase 10B — Suppliers + MOT API | v2.0 | 2/2 | Complete | 2026-03-07 |
-| 13. Phase 10C — Vehicle Server Actions + Shared Components | v2.0 | 2/2 | Complete | 2026-03-07 |
-| 14. Phase 10E — VehicleCard Full UI (8 Tabs) | v2.0 | 2/2 | Complete | 2026-03-07 |
-| 15. Phase 10F — VehicleList + AddVehicleDialog | v2.0 | 1/2 | In progress | - |
-| 16. Vehicle Card Redesign — DB Migration | v2.0 | 2/2 | Complete | 2026-03-08 |
-| 17. Vehicle Card Redesign — Details + Images + Replacement | v2.0 | 0/2 | Not started | - |
-| 18. Vehicle Card Redesign — Ownership + Licensing & Insurance | v2.0 | 0/3 | Not started | - |
-| 19. Vehicle Card Redesign — Assignment (צמידות) + Documents | v2.0 | 0/2 | Not started | - |
-
-## Coverage
-
-All 65 v1.0 requirements mapped and completed. See [v1.0 Requirements Archive](milestones/v1.0-REQUIREMENTS.md).
-
-v2.0: 23/23 requirements mapped. See [REQUIREMENTS.md](REQUIREMENTS.md).
-
 ### Phase 11: Phase 10A — Vehicle Card Database + Storage + Vehicle Suppliers tables
 
 **Goal:** תשתית DB מלאה למודול כרטיס רכב — 6 טבלאות, views, RPCs, RLS, ו-storage bucket מוכנים ל-Supabase. בסיום הפאזה, כל האובייקטים קיימים ב-DB ומוכנים לפיתוח Server Actions ו-UI בפאזות הבאות.
@@ -272,5 +254,136 @@ Plans:
 
 ---
 
+### Phase 20: Performance Standards
+
+**Goal:** הסטנדרט הגלובלי לביצועים מוגדר ומתועד — IRON RULE חדש ב-CLAUDE.md, מסמך הנחיות עם דוגמאות קוד, ו-boilerplate מוכן לשימוש. כל פיתוח עתידי יודע בדיוק מה חובה בכל דף חדש.
+
+**Depends on:** Phase 19
+
+**Requirements:** RULE-01, RULE-02, RULE-03
+
+**Success Criteria** (what must be TRUE):
+1. CLAUDE.md מכיל IRON RULE חדש "Performance Standard" — Claude Code מיישם אותו בכל דף חדש שיבנה
+2. מסמך `performance-standard.md` קיים ב-`.planning/` עם דוגמאות קוד מלאות מהדף דלק (הפרנס)
+3. Skeleton boilerplate component קיים בקוד — ניתן להשתמש בו להוספת Skeleton חדש בתוך דקות
+
+**Plans:** TBD
+
+Plans:
+- [ ] 20-01: IRON RULE update in CLAUDE.md + performance-standard.md document
+- [ ] 20-02: Skeleton boilerplate generator component + usage documentation
+
+---
+
+### Phase 21: App Pages Suspense + Loading
+
+**Goal:** כל דפי ה-App (רשימת רכבים, כרטיס רכב, רשימת נהגים, כרטיס נהג) נטענים עם Skeleton מיידי — המשתמש רואה feedback ויזואלי תוך אפס שניות, ו-loading indicators ברורים בכל פעולת filter/search/tab.
+
+**Depends on:** Phase 20
+
+**Requirements:** SKEL-APP-01, SKEL-APP-02, SKEL-APP-03, SKEL-APP-04, LOAD-01, LOAD-02, LOAD-03, LOAD-04
+
+**Success Criteria** (what must be TRUE):
+1. רשימת רכבים ורשימת נהגים מציגות skeleton של שורות טבלה מיד עם פתיחת הדף — לא מסך ריק
+2. כרטיס רכב וכרטיס נהג מציגים skeleton עם outline של header + טאבים בזמן טעינה ראשונית
+3. שינוי filter או חיפוש ברשימות מציג spinner + טקסט "מעדכן נתונים..." — המשתמש יודע שמשהו קורה
+4. מעבר בין טאבים בכרטיס (כשטאב טוען data) מציג loading indicator ברור — לא freeze ללא feedback
+
+**Plans:** TBD
+
+Plans:
+- [ ] 21-01: VehicleList Suspense + VehicleListSkeleton + loading indicator (filter/search)
+- [ ] 21-02: VehicleCard Suspense + VehicleCardSkeleton (7 tabs outline)
+- [ ] 21-03: DriverList Suspense + DriverListSkeleton + loading indicator (filter/search)
+- [ ] 21-04: DriverCard Suspense + DriverCardSkeleton + tab loading indicator
+
+---
+
+### Phase 22: Admin Pages Suspense + Loading
+
+**Goal:** כל דפי ה-Admin (dashboard, projects, users, audit-log, templates, settings, vehicle suppliers) נטענים עם Skeleton — מחליפים את כל ה-`loading.tsx` הישנים בתבנית Suspense+Skeleton אחידה. שינויי filter ב-admin מציגים loading indicators.
+
+**Depends on:** Phase 20
+
+**Requirements:** SKEL-ADM-01, SKEL-ADM-02, SKEL-ADM-03, SKEL-ADM-04, SKEL-ADM-05, SKEL-ADM-06, SKEL-ADM-07, SKEL-ADM-08, LOAD-05
+
+**Success Criteria** (what must be TRUE):
+1. Dashboard מציג skeleton של 6 stat cards + activity feed בזמן טעינה — לא מסך ריק
+2. כל דפי הטבלאות (projects, users, audit-log, templates, vehicle suppliers) מציגים skeleton שורות
+3. לא קיים אף `loading.tsx` ישן בפרויקט (companies, departments, employees, role-tags הוסרו)
+4. שינוי filter או pagination בדפי admin מציג spinner + טקסט — לא refresh שקט ללא feedback
+
+**Plans:** TBD
+
+Plans:
+- [ ] 22-01: Dashboard Suspense + DashboardSkeleton (6 stat cards + activity feed)
+- [ ] 22-02: Projects + Users + Templates + VehicleSuppliers — Suspense + Skeleton
+- [ ] 22-03: Audit Log Suspense + AuditLogSkeleton + loading indicator
+- [ ] 22-04: Settings Suspense + SettingsSkeleton + remove old loading.tsx files
+
+---
+
+### Phase 23: DB Optimization
+
+**Goal:** הדפים הכבדים (dashboard, vehicle card, driver list) נשענים על queries מאופטמות ב-DB — RPC אגרגטיבי לדשבורד, indexes לטבלאות admin, React.cache() על Server Actions חוזרים. כפתורי שמירה מציגים loading state ברור בכל מקום.
+
+**Depends on:** Phase 21
+
+**Requirements:** DBOPT-01, DBOPT-02, DBOPT-03, DBOPT-04, DBOPT-05, LOAD-06
+
+**Success Criteria** (what must be TRUE):
+1. Dashboard נטען עם query יחיד ל-DB (get_dashboard_stats RPC) — לא 7 queries נפרדים ב-Network
+2. כרטיס רכב ו-driver list מציגים נתונים מהר יותר — indexes חדשים ב-DB לפי דפוסי filter נפוצים
+3. React.cache() מיושם — Server Actions נפוצים לא מבצעים ריבוי queries בבקשה אחת
+4. כפתורי שמירה בכל הדפים מציגים spinner בזמן שמירה — המשתמש לא לוחץ פעמיים מתוך חוסר וודאות
+
+**Plans:** TBD
+
+Plans:
+- [ ] 23-01: Dashboard RPC (get_dashboard_stats) — migration + server action refactor
+- [ ] 23-02: Vehicle card + driver list indexes + audit_log/projects/users composite indexes
+- [ ] 23-03: React.cache() audit + save button loading states across all forms
+
+---
+
+## Progress
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Foundation | v1.0 | 4/4 | Complete | 2026-03-01 |
+| 2. Employees | v1.0 | 2/2 | Complete | 2026-03-01 |
+| 3. Access Control | v1.0 | 3/3 | Complete | 2026-03-03 |
+| 03.1. Security Hardening | v1.0 | 3/3 | Complete | 2026-03-03 |
+| 4. Projects | v1.0 | 4/4 | Complete | 2026-03-03 |
+| 5. Settings and Observability | v1.0 | 4/4 | Complete | 2026-03-04 |
+| 6. DB + Auth Foundation | v2.0 | 2/2 | Complete | 2026-03-04 |
+| 7. ChemoSys Login | v2.0 | 2/2 | Complete | 2026-03-04 |
+| 8. (app) Shell | v2.0 | 1/1 | Complete | 2026-03-04 |
+| 9. Fleet Home | v2.0 | 2/2 | Complete | 2026-03-05 |
+| 10. Equipment + Mobile Polish | v2.0 | 0/1 | Not started | - |
+| 11. Vehicle Card DB | v2.0 | 2/2 | Complete | 2026-03-07 |
+| 12. Suppliers + MOT API | v2.0 | 2/2 | Complete | 2026-03-07 |
+| 13. Vehicle Server Actions | v2.0 | 2/2 | Complete | 2026-03-07 |
+| 14. VehicleCard Full UI | v2.0 | 2/2 | Complete | 2026-03-07 |
+| 15. VehicleList + AddVehicleDialog | v2.0 | 1/2 | In progress | - |
+| 16. Vehicle Card Redesign — DB | v2.0 | 2/2 | Complete | 2026-03-08 |
+| 17. Vehicle Card Redesign — Details | v2.0 | 0/2 | Not started | - |
+| 18. Vehicle Card Redesign — Ownership | v2.0 | 0/3 | Not started | - |
+| 19. Vehicle Card Redesign — Assignment | v2.0 | 0/2 | Not started | - |
+| 20. Performance Standards | v2.1 | 0/2 | Not started | - |
+| 21. App Pages Suspense + Loading | v2.1 | 0/4 | Not started | - |
+| 22. Admin Pages Suspense + Loading | v2.1 | 0/4 | Not started | - |
+| 23. DB Optimization | v2.1 | 0/3 | Not started | - |
+
+## Coverage
+
+All 65 v1.0 requirements mapped and completed. See [v1.0 Requirements Archive](milestones/v1.0-REQUIREMENTS.md).
+
+v2.0: 23/23 requirements mapped. See [REQUIREMENTS.md](REQUIREMENTS.md).
+
+v2.1: 26/26 requirements mapped (+ 1 reference SKEL-APP-05 = complete). Full traceability in REQUIREMENTS.md.
+
+---
+
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-08 — Phase 18 planned (3 plans)*
+*Last updated: 2026-03-09 — v2.1 phases 20-23 added*

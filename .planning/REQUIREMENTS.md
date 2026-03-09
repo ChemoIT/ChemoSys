@@ -68,39 +68,39 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SKEL-APP-01 | TBD | Pending |
-| SKEL-APP-02 | TBD | Pending |
-| SKEL-APP-03 | TBD | Pending |
-| SKEL-APP-04 | TBD | Pending |
+| SKEL-APP-01 | Phase 21 | Pending |
+| SKEL-APP-02 | Phase 21 | Pending |
+| SKEL-APP-03 | Phase 21 | Pending |
+| SKEL-APP-04 | Phase 21 | Pending |
 | SKEL-APP-05 | — | Complete (reference) |
-| SKEL-ADM-01 | TBD | Pending |
-| SKEL-ADM-02 | TBD | Pending |
-| SKEL-ADM-03 | TBD | Pending |
-| SKEL-ADM-04 | TBD | Pending |
-| SKEL-ADM-05 | TBD | Pending |
-| SKEL-ADM-06 | TBD | Pending |
-| SKEL-ADM-07 | TBD | Pending |
-| SKEL-ADM-08 | TBD | Pending |
-| DBOPT-01 | TBD | Pending |
-| DBOPT-02 | TBD | Pending |
-| DBOPT-03 | TBD | Pending |
-| DBOPT-04 | TBD | Pending |
-| DBOPT-05 | TBD | Pending |
-| LOAD-01 | TBD | Pending |
-| LOAD-02 | TBD | Pending |
-| LOAD-03 | TBD | Pending |
-| LOAD-04 | TBD | Pending |
-| LOAD-05 | TBD | Pending |
-| LOAD-06 | TBD | Pending |
-| RULE-01 | TBD | Pending |
-| RULE-02 | TBD | Pending |
-| RULE-03 | TBD | Pending |
+| SKEL-ADM-01 | Phase 22 | Pending |
+| SKEL-ADM-02 | Phase 22 | Pending |
+| SKEL-ADM-03 | Phase 22 | Pending |
+| SKEL-ADM-04 | Phase 22 | Pending |
+| SKEL-ADM-05 | Phase 22 | Pending |
+| SKEL-ADM-06 | Phase 22 | Pending |
+| SKEL-ADM-07 | Phase 22 | Pending |
+| SKEL-ADM-08 | Phase 22 | Pending |
+| DBOPT-01 | Phase 23 | Pending |
+| DBOPT-02 | Phase 23 | Pending |
+| DBOPT-03 | Phase 23 | Pending |
+| DBOPT-04 | Phase 23 | Pending |
+| DBOPT-05 | Phase 23 | Pending |
+| LOAD-01 | Phase 21 | Pending |
+| LOAD-02 | Phase 21 | Pending |
+| LOAD-03 | Phase 21 | Pending |
+| LOAD-04 | Phase 21 | Pending |
+| LOAD-05 | Phase 22 | Pending |
+| LOAD-06 | Phase 23 | Pending |
+| RULE-01 | Phase 20 | Pending |
+| RULE-02 | Phase 20 | Pending |
+| RULE-03 | Phase 20 | Pending |
 
 **Coverage:**
 - v2.1 requirements: 27 total (26 active + 1 reference)
-- Mapped to phases: 0
-- Unmapped: 26 ⚠️
+- Mapped to phases: 26
+- Unmapped: 0 — coverage complete
 
 ---
 *Requirements defined: 2026-03-09*
-*Last updated: 2026-03-09 after initial definition*
+*Last updated: 2026-03-09 — traceability complete (phases 20-23)*
