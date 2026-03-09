@@ -39,7 +39,7 @@
 
 **Milestone Goal:** החלת תבנית ביצועים מלאה (Suspense + Skeleton + DB optimization + loading indicators) על כל דפי המערכת, והגדרת IRON RULE לפיתוח עתידי. דף הדלק משמש כרפרנס.
 
-- [ ] **Phase 20: Performance Standards** — IRON RULE + מסמך סטנדרט + boilerplate generator
+- [x] **Phase 20: Performance Standards** — IRON RULE + מסמך סטנדרט + boilerplate generator — completed 2026-03-09
 - [ ] **Phase 21: App Pages Suspense + Loading** — Skeleton לרשימות/כרטיסי רכב ונהגים + loading indicators
 - [ ] **Phase 22: Admin Pages Suspense + Loading** — Skeleton ל-7 דפי אדמין + הסרת loading.tsx ישנים
 - [ ] **Phase 23: DB Optimization** — Dashboard RPC + indexes + React.cache() + save button states
@@ -270,8 +270,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 20-01-PLAN.md — IRON RULE "ביצועים" in CLAUDE.md + performance-standard.md reference document
-- [ ] 20-02-PLAN.md — PageSkeleton configurable boilerplate + LoadingIndicator shared component
+- [x] 20-01-PLAN.md — IRON RULE "ביצועים" in CLAUDE.md + performance-standard.md reference document
+- [x] 20-02-PLAN.md — PageSkeleton configurable boilerplate + LoadingIndicator shared component
 
 ---
 
@@ -370,7 +370,7 @@ Plans:
 | 17. Vehicle Card Redesign — Details | v2.0 | 0/2 | Not started | - |
 | 18. Vehicle Card Redesign — Ownership | v2.0 | 0/3 | Not started | - |
 | 19. Vehicle Card Redesign — Assignment | v2.0 | 0/2 | Not started | - |
-| 20. Performance Standards | v2.1 | 0/2 | Not started | - |
+| 20. Performance Standards | v2.1 | 2/2 | Complete | 2026-03-09 |
 | 21. App Pages Suspense + Loading | v2.1 | 0/4 | Not started | - |
 | 22. Admin Pages Suspense + Loading | v2.1 | 0/4 | Not started | - |
 | 23. DB Optimization | v2.1 | 0/3 | Not started | - |
