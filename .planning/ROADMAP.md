@@ -42,7 +42,7 @@
 - [x] **Phase 20: Performance Standards** — IRON RULE + מסמך סטנדרט + boilerplate generator — completed 2026-03-09
 - [x] **Phase 21: App Pages Suspense + Loading** — Skeleton לרשימות/כרטיסי רכב ונהגים + loading indicators — completed 2026-03-09
 - [x] **Phase 22: Admin Pages Suspense + Loading** — Skeleton ל-7 דפי אדמין + הסרת loading.tsx ישנים — completed 2026-03-09
-- [ ] **Phase 23: DB Optimization** — Dashboard RPC + indexes + React.cache() + save button states
+- [x] **Phase 23: DB Optimization** — Dashboard RPC + indexes + React.cache() + save button states — completed 2026-03-09
 
 ---
 
@@ -340,8 +340,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 23-01-PLAN.md — Dashboard RPC (get_dashboard_stats) migration 00037 + composite indexes + server action + page refactor
-- [ ] 23-02-PLAN.md — VehicleSuppliersPage save button fix (useTransition) + React.cache() audit
+- [x] 23-01-PLAN.md — Dashboard RPC (get_dashboard_stats) migration 00037 + composite indexes + server action + page refactor
+- [x] 23-02-PLAN.md — VehicleSuppliersPage save button fix (useTransition) + React.cache() audit
 
 ---
 
@@ -372,7 +372,7 @@ Plans:
 | 20. Performance Standards | v2.1 | 2/2 | Complete | 2026-03-09 |
 | 21. App Pages Suspense + Loading | v2.1 | 4/4 | Complete | 2026-03-09 |
 | 22. Admin Pages Suspense + Loading | v2.1 | 4/4 | Complete | 2026-03-09 |
-| 23. DB Optimization | v2.1 | 0/2 | Not started | - |
+| 23. DB Optimization | v2.1 | 2/2 | Complete | 2026-03-09 |
 
 ## Coverage
 
@@ -385,4 +385,4 @@ v2.1: 26/26 requirements mapped (+ 1 reference SKEL-APP-05 = complete). Full tra
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-09 — Phase 23 planned (2 plans)*
+*Last updated: 2026-03-09 — Phase 23 complete (2/2 plans)*
