@@ -69,12 +69,13 @@ export async function getVehiclesList(): Promise<VehicleListItem[]> {
       vehicle_category,
       companies ( name ),
       drivers (
-        employees ( first_name, last_name )
+        employees ( first_name, last_name, employee_number )
       ),
       vehicle_tests ( expiry_date ),
       vehicle_insurance ( expiry_date ),
       vehicle_documents ( expiry_date ),
-      vehicle_project_journal ( project_id, end_date, projects ( name ) )
+      vehicle_project_journal ( project_id, end_date, projects ( name ) ),
+      vehicle_driver_journal ( driver_id, end_date, drivers ( employees ( first_name, last_name, employee_number ) ) )
     `)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
@@ -84,7 +85,7 @@ export async function getVehiclesList(): Promise<VehicleListItem[]> {
   return (data ?? []).map((row) => {
     const company = (row.companies as unknown) as { name: string } | null
     const driver = (row.drivers as unknown) as {
-      employees: { first_name: string; last_name: string } | null
+      employees: { first_name: string; last_name: string; employee_number: string | null } | null
     } | null
     const driverEmployee = driver?.employees ?? null
 
@@ -105,6 +106,16 @@ export async function getVehiclesList(): Promise<VehicleListItem[]> {
     }[]
     const activeProject = journalEntries.find((j) => j.end_date === null)
 
+    // Find active driver from journal (end_date IS NULL) — more reliable than assigned_driver_id
+    const driverJournalEntries = (row.vehicle_driver_journal ?? []) as unknown as {
+      driver_id: string; end_date: string | null
+      drivers: { employees: { first_name: string; last_name: string; employee_number: string | null } | null } | null
+    }[]
+    const activeDriverJournal = driverJournalEntries.find((j) => j.end_date === null)
+    const journalDriverName = activeDriverJournal?.drivers?.employees
+      ? `${activeDriverJournal.drivers.employees.first_name} ${activeDriverJournal.drivers.employees.last_name}`
+      : null
+
     return {
       id: row.id,
       licensePlate: row.license_plate,
@@ -116,9 +127,11 @@ export async function getVehiclesList(): Promise<VehicleListItem[]> {
       vehicleCategory: (row.vehicle_category as 'camp' | 'assigned' | null) ?? null,
       companyName: company?.name ?? null,
       computedStatus,
-      assignedDriverName: driverEmployee
-        ? `${driverEmployee.first_name} ${driverEmployee.last_name}`
-        : null,
+      // Prefer journal driver name, fallback to assigned_driver_id
+      assignedDriverName: journalDriverName
+        ?? (driverEmployee ? `${driverEmployee.first_name} ${driverEmployee.last_name}` : null),
+      assignedDriverEmployeeNumber: activeDriverJournal?.drivers?.employees?.employee_number
+        ?? driverEmployee?.employee_number ?? null,
       activeProjectName: activeProject?.projects?.name ?? null,
       testExpiryDate: testExpiries.sort()[0] ?? null,
       insuranceMinExpiry: insuranceExpiries.sort()[0] ?? null,
@@ -1028,22 +1041,32 @@ export async function getVehicleDriverJournal(vehicleId: string): Promise<Vehicl
     .from('vehicle_driver_journal')
     .select(`
       id, vehicle_id, driver_id, start_date, end_date, created_at,
-      drivers ( employees ( first_name, last_name ) )
+      drivers (
+        employees (
+          first_name, last_name, employee_number,
+          companies ( name )
+        )
+      )
     `)
     .eq('vehicle_id', vehicleId)
     .order('start_date', { ascending: false })
   if (error) throw new Error(error.message)
   return (data ?? []).map((row) => {
     const driver = (row.drivers as unknown) as {
-      employees: { first_name: string; last_name: string } | null
+      employees: {
+        first_name: string; last_name: string
+        employee_number: string | null
+        companies: { name: string } | null
+      } | null
     } | null
+    const emp = driver?.employees ?? null
     return {
       id: row.id,
       vehicleId: row.vehicle_id,
       driverId: row.driver_id,
-      driverName: driver?.employees
-        ? `${driver.employees.first_name} ${driver.employees.last_name}`
-        : null,
+      driverName: emp ? `${emp.first_name} ${emp.last_name}` : null,
+      driverCompanyName: emp?.companies?.name ?? null,
+      driverEmployeeNumber: emp?.employee_number ?? null,
       startDate: row.start_date,
       endDate: row.end_date,
       createdAt: row.created_at,

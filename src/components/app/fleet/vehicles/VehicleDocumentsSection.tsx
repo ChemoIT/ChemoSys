@@ -52,6 +52,7 @@ type Props = {
   vehicleId: string
   documents: VehicleDocument[]
   docYellowDays: number
+  isLocked?: boolean
   onEditingChange?: (isEditing: boolean) => void
 }
 
@@ -63,6 +64,7 @@ export function VehicleDocumentsSection({
   vehicleId,
   documents: initialDocs,
   docYellowDays,
+  isLocked = false,
   onEditingChange,
 }: Props) {
   const [docs, setDocs] = useState<VehicleDocument[]>(initialDocs)
@@ -462,8 +464,8 @@ export function VehicleDocumentsSection({
             return (
               <div
                 key={doc.id}
-                className="flex items-start justify-between gap-3 p-3 border rounded-lg hover:bg-muted/20 transition-colors cursor-pointer group"
-                onClick={() => startEdit(doc)}
+                className={`flex items-start justify-between gap-3 p-3 border rounded-lg transition-colors group ${isLocked ? '' : 'hover:bg-muted/20 cursor-pointer'}`}
+                onClick={isLocked ? undefined : () => startEdit(doc)}
               >
                 <div className="flex items-start gap-3 flex-1 min-w-0">
                   <FileText className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
@@ -499,19 +501,23 @@ export function VehicleDocumentsSection({
                       פתח קובץ
                     </a>
                   )}
-                  <Pencil className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
-                  <button
-                    onClick={(e) => { e.stopPropagation(); void handleDelete(doc.id) }}
-                    disabled={deletingId === doc.id}
-                    className="text-muted-foreground hover:text-destructive transition-colors"
-                    title="מחק"
-                  >
-                    {deletingId === doc.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </button>
+                  {!isLocked && (
+                    <>
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); void handleDelete(doc.id) }}
+                        disabled={deletingId === doc.id}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        title="מחק"
+                      >
+                        {deletingId === doc.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )
@@ -522,8 +528,8 @@ export function VehicleDocumentsSection({
       {/* Add form */}
       {showAddForm && renderForm('add')}
 
-      {/* Add button */}
-      {!showAddForm && !editingId && (
+      {/* Add button — hidden when vehicle is locked */}
+      {!showAddForm && !editingId && !isLocked && (
         <Button
           variant="outline"
           size="sm"

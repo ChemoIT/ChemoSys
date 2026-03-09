@@ -41,6 +41,15 @@ export const VEHICLE_STATUS_LABELS: Record<string, string> = {
   decommissioned: 'מושבת',
 }
 
+/** Statuses that lock the vehicle card (all fields disabled except vehicle_status) */
+export const LOCKED_STATUSES = ['returned', 'sold', 'decommissioned'] as const
+export type LockedStatus = typeof LOCKED_STATUSES[number]
+
+/** Check if a vehicle status is locked (returned/sold/decommissioned) */
+export function isVehicleLocked(status: string | null | undefined): boolean {
+  return LOCKED_STATUSES.includes((status ?? 'active') as LockedStatus)
+}
+
 export const REPLACEMENT_REASON_LABELS: Record<string, string> = {
   maintenance: 'טיפול',
   test:        'טסט',
@@ -71,6 +80,8 @@ export type VehicleListItem = {
   /** camp | assigned | null */
   vehicleCategory: 'camp' | 'assigned' | null
   assignedDriverName: string | null
+  /** Assigned driver's employee number (for search) */
+  assignedDriverEmployeeNumber: string | null
   /** Current active project name (from vehicle_project_journal) */
   activeProjectName: string | null
   /** Nearest upcoming vehicle test expiry date */
@@ -289,9 +300,11 @@ export type VehicleDriverJournal = {
   id: string
   vehicleId: string
   driverId: string
-  driverName: string | null  // joined from drivers → employees
-  startDate: string          // yyyy-mm-dd
-  endDate: string | null     // null = currently active
+  driverName: string | null           // joined from drivers → employees
+  driverCompanyName: string | null    // joined employees → companies
+  driverEmployeeNumber: string | null // employees.employee_number
+  startDate: string                   // yyyy-mm-dd
+  endDate: string | null              // null = currently active
   createdAt: string
 }
 

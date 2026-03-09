@@ -201,7 +201,8 @@ export function FleetSidebar({ permissions, children }: FleetSidebarProps) {
             </SidebarGroupLabel>
             <div className="space-y-0.5">
               {FLEET_SUB_MODULES.map((item) => {
-                const isEnabled = permSet.has(item.key);
+                // DEV: all sub-modules enabled during development
+                const isEnabled = true; // permSet.has(item.key);
                 const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
                 const Icon = item.icon;
 

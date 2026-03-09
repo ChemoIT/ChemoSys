@@ -53,6 +53,7 @@ import { deleteVehicleWithPassword } from '@/actions/fleet/vehicles'
 import { formatLicensePlate } from '@/lib/format'
 import {
   VEHICLE_STATUS_LABELS,
+  isVehicleLocked,
   type VehicleFull,
   type VehicleTest,
   type VehicleInsurance,
@@ -102,6 +103,9 @@ export function VehicleCard({
   documentMinExpiry,
 }: VehicleCardProps) {
   const router = useRouter()
+
+  // ── Vehicle lock state (returned/sold/decommissioned) ──
+  const isLocked = isVehicleLocked(vehicle.vehicleStatus)
 
   // ── Active tab (controlled) ──
   const [activeTab, setActiveTab] = useState('details')
@@ -322,6 +326,7 @@ export function VehicleCard({
                   insuranceMinExpiry={insuranceMinExpiry}
                   documentMinExpiry={documentMinExpiry}
                   yellowDays={yellowDays}
+                  isInactive={isLocked}
                 />
               </div>
             </div>
@@ -386,6 +391,7 @@ export function VehicleCard({
               tests={tests}
               insurance={insurance}
               docYellowDays={docYellowDays}
+              isLocked={isLocked}
               onEditingChange={onContractEditingChange}
             />
           </div>
@@ -403,6 +409,7 @@ export function VehicleCard({
               vehicle={vehicle}
               driverJournal={driverJournal}
               projectJournal={projectJournal}
+              isLocked={isLocked}
               onEditingChange={onAssignmentEditingChange}
             />
           </div>
@@ -417,6 +424,7 @@ export function VehicleCard({
           >
             <VehiclePermitsSection
               vehicle={vehicle}
+              isLocked={isLocked}
               onEditingChange={onPermitsEditingChange}
             />
           </div>
@@ -433,6 +441,7 @@ export function VehicleCard({
               vehicleId={vehicle.id}
               documents={documents}
               docYellowDays={docYellowDays}
+              isLocked={isLocked}
               onEditingChange={onDocumentsEditingChange}
             />
           </div>

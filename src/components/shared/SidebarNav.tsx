@@ -19,6 +19,7 @@ import {
   FolderKanban,
   ScrollText,
   Truck,
+  FileSpreadsheet,
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -42,8 +43,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/templates",   label: "תבניות הרשאות",    icon: Shield,          moduleKey: "templates" },
   { href: "/admin/projects",    label: "ניהול פרויקטים",   icon: FolderKanban,    moduleKey: "projects" },
   { href: "/admin/audit-log",        label: "יומן פעולות",   icon: ScrollText, moduleKey: "audit_log" },
-  { href: "/admin/vehicle-suppliers", label: "ספקי רכב",    icon: Truck,      moduleKey: "vehicle_suppliers" },
-  { href: "/admin/settings",         label: "הגדרות מערכת", icon: Settings,   moduleKey: "settings" },
+  { href: "/admin/vehicle-suppliers", label: "ספקי רכב",    icon: Truck,           moduleKey: "vehicle_suppliers" },
+  { href: "/admin/data-updates",     label: "עדכון נתונים שוטף", icon: FileSpreadsheet, moduleKey: "data_updates" },
+  { href: "/admin/settings",         label: "הגדרות מערכת", icon: Settings,        moduleKey: "settings" },
 ];
 
 export function SidebarNav() {

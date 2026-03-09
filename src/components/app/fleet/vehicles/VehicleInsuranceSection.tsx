@@ -38,6 +38,7 @@ type Props = {
   vehicleId: string
   insurance: VehicleInsurance[]
   docYellowDays: number
+  isLocked?: boolean
   onEditingChange?: (isDirty: boolean) => void
 }
 
@@ -45,7 +46,7 @@ type Props = {
 // Main Component
 // ─────────────────────────────────────────────────────────────
 
-export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance, docYellowDays, onEditingChange }: Props) {
+export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance, docYellowDays, isLocked = false, onEditingChange }: Props) {
   const [policies, setPolicies] = useState<VehicleInsurance[]>(initialInsurance)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -429,8 +430,8 @@ export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance
             return (
               <div
                 key={policy.id}
-                className="flex items-start justify-between gap-3 p-3 border rounded-lg hover:bg-muted/20 transition-colors cursor-pointer group"
-                onClick={() => startEdit(policy)}
+                className={`flex items-start justify-between gap-3 p-3 border rounded-lg transition-colors group ${isLocked ? '' : 'hover:bg-muted/20 cursor-pointer'}`}
+                onClick={isLocked ? undefined : () => startEdit(policy)}
               >
                 <div className="flex items-start gap-3 flex-1 min-w-0">
                   <Shield className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
@@ -456,18 +457,22 @@ export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance
                       פתח קובץ
                     </a>
                   )}
-                  <Pencil className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
-                  <button
-                    onClick={(e) => { e.stopPropagation(); void handleDelete(policy.id) }}
-                    disabled={deletingId === policy.id}
-                    className="text-muted-foreground hover:text-destructive transition-colors"
-                    title="מחק"
-                  >
-                    {deletingId === policy.id
-                      ? <Loader2 className="h-4 w-4 animate-spin" />
-                      : <Trash2 className="h-4 w-4" />
-                    }
-                  </button>
+                  {!isLocked && (
+                    <>
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); void handleDelete(policy.id) }}
+                        disabled={deletingId === policy.id}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        title="מחק"
+                      >
+                        {deletingId === policy.id
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <Trash2 className="h-4 w-4" />
+                        }
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )
@@ -478,8 +483,8 @@ export function VehicleInsuranceSection({ vehicleId, insurance: initialInsurance
       {/* Add form */}
       {showAddForm && renderForm('add')}
 
-      {/* Add button */}
-      {!showAddForm && !editingId && (
+      {/* Add button — hidden when vehicle is locked */}
+      {!showAddForm && !editingId && !isLocked && (
         <Button
           variant="outline"
           size="sm"

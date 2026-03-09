@@ -57,6 +57,7 @@ type VehicleContractSectionProps = {
   tests: VehicleTest[]
   insurance: VehicleInsurance[]
   docYellowDays: number
+  isLocked?: boolean
   onEditingChange: (dirty: boolean) => void
 }
 
@@ -90,6 +91,7 @@ export function VehicleContractSection({
   tests,
   insurance,
   docYellowDays,
+  isLocked = false,
   onEditingChange,
 }: VehicleContractSectionProps) {
   const router = useRouter()
@@ -370,6 +372,7 @@ export function VehicleContractSection({
                 value={fleetEntryDate}
                 onChange={setFleetEntryDate}
                 minYear={2000}
+                disabled={isLocked}
               />
             </div>
             <div>
@@ -382,6 +385,7 @@ export function VehicleContractSection({
                 style={{ maxWidth: '180px' }}
                 placeholder="0"
                 min="0"
+                disabled={isLocked}
               />
             </div>
           </div>
@@ -401,6 +405,7 @@ export function VehicleContractSection({
               <Switch
                 checked={showExitFields}
                 onCheckedChange={handleExitToggle}
+                disabled={isLocked}
                 className="data-[state=checked]:bg-[#4ECDC4]"
               />
               <span
@@ -420,6 +425,7 @@ export function VehicleContractSection({
                   value={fleetExitDate}
                   onChange={setFleetExitDate}
                   minYear={2000}
+                  disabled={isLocked}
                 />
               </div>
               <div>
@@ -432,6 +438,7 @@ export function VehicleContractSection({
                   style={{ maxWidth: '180px' }}
                   placeholder="0"
                   min="0"
+                  disabled={isLocked}
                 />
               </div>
             </div>
@@ -452,7 +459,8 @@ export function VehicleContractSection({
                   key={opt.value}
                   type="button"
                   onClick={() => setOwnershipType(active ? '' : opt.value)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all"
+                  disabled={isLocked}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     background: active ? 'linear-gradient(135deg, #4ECDC4, #3ABFB6)' : '#F8FAFB',
                     borderColor: active ? '#3ABFB6' : '#C8D5E2',
@@ -473,6 +481,7 @@ export function VehicleContractSection({
               value={ownershipSupplierId}
               onChange={(e) => setOwnershipSupplierId(e.target.value)}
               className={selectClass}
+              disabled={isLocked}
             >
               <option value="">— ללא —</option>
               {suppliers.map((s) => (
@@ -503,6 +512,7 @@ export function VehicleContractSection({
                 onChange={(e) => setContractNumber(e.target.value)}
                 className={inputClass}
                 placeholder="מס' חוזה"
+                disabled={isLocked}
               />
             </div>
 
@@ -552,7 +562,7 @@ export function VehicleContractSection({
         <div className="flex justify-start pt-2">
           <button
             onClick={handleSave}
-            disabled={isPending || !contractFieldsDirty}
+            disabled={isPending || !contractFieldsDirty || isLocked}
             className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-base font-semibold transition-all"
             style={
               contractFieldsDirty
@@ -594,7 +604,7 @@ export function VehicleContractSection({
             <Banknote className="h-4 w-4" />
             עלות חודשית — יומן שינויים
           </p>
-          <VehicleOwnershipJournal vehicleId={vehicle.id} costs={costs} />
+          <VehicleOwnershipJournal vehicleId={vehicle.id} costs={costs} isLocked={isLocked} />
         </div>
 
         {/* ── קבוצת דירוג ────────────────────────────────────── */}
@@ -607,6 +617,7 @@ export function VehicleContractSection({
             value={vehicleGroup ?? ''}
             onChange={(e) => setVehicleGroup(e.target.value ? Number(e.target.value) : null)}
             className={selectClass}
+            disabled={isLocked}
           >
             <option value="">בחר קבוצה</option>
             {VEHICLE_GROUP_OPTIONS.map((g) => (
@@ -630,6 +641,7 @@ export function VehicleContractSection({
             vehicleId={vehicle.id}
             tests={tests}
             docYellowDays={docYellowDays}
+            isLocked={isLocked}
             onEditingChange={handleTestsEditingChange}
           />
         </div>
@@ -647,6 +659,7 @@ export function VehicleContractSection({
             vehicleId={vehicle.id}
             insurance={insurance}
             docYellowDays={docYellowDays}
+            isLocked={isLocked}
             onEditingChange={handleInsuranceEditingChange}
           />
         </div>

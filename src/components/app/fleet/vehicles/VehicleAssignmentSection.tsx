@@ -66,14 +66,25 @@ type Props = {
   vehicle: VehicleFull
   driverJournal: VehicleDriverJournal[]
   projectJournal: VehicleProjectJournal[]
+  isLocked?: boolean
   onEditingChange?: (isEditing: boolean) => void
 }
 
 // ─────────────────────────────────────────────────────────────
-// Helper — "נוכחי" badge
+// Helper — "נוכחי" / "אחרון" badge
 // ─────────────────────────────────────────────────────────────
 
-function CurrentBadge() {
+function CurrentBadge({ isLast }: { isLast?: boolean }) {
+  if (isLast) {
+    return (
+      <span
+        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
+        style={{ background: '#F3F4F6', color: '#6B7280', border: '1px solid #D1D5DB' }}
+      >
+        אחרון
+      </span>
+    )
+  }
   return (
     <span
       className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
@@ -104,6 +115,7 @@ export function VehicleAssignmentSection({
   vehicle,
   driverJournal,
   projectJournal,
+  isLocked = false,
   onEditingChange,
 }: Props) {
   const router = useRouter()
@@ -315,7 +327,7 @@ export function VehicleAssignmentSection({
                 <button
                   key={cat}
                   type="button"
-                  disabled={isSavingCategory}
+                  disabled={isSavingCategory || isLocked}
                   onClick={() => handleCategoryChange(cat)}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all"
                   style={{
@@ -369,6 +381,7 @@ export function VehicleAssignmentSection({
                     value={value}
                     checked={campType === value}
                     onChange={() => setCampType(value)}
+                    disabled={isLocked}
                     className="h-4 w-4 accent-primary"
                   />
                   <span className="text-sm text-foreground">{label}</span>
@@ -402,6 +415,7 @@ export function VehicleAssignmentSection({
                     value={campName}
                     onChange={(e) => setCampName(e.target.value)}
                     placeholder="שם מלא..."
+                    disabled={isLocked}
                     className={inputClass}
                     style={{ borderColor: '#C8D5E2' }}
                   />
@@ -417,6 +431,7 @@ export function VehicleAssignmentSection({
                     value={campPhone}
                     onChange={(e) => setCampPhone(e.target.value)}
                     placeholder="05x-xxxxxxx"
+                    disabled={isLocked}
                     className={inputClass}
                     style={{ borderColor: '#C8D5E2' }}
                     dir="ltr"
@@ -433,7 +448,7 @@ export function VehicleAssignmentSection({
             {/* Save button */}
             <Button
               onClick={handleSaveCamp}
-              disabled={!campDirty || isSavingCamp}
+              disabled={!campDirty || isSavingCamp || isLocked}
               className="gap-2"
               style={{
                 background: campDirty
@@ -452,51 +467,69 @@ export function VehicleAssignmentSection({
         <div>
           <h3 className={sectionHeader}>
             <Users className="h-4 w-4" />
-            יומן נהגים
+            {isLocked ? 'יומן נהגים (כרטיס נעול)' : 'יומן נהגים'}
           </h3>
 
-          {/* Current driver card */}
+          {/* Current driver card — prominent display */}
           {activeDriverEntry ? (
             <div
-              className="flex items-center justify-between gap-3 p-3 rounded-xl border mb-3"
-              style={{ background: '#F0F5FB', borderColor: '#C8D5E2' }}
+              className="rounded-xl border mb-3 overflow-hidden"
+              style={{ borderColor: '#C8D5E2' }}
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                  style={{ background: 'linear-gradient(135deg, #152D3C, #1E3D50)' }}
-                >
-                  <Users className="h-4 w-4 text-white" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate">
-                    {activeDriverEntry.driverName ?? 'נהג לא ידוע'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    משויך מ-{formatDate(activeDriverEntry.startDate)}
-                  </p>
+              <div
+                className="px-4 py-4"
+                style={{ background: 'linear-gradient(135deg, #152D3C, #1E3D50)' }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-white/15">
+                      <Users className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xl font-bold text-white truncate">
+                        {activeDriverEntry.driverName ?? 'נהג לא ידוע'}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1 text-white/70 text-sm">
+                        {activeDriverEntry.driverCompanyName && (
+                          <span>{activeDriverEntry.driverCompanyName}</span>
+                        )}
+                        {activeDriverEntry.driverEmployeeNumber && (
+                          <span>עובד #{activeDriverEntry.driverEmployeeNumber}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <CurrentBadge isLast={isLocked} />
                 </div>
               </div>
-              <CurrentBadge />
+              <div className="px-4 py-2.5" style={{ background: '#F0F5FB' }}>
+                <p className="text-xs text-muted-foreground">
+                  {isLocked ? 'שויך מ-' : 'משויך מ-'}{formatDate(activeDriverEntry.startDate)}
+                </p>
+              </div>
             </div>
           ) : (
             <div
               className="p-3 rounded-xl border mb-3 text-center"
               style={{ borderColor: '#E2EBF4', borderStyle: 'dashed' }}
             >
-              <p className="text-sm text-muted-foreground">אין נהג משויך כרגע</p>
+              <p className="text-sm text-muted-foreground">
+                {isLocked ? 'לא היה נהג משויך' : 'אין נהג משויך כרגע'}
+              </p>
             </div>
           )}
 
-          {/* Open/close inline form */}
-          <button
-            type="button"
-            onClick={() => showDriverForm ? setShowDriverForm(false) : openDriverForm()}
-            className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors mb-3"
-          >
-            {showDriverForm ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            שינוי נהג
-          </button>
+          {/* Open/close inline form — hidden when locked */}
+          {!isLocked && (
+            <button
+              type="button"
+              onClick={() => showDriverForm ? setShowDriverForm(false) : openDriverForm()}
+              className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors mb-3"
+            >
+              {showDriverForm ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              שינוי נהג
+            </button>
+          )}
 
           {/* Inline driver form */}
           {showDriverForm && (
@@ -607,7 +640,7 @@ export function VehicleAssignmentSection({
                         {entry.endDate ? (
                           <span className="text-muted-foreground">{formatDate(entry.endDate)}</span>
                         ) : (
-                          <CurrentBadge />
+                          <CurrentBadge isLast={isLocked} />
                         )}
                       </td>
                     </tr>
@@ -636,51 +669,67 @@ export function VehicleAssignmentSection({
         <div>
           <h3 className={sectionHeader}>
             <FolderKanban className="h-4 w-4" />
-            יומן פרויקטים
+            {isLocked ? 'יומן פרויקטים' : 'יומן פרויקטים'}
           </h3>
 
-          {/* Current project card */}
+          {/* Current project card — prominent display */}
           {activeProjectEntry ? (
             <div
-              className="flex items-center justify-between gap-3 p-3 rounded-xl border mb-3"
-              style={{ background: '#F0F5FB', borderColor: '#C8D5E2' }}
+              className="rounded-xl border mb-3 overflow-hidden"
+              style={{ borderColor: '#C8D5E2' }}
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                  style={{ background: 'linear-gradient(135deg, #152D3C, #1E3D50)' }}
-                >
-                  <FolderKanban className="h-4 w-4 text-white" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate">
-                    {activeProjectEntry.projectName}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    פרויקט {activeProjectEntry.projectNumber} · משויך מ-{formatDate(activeProjectEntry.startDate)}
-                  </p>
+              <div
+                className="px-4 py-4"
+                style={{ background: 'linear-gradient(135deg, #152D3C, #1E3D50)' }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-white/15">
+                      <FolderKanban className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xl font-bold text-white truncate">
+                        {activeProjectEntry.projectName}
+                      </p>
+                      <p className="text-sm text-white/70 mt-1">
+                        פרויקט {activeProjectEntry.projectNumber}
+                      </p>
+                    </div>
+                  </div>
+                  <CurrentBadge isLast={isLocked} />
                 </div>
               </div>
-              <CurrentBadge />
+              <div className="px-4 py-2.5" style={{ background: '#F0F5FB' }}>
+                <p className="text-xs text-muted-foreground">
+                  {activeProjectEntry.projectManagerName && (
+                    <span>מנהל: {activeProjectEntry.projectManagerName} · </span>
+                  )}
+                  {isLocked ? 'שויך מ-' : 'משויך מ-'}{formatDate(activeProjectEntry.startDate)}
+                </p>
+              </div>
             </div>
           ) : (
             <div
               className="p-3 rounded-xl border mb-3 text-center"
               style={{ borderColor: '#E2EBF4', borderStyle: 'dashed' }}
             >
-              <p className="text-sm text-muted-foreground">אין פרויקט משויך כרגע</p>
+              <p className="text-sm text-muted-foreground">
+                {isLocked ? 'לא היה פרויקט משויך' : 'אין פרויקט משויך כרגע'}
+              </p>
             </div>
           )}
 
-          {/* Open/close inline form */}
-          <button
-            type="button"
-            onClick={() => showProjectForm ? setShowProjectForm(false) : openProjectForm()}
-            className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors mb-3"
-          >
-            {showProjectForm ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            שייך פרויקט
-          </button>
+          {/* Open/close inline form — hidden when locked */}
+          {!isLocked && (
+            <button
+              type="button"
+              onClick={() => showProjectForm ? setShowProjectForm(false) : openProjectForm()}
+              className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors mb-3"
+            >
+              {showProjectForm ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              שייך פרויקט
+            </button>
+          )}
 
           {/* Inline project form */}
           {showProjectForm && (
@@ -791,7 +840,7 @@ export function VehicleAssignmentSection({
                         {entry.endDate ? (
                           <span className="text-muted-foreground">{formatDate(entry.endDate)}</span>
                         ) : (
-                          <CurrentBadge />
+                          <CurrentBadge isLast={isLocked} />
                         )}
                       </td>
                     </tr>

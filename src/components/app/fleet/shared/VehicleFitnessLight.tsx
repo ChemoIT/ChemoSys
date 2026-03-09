@@ -70,16 +70,20 @@ export function computeVehicleFitnessStatus(
   return 'green'
 }
 
-const STATUS_TOOLTIP: Record<VehicleFitnessStatus, string> = {
+export type VehicleFitnessStatusExtended = VehicleFitnessStatus | 'gray'
+
+const STATUS_TOOLTIP: Record<VehicleFitnessStatusExtended, string> = {
   red: 'תוקף פג',
   yellow: 'תוקף מתקרב',
   green: 'רכב תקין',
+  gray: 'רכב מחוץ לצי',
 }
 
-const DOT_CLASS: Record<VehicleFitnessStatus, string> = {
+const DOT_CLASS: Record<VehicleFitnessStatusExtended, string> = {
   red: 'bg-red-500 shadow-red-500/50',
   yellow: 'bg-yellow-400 shadow-yellow-400/50',
   green: 'bg-green-500 shadow-green-500/50',
+  gray: 'bg-gray-400 shadow-gray-400/50',
 }
 
 type VehicleFitnessLightProps = {
@@ -87,6 +91,7 @@ type VehicleFitnessLightProps = {
   insuranceMinExpiry: string | null
   documentMinExpiry: string | null
   yellowDays: number
+  isInactive?: boolean
   className?: string
 }
 
@@ -95,14 +100,17 @@ export function VehicleFitnessLight({
   insuranceMinExpiry,
   documentMinExpiry,
   yellowDays,
+  isInactive = false,
   className,
 }: VehicleFitnessLightProps) {
-  const status = computeVehicleFitnessStatus(
-    testExpiryDate,
-    insuranceMinExpiry,
-    documentMinExpiry,
-    yellowDays
-  )
+  const status: VehicleFitnessStatusExtended = isInactive
+    ? 'gray'
+    : computeVehicleFitnessStatus(
+        testExpiryDate,
+        insuranceMinExpiry,
+        documentMinExpiry,
+        yellowDays
+      )
 
   return (
     <span

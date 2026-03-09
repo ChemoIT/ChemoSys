@@ -41,6 +41,7 @@ const TOLL_ROADS = [
 
 type Props = {
   vehicle: VehicleFull
+  isLocked?: boolean
   onEditingChange: (dirty: boolean) => void
 }
 
@@ -48,7 +49,7 @@ type Props = {
 // Main Component
 // ─────────────────────────────────────────────────────────────
 
-export function VehiclePermitsSection({ vehicle, onEditingChange }: Props) {
+export function VehiclePermitsSection({ vehicle, isLocked = false, onEditingChange }: Props) {
   // ── Right column state ──
   const [tollRoads, setTollRoads] = useState<string[]>(vehicle.tollRoadPermits ?? [])
   const [weekendPermit, setWeekendPermit] = useState(vehicle.weekendHolidayPermit ?? false)
@@ -143,7 +144,7 @@ export function VehiclePermitsSection({ vehicle, onEditingChange }: Props) {
                     type="checkbox"
                     checked={tollRoads.includes(value)}
                     onChange={() => toggleTollRoad(value)}
-                    disabled={isSaving}
+                    disabled={isSaving || isLocked}
                     className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30 accent-[#4ECDC4]"
                   />
                   <span className="text-sm text-foreground">{label}</span>
@@ -159,7 +160,7 @@ export function VehiclePermitsSection({ vehicle, onEditingChange }: Props) {
                 <Switch
                   checked={weekendPermit}
                   onCheckedChange={setWeekendPermit}
-                  disabled={isSaving}
+                  disabled={isSaving || isLocked}
                 />
               </div>
               <h3 className={labelClass}>אישור נסיעה בסופ&quot;ש ובחגים</h3>
@@ -174,7 +175,7 @@ export function VehiclePermitsSection({ vehicle, onEditingChange }: Props) {
               inputMode="numeric"
               value={pascalNumber}
               onChange={(e) => setPascalNumber(digitsOnly(e.target.value))}
-              disabled={isSaving}
+              disabled={isSaving || isLocked}
               className={inputClass}
               style={{ borderColor: '#C8D5E2' }}
               placeholder="הזן מספר פסקל..."
@@ -205,7 +206,7 @@ export function VehiclePermitsSection({ vehicle, onEditingChange }: Props) {
               inputMode="numeric"
               value={serviceIntervalKm}
               onChange={(e) => setServiceIntervalKm(digitsOnly(e.target.value))}
-              disabled={isSaving}
+              disabled={isSaving || isLocked}
               className={inputClass}
               style={{ borderColor: '#C8D5E2' }}
               placeholder="לדוגמה: 10000"
@@ -232,7 +233,7 @@ export function VehiclePermitsSection({ vehicle, onEditingChange }: Props) {
               inputMode="numeric"
               value={annualKmLimit}
               onChange={(e) => setAnnualKmLimit(digitsOnly(e.target.value))}
-              disabled={isSaving}
+              disabled={isSaving || isLocked}
               className={inputClass}
               style={{ borderColor: '#C8D5E2' }}
               placeholder="לדוגמה: 30000"
@@ -259,7 +260,7 @@ export function VehiclePermitsSection({ vehicle, onEditingChange }: Props) {
               inputMode="numeric"
               value={monthlyFuelLimit}
               onChange={(e) => setMonthlyFuelLimit(digitsOnly(e.target.value))}
-              disabled={isSaving}
+              disabled={isSaving || isLocked}
               className={inputClass}
               style={{ borderColor: '#C8D5E2' }}
               placeholder="לדוגמה: 200"
@@ -272,7 +273,7 @@ export function VehiclePermitsSection({ vehicle, onEditingChange }: Props) {
       <div className="flex justify-start">
         <Button
           onClick={handleSave}
-          disabled={isSaving || !isDirty}
+          disabled={isSaving || !isDirty || isLocked}
           className="gap-2"
           style={
             isDirty

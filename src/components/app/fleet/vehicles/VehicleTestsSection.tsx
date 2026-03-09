@@ -37,6 +37,7 @@ type Props = {
   vehicleId: string
   tests: VehicleTest[]
   docYellowDays: number
+  isLocked?: boolean
   onEditingChange?: (isDirty: boolean) => void
 }
 
@@ -44,7 +45,7 @@ type Props = {
 // Main Component
 // ─────────────────────────────────────────────────────────────
 
-export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowDays, onEditingChange }: Props) {
+export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowDays, isLocked = false, onEditingChange }: Props) {
   const [tests, setTests] = useState<VehicleTest[]>(initialTests)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -426,8 +427,8 @@ export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowD
             return (
               <div
                 key={test.id}
-                className="flex items-start justify-between gap-3 p-3 border rounded-lg hover:bg-muted/20 transition-colors cursor-pointer group"
-                onClick={() => startEdit(test)}
+                className={`flex items-start justify-between gap-3 p-3 border rounded-lg transition-colors group ${isLocked ? '' : 'hover:bg-muted/20 cursor-pointer'}`}
+                onClick={isLocked ? undefined : () => startEdit(test)}
               >
                 <div className="flex items-start gap-3 flex-1 min-w-0">
                   <ClipboardCheck className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
@@ -453,18 +454,22 @@ export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowD
                       פתח קובץ
                     </a>
                   )}
-                  <Pencil className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
-                  <button
-                    onClick={(e) => { e.stopPropagation(); void handleDelete(test.id) }}
-                    disabled={deletingId === test.id}
-                    className="text-muted-foreground hover:text-destructive transition-colors"
-                    title="מחק"
-                  >
-                    {deletingId === test.id
-                      ? <Loader2 className="h-4 w-4 animate-spin" />
-                      : <Trash2 className="h-4 w-4" />
-                    }
-                  </button>
+                  {!isLocked && (
+                    <>
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); void handleDelete(test.id) }}
+                        disabled={deletingId === test.id}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        title="מחק"
+                      >
+                        {deletingId === test.id
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <Trash2 className="h-4 w-4" />
+                        }
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )
@@ -475,8 +480,8 @@ export function VehicleTestsSection({ vehicleId, tests: initialTests, docYellowD
       {/* Add form */}
       {showAddForm && renderForm('add')}
 
-      {/* Add button */}
-      {!showAddForm && !editingId && (
+      {/* Add button — hidden when vehicle is locked */}
+      {!showAddForm && !editingId && !isLocked && (
         <Button
           variant="outline"
           size="sm"

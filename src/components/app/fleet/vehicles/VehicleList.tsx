@@ -20,7 +20,7 @@ import {
 } from '@/components/app/fleet/shared/VehicleFitnessLight'
 import { AddVehicleDialog } from '@/components/app/fleet/vehicles/AddVehicleDialog'
 import { formatLicensePlate } from '@/lib/format'
-import { VEHICLE_TYPE_LABELS, VEHICLE_STATUS_LABELS } from '@/lib/fleet/vehicle-types'
+import { VEHICLE_TYPE_LABELS, VEHICLE_STATUS_LABELS, isVehicleLocked } from '@/lib/fleet/vehicle-types'
 import type { VehicleListItem } from '@/lib/fleet/vehicle-types'
 
 type Props = {
@@ -105,7 +105,17 @@ export function VehicleList({ vehicles, yellowDays }: Props) {
   }, [vehicles])
 
   // -- Apply filters --
+  // When search is active — bypass ALL other filters and search across the entire fleet.
   const filtered = vehicles.filter((v) => {
+    if (search) {
+      const q = search.toLowerCase()
+      return (
+        v.licensePlate.toLowerCase().includes(q) ||
+        (v.assignedDriverName?.toLowerCase().includes(q) ?? false) ||
+        (v.assignedDriverEmployeeNumber?.toLowerCase().includes(q) ?? false)
+      )
+    }
+
     // Status filter
     if (statusFilter === 'active_suspended') {
       if (v.vehicleStatus !== 'active' && v.vehicleStatus !== 'suspended') return false
@@ -134,19 +144,6 @@ export function VehicleList({ vehicles, yellowDays }: Props) {
       if (v.activeProjectName) return false
     } else if (projectFilter !== 'all') {
       if (v.activeProjectName !== projectFilter) return false
-    }
-
-    // Search filter
-    if (search) {
-      const q = search.toLowerCase()
-      return (
-        v.licensePlate.toLowerCase().includes(q) ||
-        (v.tozeret?.toLowerCase().includes(q) ?? false) ||
-        (v.degem?.toLowerCase().includes(q) ?? false) ||
-        (v.companyName?.toLowerCase().includes(q) ?? false) ||
-        (v.assignedDriverName?.toLowerCase().includes(q) ?? false) ||
-        (v.activeProjectName?.toLowerCase().includes(q) ?? false)
-      )
     }
 
     return true
@@ -210,8 +207,8 @@ export function VehicleList({ vehicles, yellowDays }: Props) {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="חיפוש חופשי..."
-            className="border border-border rounded-full pr-9 pl-3 py-2 text-base sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 w-full sm:w-48 shadow-sm"
+            placeholder="מספר רישוי / שם נהג / מספר עובד..."
+            className="border border-border rounded-full pr-9 pl-3 py-2 text-base sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 w-full sm:w-64 shadow-sm"
             style={{ transition: 'box-shadow 150ms, border-color 150ms' }}
           />
         </div>
@@ -320,6 +317,7 @@ export function VehicleList({ vehicles, yellowDays }: Props) {
                       insuranceMinExpiry={vehicle.insuranceMinExpiry}
                       documentMinExpiry={vehicle.documentMinExpiry}
                       yellowDays={yellowDays}
+                      isInactive={isVehicleLocked(vehicle.vehicleStatus)}
                     />
                   </td>
 

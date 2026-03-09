@@ -77,6 +77,32 @@ export function formatLicensePlate(plate: string | null | undefined): string {
   return plate
 }
 
+/** Format time string (HH:MM:SS → HH:MM). Returns '—' for null/empty. */
+export function formatTime(timeStr: string | null | undefined): string {
+  if (!timeStr) return '—'
+  return timeStr.slice(0, 5)
+}
+
+/** Format currency in ILS (₪). Uses he-IL locale. Returns '—' for null. */
+export function formatCurrency(amount: number | null | undefined): string {
+  if (amount == null) return '—'
+  return new Intl.NumberFormat('he-IL', {
+    style: 'currency',
+    currency: 'ILS',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+
+/** Format number with he-IL locale grouping. Returns '—' for null. */
+export function formatNumber(n: number | null | undefined, decimals = 0): string {
+  if (n == null) return '—'
+  return new Intl.NumberFormat('he-IL', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(n)
+}
+
 /** Days from today until a given date string. Negative = past. */
 export function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null

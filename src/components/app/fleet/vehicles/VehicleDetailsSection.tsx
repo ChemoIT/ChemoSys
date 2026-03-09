@@ -26,6 +26,8 @@ import {
   VEHICLE_STATUS_LABELS,
   VEHICLE_TYPE_LABELS,
   REPLACEMENT_REASON_LABELS,
+  LOCKED_STATUSES,
+  type LockedStatus,
   type VehicleFull,
   type VehicleReplacementRecord,
 } from '@/lib/fleet/vehicle-types'
@@ -92,10 +94,6 @@ type Props = {
   vehicle: VehicleFull
   onEditingChange?: (isDirty: boolean) => void
 }
-
-// Statuses that lock the card (all fields disabled except vehicle_status)
-const LOCKED_STATUSES = ['returned', 'sold', 'decommissioned'] as const
-type LockedStatus = typeof LOCKED_STATUSES[number]
 
 // ─────────────────────────────────────────────────────────────
 // Main Component
@@ -271,8 +269,8 @@ export function VehicleDetailsSection({ vehicle, onEditingChange }: Props) {
           >
             <button
               onClick={handleMotSync}
-              disabled={isSyncing}
-              className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors font-medium"
+              disabled={isSyncing || isLocked}
+              className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSyncing
                 ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -395,14 +393,16 @@ export function VehicleDetailsSection({ vehicle, onEditingChange }: Props) {
         >
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-muted-foreground font-semibold">רכבים חלופיים</p>
-            <button
-              type="button"
-              onClick={openAdd}
-              className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors font-medium"
-            >
-              <Plus className="h-4 w-4" />
-              הוסף
-            </button>
+            {!isLocked && (
+              <button
+                type="button"
+                onClick={openAdd}
+                className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors font-medium"
+              >
+                <Plus className="h-4 w-4" />
+                הוסף
+              </button>
+            )}
           </div>
 
           {isLoadingRecords ? (

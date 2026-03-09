@@ -33,6 +33,7 @@ import type { VehicleMonthlyCost } from '@/lib/fleet/vehicle-types'
 type VehicleOwnershipJournalProps = {
   vehicleId: string
   costs: VehicleMonthlyCost[]
+  isLocked?: boolean
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -42,6 +43,7 @@ type VehicleOwnershipJournalProps = {
 export function VehicleOwnershipJournal({
   vehicleId,
   costs: initialCosts,
+  isLocked = false,
 }: VehicleOwnershipJournalProps) {
   const [costs, setCosts] = useState<VehicleMonthlyCost[]>(initialCosts)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -307,13 +309,15 @@ export function VehicleOwnershipJournal({
                     {cost.endDate ? ` ← ${formatDate(cost.endDate)}` : ''}
                   </span>
                 </div>
-                <button
-                  onClick={() => openEditForm(cost)}
-                  className="text-muted-foreground/40 hover:text-primary transition-colors shrink-0"
-                  title="ערוך"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
+                {!isLocked && (
+                  <button
+                    onClick={() => openEditForm(cost)}
+                    className="text-muted-foreground/40 hover:text-primary transition-colors shrink-0"
+                    title="ערוך"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
             )
           })}
@@ -323,8 +327,8 @@ export function VehicleOwnershipJournal({
       {/* Add form */}
       {showAddForm && renderForm('add')}
 
-      {/* Add button */}
-      {!showAddForm && !editingId && (
+      {/* Add button — hidden when vehicle is locked */}
+      {!showAddForm && !editingId && !isLocked && (
         <Button
           variant="outline"
           size="sm"
