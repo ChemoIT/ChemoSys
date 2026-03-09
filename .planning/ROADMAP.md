@@ -267,11 +267,11 @@ Plans:
 2. מסמך `performance-standard.md` קיים ב-`.planning/` עם דוגמאות קוד מלאות מהדף דלק (הפרנס)
 3. Skeleton boilerplate component קיים בקוד — ניתן להשתמש בו להוספת Skeleton חדש בתוך דקות
 
-**Plans:** TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 20-01: IRON RULE update in CLAUDE.md + performance-standard.md document
-- [ ] 20-02: Skeleton boilerplate generator component + usage documentation
+- [ ] 20-01-PLAN.md — IRON RULE "ביצועים" in CLAUDE.md + performance-standard.md reference document
+- [ ] 20-02-PLAN.md — PageSkeleton configurable boilerplate + LoadingIndicator shared component
 
 ---
 
