@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 ## Current Position
 
 Phase: 23 of 23 (DB Optimization)
-Plan: 0 of 3 in current phase
-Status: Ready to plan
-Last activity: 2026-03-09 — Phase 22 complete (4/4 plans — all Admin pages with Suspense + Skeleton + loading indicators)
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-03-09 — Plan 23-01 complete (Dashboard RPC + composite indexes)
 
-Progress: v2.1 [██████████████████░░░░░░░] 75% (Phases 20-22 complete, 23 remaining)
+Progress: v2.1 [████████████████████░░░░░] 80% (Phases 20-22 complete, 23 in progress — 1/3 plans done)
 
 ## Strategic Decision (Session #18)
 
@@ -71,6 +71,10 @@ Progress: v2.1 [██████████████████░░░�
 - **[22-02]** verifySession() must run OUTSIDE Suspense boundary — auth redirect must fire immediately
 - **[22-01]** DashboardSkeleton custom (not PageSkeleton) — two-section layout (stat grid + activity feed) requires dedicated component
 - **[22-01]** verifySession() always outside Suspense boundary — auth redirect must not be deferred
+- **[23-01]** get_dashboard_stats() RPC = no-arg RETURNS TABLE pattern for aggregated dashboard stats — reference for future stat dashboards
+- **[23-01]** getDashboardStats() server action = verifySession + rpc() + array[0] + camelCase mapping + zero fallback — reference wrapper pattern
+- **[23-01]** SECURITY INVOKER for read-only stats RPC — no privilege escalation needed, RLS applies normally
+- **[23-01]** Activity feed entity resolution stays inline in page.tsx — complex 8-entity lookup chain, too risky to abstract
 
 ### Pending Todos
 
@@ -86,7 +90,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-09 (Phase 22 executed — all Admin pages with Suspense + Skeleton + loading indicators)
-Stopped at: Phase 22 complete — verified 7/7 must-haves passed
+Last session: 2026-03-09 (Phase 23 Plan 01 executed — Dashboard RPC + composite indexes)
+Stopped at: Completed 23-01-PLAN.md — migration 00037 ready to run, dashboard refactored to single RPC call
 
 Resume file: None
