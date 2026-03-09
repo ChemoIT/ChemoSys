@@ -40,7 +40,7 @@
 **Milestone Goal:** החלת תבנית ביצועים מלאה (Suspense + Skeleton + DB optimization + loading indicators) על כל דפי המערכת, והגדרת IRON RULE לפיתוח עתידי. דף הדלק משמש כרפרנס.
 
 - [x] **Phase 20: Performance Standards** — IRON RULE + מסמך סטנדרט + boilerplate generator — completed 2026-03-09
-- [ ] **Phase 21: App Pages Suspense + Loading** — Skeleton לרשימות/כרטיסי רכב ונהגים + loading indicators
+- [x] **Phase 21: App Pages Suspense + Loading** — Skeleton לרשימות/כרטיסי רכב ונהגים + loading indicators — completed 2026-03-09
 - [ ] **Phase 22: Admin Pages Suspense + Loading** — Skeleton ל-7 דפי אדמין + הסרת loading.tsx ישנים
 - [ ] **Phase 23: DB Optimization** — Dashboard RPC + indexes + React.cache() + save button states
 
@@ -292,10 +292,10 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 21-01-PLAN.md — VehicleList Suspense + VehicleListSkeleton (9-column table skeleton)
-- [ ] 21-02-PLAN.md — VehicleCard Suspense + VehicleCardSkeleton (header + 8 tabs outline)
-- [ ] 21-03-PLAN.md — DriverList Suspense + DriverListSkeleton (7-column table skeleton)
-- [ ] 21-04-PLAN.md — DriverCard Suspense + DriverCardSkeleton (header + 5 tabs outline)
+- [x] 21-01-PLAN.md — VehicleList Suspense + VehicleListSkeleton (9-column table skeleton)
+- [x] 21-02-PLAN.md — VehicleCard Suspense + VehicleCardSkeleton (header + 8 tabs outline)
+- [x] 21-03-PLAN.md — DriverList Suspense + DriverListSkeleton (7-column table skeleton)
+- [x] 21-04-PLAN.md — DriverCard Suspense + DriverCardSkeleton (header + 5 tabs outline)
 
 ---
 
@@ -371,7 +371,7 @@ Plans:
 | 18. Vehicle Card Redesign — Ownership | v2.0 | 0/3 | Not started | - |
 | 19. Vehicle Card Redesign — Assignment | v2.0 | 0/2 | Not started | - |
 | 20. Performance Standards | v2.1 | 2/2 | Complete | 2026-03-09 |
-| 21. App Pages Suspense + Loading | v2.1 | 0/4 | Not started | - |
+| 21. App Pages Suspense + Loading | v2.1 | 4/4 | Complete | 2026-03-09 |
 | 22. Admin Pages Suspense + Loading | v2.1 | 0/4 | Not started | - |
 | 23. DB Optimization | v2.1 | 0/3 | Not started | - |
 
