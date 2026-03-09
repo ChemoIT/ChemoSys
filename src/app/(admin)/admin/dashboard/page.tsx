@@ -1,6 +1,9 @@
 /**
  * Dashboard page — Server Component.
- * Fetches 6 entity counts + 20 recent audit log entries in parallel.
+ * Fetches stats via single RPC call + 20 recent audit log entries in parallel.
+ *
+ * Stats: getDashboardStats() calls get_dashboard_stats() RPC — 1 round-trip
+ * instead of 6 separate COUNT queries.
  *
  * Pitfall 2 (RESEARCH.md): audit_log.user_id references auth.users(id),
  * not public.users. User display names resolved via two-step approach:
@@ -9,13 +12,14 @@
  *   3. Build Map<user_id, displayName> → merge into entries
  *
  * IRON RULE (Performance): DashboardContent is wrapped in <Suspense> so the
- * user sees DashboardSkeleton immediately — no blank screen during 7-query fetch.
+ * user sees DashboardSkeleton immediately — no blank screen during fetch.
  * verifySession() runs OUTSIDE the Suspense boundary (auth guard is not deferred).
  */
 
 import { Suspense } from 'react'
 import { verifySession } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
+import { getDashboardStats } from '@/actions/admin/dashboard'
 import { StatsCards } from '@/components/admin/dashboard/StatsCards'
 import { ActivityFeed, type ActivityEntry } from '@/components/admin/dashboard/ActivityFeed'
 import { RefreshButton } from '@/components/shared/RefreshButton'
@@ -24,40 +28,12 @@ import { DashboardSkeleton } from '@/components/admin/dashboard/DashboardSkeleto
 async function DashboardContent() {
   const supabase = await createClient()
 
-  // Run 7 queries in parallel for fast page load
+  // Run 2 queries in parallel — stats RPC + audit log
   const [
-    employeeRes,
-    projectRes,
-    userRes,
-    companyRes,
-    deptRes,
-    roleTagRes,
+    stats,
     activityRes,
   ] = await Promise.all([
-    supabase
-      .from('employees')
-      .select('id', { count: 'exact', head: true })
-      .is('deleted_at', null),
-    supabase
-      .from('projects')
-      .select('id', { count: 'exact', head: true })
-      .is('deleted_at', null),
-    supabase
-      .from('users')
-      .select('id', { count: 'exact', head: true })
-      .is('deleted_at', null),
-    supabase
-      .from('companies')
-      .select('id', { count: 'exact', head: true })
-      .is('deleted_at', null),
-    supabase
-      .from('departments')
-      .select('id', { count: 'exact', head: true })
-      .is('deleted_at', null),
-    supabase
-      .from('role_tags')
-      .select('id', { count: 'exact', head: true })
-      .is('deleted_at', null),
+    getDashboardStats(),
     supabase
       .from('audit_log')
       .select('id, created_at, action, entity_type, entity_id, user_id')
@@ -65,23 +41,7 @@ async function DashboardContent() {
       .limit(20),
   ])
 
-  // Log any query errors (non-blocking — page renders with fallback zeros)
-  if (employeeRes.error) console.error('[Dashboard] employee count error:', employeeRes.error.message)
-  if (projectRes.error)  console.error('[Dashboard] project count error:', projectRes.error.message)
-  if (userRes.error)     console.error('[Dashboard] user count error:', userRes.error.message)
-  if (companyRes.error)  console.error('[Dashboard] company count error:', companyRes.error.message)
-  if (deptRes.error)     console.error('[Dashboard] department count error:', deptRes.error.message)
-  if (roleTagRes.error)  console.error('[Dashboard] role_tag count error:', roleTagRes.error.message)
   if (activityRes.error) console.error('[Dashboard] activity feed error:', activityRes.error.message)
-
-  const stats = {
-    employees:   employeeRes.count  ?? 0,
-    projects:    projectRes.count   ?? 0,
-    users:       userRes.count      ?? 0,
-    companies:   companyRes.count   ?? 0,
-    departments: deptRes.count      ?? 0,
-    roleTags:    roleTagRes.count   ?? 0,
-  }
 
   // ----------------------------------------------------------------
   // Resolve user display names for activity feed
