@@ -7,18 +7,21 @@
  *   1. Fetch audit log rows
  *   2. Collect distinct user_ids → query public.users.auth_user_id IN (...)
  *   3. Build Map<user_id, displayName> → merge into entries
+ *
+ * IRON RULE (Performance): DashboardContent is wrapped in <Suspense> so the
+ * user sees DashboardSkeleton immediately — no blank screen during 7-query fetch.
+ * verifySession() runs OUTSIDE the Suspense boundary (auth guard is not deferred).
  */
 
+import { Suspense } from 'react'
 import { verifySession } from '@/lib/dal'
 import { createClient } from '@/lib/supabase/server'
 import { StatsCards } from '@/components/admin/dashboard/StatsCards'
 import { ActivityFeed, type ActivityEntry } from '@/components/admin/dashboard/ActivityFeed'
 import { RefreshButton } from '@/components/shared/RefreshButton'
+import { DashboardSkeleton } from '@/components/admin/dashboard/DashboardSkeleton'
 
-export default async function DashboardPage() {
-  // Auth guard — redirects to /login if no valid session
-  await verifySession()
-
+async function DashboardContent() {
   const supabase = await createClient()
 
   // Run 7 queries in parallel for fast page load
@@ -204,5 +207,17 @@ export default async function DashboardPage() {
       {/* Recent audit log activity */}
       <ActivityFeed entries={entries} />
     </div>
+  )
+}
+
+export default async function DashboardPage() {
+  // Auth guard — runs immediately, OUTSIDE Suspense boundary.
+  // This ensures unauthorized users are redirected before any skeleton is shown.
+  await verifySession()
+
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <DashboardContent />
+    </Suspense>
   )
 }
