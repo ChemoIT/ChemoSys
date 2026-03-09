@@ -44,25 +44,65 @@ export const HEBREW_MONTHS: Record<number, string> = {
 }
 
 // ─────────────────────────────────────────────────────────────
+// CARLOG MAPPING CONSTANTS
+// ─────────────────────────────────────────────────────────────
+
+/** CarLog column [11] → fuel_supplier */
+export const CARLOG_SUPPLIER_MAP: Record<string, string> = {
+  '1': 'delek',
+  '2': 'tapuz',
+  '3': 'dalkal',
+}
+
+/** CarLog column [6] → fuel_type (supports both numeric codes and Hebrew text) */
+export const CARLOG_FUEL_TYPE_MAP: Record<string, string> = {
+  '095':       'benzine',
+  'בנזין 95':  'benzine',
+  'בנזין':     'benzine',
+  '050':       'diesel',
+  '053':       'diesel',
+  '53':        'diesel',
+  'סולר':      'diesel',
+  '037':       'urea',
+  'אוריאה':    'urea',
+}
+
+/** CarLog column [5] → fueling_method */
+export const CARLOG_DEVICE_CODE_MAP: Record<string, string> = {
+  '1': 'device',  // דלקן — onboard device
+  '2': 'card',    // כרטיס — card master
+  '3': 'card',    // כרטיס — card cash
+}
+
+/** CarLog column [19] → km source for vehicle_km_log */
+export const CARLOG_SOURCE_MAP: Record<string, string> = {
+  '1': 'fuel_device',  // device output
+  '2': 'sms',          // employee message
+  '3': 'manual',       // manual entry
+  '4': 'import',       // external API / n8n
+}
+
+// ─────────────────────────────────────────────────────────────
 // FUEL RECORD TYPE — single fueling transaction
 // ─────────────────────────────────────────────────────────────
 
 export type FuelRecord = {
   id: string
-  vehicleId: string
+  vehicleId: string | null
   licensePlate: string
   fuelingDate: string          // yyyy-mm-dd
   fuelingTime: string | null   // HH:MM:SS
   fuelSupplier: string         // key from FUEL_SUPPLIER_LABELS
   fuelType: string             // key from FUEL_TYPE_LABELS
   fuelingMethod: string | null // key from FUELING_METHOD_LABELS
+  fuelCardNumber: string | null
   quantityLiters: number
   stationName: string | null
   grossAmount: number | null
   netAmount: number | null
+  actualFuelCompany: string | null
   odometerKm: number | null
-  importMonth: number
-  importYear: number
+  matchStatus: string          // 'matched' | 'unmatched'
   importBatchId: string | null
   createdAt: string
 }
@@ -96,20 +136,52 @@ export type FuelStats = {
 }
 
 // ─────────────────────────────────────────────────────────────
-// FUEL IMPORT BATCH — tracks each Excel import operation
+// FUEL IMPORT BATCH — tracks each CarLog.top file import
 // ─────────────────────────────────────────────────────────────
 
 export type FuelImportBatch = {
   id: string
-  importMonth: number
-  importYear: number
-  fuelSupplier: string
-  recordCount: number | null
+  sourceFile: string
+  sourceYear: number
+  totalLines: number | null
+  fuelCount: number | null
+  kmCount: number | null
   matchedCount: number | null
   unmatchedCount: number | null
+  skippedCount: number | null
+  duplicateCount: number | null
   status: string | null
-  fileName: string | null
   createdAt: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// CARLOG IMPORT TYPES
+// ─────────────────────────────────────────────────────────────
+
+export type CarLogDryRunReport = {
+  fileName: string
+  totalLines: number
+  fuelRecords: number
+  kmRecords: number
+  skippedLines: number
+  matchedPlates: number
+  unmatchedPlates: number
+  unmatchedDetails: { licensePlate: string; count: number }[]
+  dateRange: { from: string; to: string } | null
+  supplierBreakdown: { supplier: string; count: number }[]
+  fuelTypeBreakdown: { fuelType: string; count: number }[]
+  parseErrors: string[]
+}
+
+export type CarLogImportResult = {
+  success: boolean
+  fuelInserted: number
+  kmInserted: number
+  duplicatesSkipped: number
+  matchedCount: number
+  unmatchedCount: number
+  errors: string[]
+  batchId: string | null
 }
 
 // ─────────────────────────────────────────────────────────────

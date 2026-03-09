@@ -18,6 +18,7 @@ const ROUTE_MESSAGES: Record<string, string> = {
   '/admin/audit-log': 'טוען לוג פעילות...',
   '/admin/settings': 'טוען הגדרות...',
   '/admin/fleet/import-drivers': 'טוען ייבוא נהגים...',
+  '/admin/fleet/import-carlog': 'טוען ייבוא תדלוקים...',
   '/admin/employees/import': 'טוען ייבוא עובדים...',
   '/app/fleet/driver-card': 'טוען כרטיס נהג...',
   '/app/fleet/vehicle-card': 'טוען כרטיס רכב...',

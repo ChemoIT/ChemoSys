@@ -9,20 +9,36 @@
  * Key behaviours:
  *   - Fuel records are READ-ONLY from the app side (imported via admin).
  *   - Server-side pagination (50 per page) — fuel data can be thousands of rows.
+ *   - Period filter uses fueling_date range (yyyy-mm-dd).
  *   - Project filter uses subquery on vehicle_project_journal.
  *   - Vehicle type filter joins the vehicles table.
  */
 
 import { createClient } from '@/lib/supabase/server'
-import { verifyAppUser, verifySession } from '@/lib/dal'
+import { verifyAppUser } from '@/lib/dal'
 import type {
   FuelRecord,
   FuelFilters,
   FuelStats,
-  FuelImportBatch,
   ProjectOptionForFilter,
 } from '@/lib/fleet/fuel-types'
 import { FUEL_RECORDS_PER_PAGE } from '@/lib/fleet/fuel-types'
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+
+/** Build start date for period filter: first day of fromMonth/fromYear */
+function periodStartDate(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-01`
+}
+
+/** Build end date for period filter: last day of toMonth/toYear */
+function periodEndDate(year: number, month: number): string {
+  // Last day = first day of next month minus 1
+  const d = new Date(year, month, 0) // month is 1-based, Date(y,m,0) gives last day of month m
+  return d.toISOString().split('T')[0]
+}
 
 // ─────────────────────────────────────────────────────────────
 // FUEL RECORDS — App side (read-only)
@@ -38,18 +54,15 @@ export async function getFuelRecords(
   await verifyAppUser()
   const supabase = await createClient()
 
-  // Build period range as YYYYMM integers for comparison
-  const fromPeriod = filters.fromYear * 100 + filters.fromMonth
-  const toPeriod = filters.toYear * 100 + filters.toMonth
+  const fromDate = periodStartDate(filters.fromYear, filters.fromMonth)
+  const toDate = periodEndDate(filters.toYear, filters.toMonth)
 
   // Start building the query
   let query = supabase
     .from('fuel_records')
     .select('*', { count: 'exact' })
-
-  // Period filter: import_year * 100 + import_month BETWEEN from AND to
-  // Supabase doesn't support computed columns in filters, so we filter by range
-  query = query.gte('import_year', filters.fromYear).lte('import_year', filters.toYear)
+    .gte('fueling_date', fromDate)
+    .lte('fueling_date', toDate)
 
   // Supplier filter
   if (filters.supplier) {
@@ -70,7 +83,6 @@ export async function getFuelRecords(
   }
 
   // Vehicle type filter — requires filtering by vehicle_id IN (select from vehicles)
-  // Supabase PostgREST can't do subqueries easily, so we fetch matching vehicle IDs first
   if (filters.vehicleType) {
     const { data: vehicleIds } = await supabase
       .from('vehicles')
@@ -80,7 +92,6 @@ export async function getFuelRecords(
     if (vehicleIds && vehicleIds.length > 0) {
       query = query.in('vehicle_id', vehicleIds.map(v => v.id))
     } else {
-      // No vehicles match this type — return empty
       return { records: [], total: 0 }
     }
   }
@@ -116,32 +127,26 @@ export async function getFuelRecords(
     return { records: [], total: 0 }
   }
 
-  // Post-filter for exact period match (since we can't do computed column filter)
-  // The year range filter above is a broad filter; we narrow it here
-  const records: FuelRecord[] = (data ?? [])
-    .filter(row => {
-      const period = row.import_year * 100 + row.import_month
-      return period >= fromPeriod && period <= toPeriod
-    })
-    .map(row => ({
-      id: row.id,
-      vehicleId: row.vehicle_id,
-      licensePlate: row.license_plate,
-      fuelingDate: row.fueling_date,
-      fuelingTime: row.fueling_time,
-      fuelSupplier: row.fuel_supplier,
-      fuelType: row.fuel_type,
-      fuelingMethod: row.fueling_method,
-      quantityLiters: Number(row.quantity_liters),
-      stationName: row.station_name,
-      grossAmount: row.gross_amount != null ? Number(row.gross_amount) : null,
-      netAmount: row.net_amount != null ? Number(row.net_amount) : null,
-      odometerKm: row.odometer_km,
-      importMonth: row.import_month,
-      importYear: row.import_year,
-      importBatchId: row.import_batch_id,
-      createdAt: row.created_at,
-    }))
+  const records: FuelRecord[] = (data ?? []).map(row => ({
+    id: row.id,
+    vehicleId: row.vehicle_id,
+    licensePlate: row.license_plate,
+    fuelingDate: row.fueling_date,
+    fuelingTime: row.fueling_time,
+    fuelSupplier: row.fuel_supplier,
+    fuelType: row.fuel_type,
+    fuelingMethod: row.fueling_method,
+    fuelCardNumber: row.fuel_card_number,
+    quantityLiters: Number(row.quantity_liters),
+    stationName: row.station_name,
+    grossAmount: row.gross_amount != null ? Number(row.gross_amount) : null,
+    netAmount: row.net_amount != null ? Number(row.net_amount) : null,
+    actualFuelCompany: row.actual_fuel_company,
+    odometerKm: row.odometer_km,
+    matchStatus: row.match_status,
+    importBatchId: row.import_batch_id,
+    createdAt: row.created_at,
+  }))
 
   return { records, total: count ?? 0 }
 }
@@ -153,16 +158,14 @@ export async function getFuelStats(filters: FuelFilters): Promise<FuelStats> {
   await verifyAppUser()
   const supabase = await createClient()
 
-  const fromPeriod = filters.fromYear * 100 + filters.fromMonth
-  const toPeriod = filters.toYear * 100 + filters.toMonth
+  const fromDate = periodStartDate(filters.fromYear, filters.fromMonth)
+  const toDate = periodEndDate(filters.toYear, filters.toMonth)
 
-  // Use an RPC or fetch all matching rows for aggregation
-  // For now, do a simple query with no pagination to get all matching records
   let query = supabase
     .from('fuel_records')
-    .select('quantity_liters, gross_amount, net_amount, import_year, import_month', { count: 'exact' })
-    .gte('import_year', filters.fromYear)
-    .lte('import_year', filters.toYear)
+    .select('quantity_liters, gross_amount, net_amount', { count: 'exact' })
+    .gte('fueling_date', fromDate)
+    .lte('fueling_date', toDate)
 
   if (filters.supplier) query = query.eq('fuel_supplier', filters.supplier)
   if (filters.fuelType) query = query.eq('fuel_type', filters.fuelType)
@@ -198,25 +201,20 @@ export async function getFuelStats(filters: FuelFilters): Promise<FuelStats> {
     }
   }
 
-  // Fetch all rows for aggregation (limit 10000 — fuel records per month are ~hundreds)
+  // Fetch all rows for aggregation (limit 10000)
   const { data, count } = await query.limit(10000)
-
-  const filtered = (data ?? []).filter(row => {
-    const period = row.import_year * 100 + row.import_month
-    return period >= fromPeriod && period <= toPeriod
-  })
 
   let totalLiters = 0
   let totalGrossAmount = 0
   let totalNetAmount = 0
-  for (const row of filtered) {
+  for (const row of (data ?? [])) {
     totalLiters += Number(row.quantity_liters) || 0
     totalGrossAmount += Number(row.gross_amount) || 0
     totalNetAmount += Number(row.net_amount) || 0
   }
 
   return {
-    totalRecords: filtered.length,
+    totalRecords: count ?? (data?.length ?? 0),
     totalLiters: Math.round(totalLiters * 100) / 100,
     totalGrossAmount: Math.round(totalGrossAmount * 100) / 100,
     totalNetAmount: Math.round(totalNetAmount * 100) / 100,
@@ -252,37 +250,4 @@ export async function getProjectsForFuelFilter(): Promise<ProjectOptionForFilter
   }
 
   return projects.sort((a, b) => a.name.localeCompare(b.name, 'he'))
-}
-
-// ─────────────────────────────────────────────────────────────
-// FUEL IMPORT BATCHES — Admin side
-// ─────────────────────────────────────────────────────────────
-
-/**
- * Get all import batches, ordered by most recent first.
- */
-export async function getFuelImportBatches(): Promise<FuelImportBatch[]> {
-  await verifySession()
-  const supabase = await createClient()
-
-  const { data, error } = await supabase
-    .from('fuel_import_batches')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(100)
-
-  if (error || !data) return []
-
-  return data.map(row => ({
-    id: row.id,
-    importMonth: row.import_month,
-    importYear: row.import_year,
-    fuelSupplier: row.fuel_supplier,
-    recordCount: row.record_count,
-    matchedCount: row.matched_count,
-    unmatchedCount: row.unmatched_count,
-    status: row.status,
-    fileName: row.file_name,
-    createdAt: row.created_at,
-  }))
 }

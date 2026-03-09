@@ -9,13 +9,8 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { FuelImportTab } from './FuelImportTab'
-import type { FuelImportBatch } from '@/lib/fleet/fuel-types'
 
-type Props = {
-  initialBatches: FuelImportBatch[]
-}
-
-export function DataUpdatesPage({ initialBatches }: Props) {
+export function DataUpdatesPage() {
   return (
     <Tabs defaultValue="fuel" className="w-full">
       <TabsList dir="rtl" className="mb-4">
@@ -25,7 +20,7 @@ export function DataUpdatesPage({ initialBatches }: Props) {
       </TabsList>
 
       <TabsContent value="fuel" dir="rtl">
-        <FuelImportTab initialBatches={initialBatches} />
+        <FuelImportTab />
       </TabsContent>
 
       <TabsContent value="km" dir="rtl">
