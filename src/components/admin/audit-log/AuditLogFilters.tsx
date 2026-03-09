@@ -8,9 +8,12 @@
  *
  * All filter changes push new URL search params → triggers Server Component re-fetch.
  * Page always resets to 1 on filter change.
+ *
+ * Performance: useTransition wraps all router.push calls → LoadingIndicator shown
+ * while server re-renders (replaces silent opacity-only feedback).
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO } from 'date-fns'
 import { he } from 'date-fns/locale'
@@ -28,6 +31,7 @@ import {
 } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
+import { LoadingIndicator } from '@/components/shared/LoadingIndicator'
 
 // ---------------------------------------------------------------------------
 // Hebrew action labels
@@ -65,6 +69,7 @@ type Props = {
 
 export function AuditLogFilters({ entityTypes, actionTypes, currentFilters }: Props) {
   const router = useRouter()
+  const [isPending, startTransition] = useTransition()
 
   // Local state initialized from server-side filter values
   const [entity, setEntity] = useState(currentFilters.entity ?? '')
@@ -105,7 +110,9 @@ export function AuditLogFilters({ entityTypes, actionTypes, currentFilters }: Pr
     if (merged.to)      params.set('to', merged.to)
     // Always reset to page 1 on filter change
 
-    router.push('/admin/audit-log' + (params.toString() ? '?' + params.toString() : ''))
+    startTransition(() => {
+      router.push('/admin/audit-log' + (params.toString() ? '?' + params.toString() : ''))
+    })
   }
 
   // ---------------------------------------------------------------------------
@@ -146,7 +153,9 @@ export function AuditLogFilters({ entityTypes, actionTypes, currentFilters }: Pr
     setAction('')
     setSearch('')
     setDateRange(undefined)
-    router.push('/admin/audit-log')
+    startTransition(() => {
+      router.push('/admin/audit-log')
+    })
   }
 
   // Cleanup debounce on unmount
@@ -178,80 +187,85 @@ export function AuditLogFilters({ entityTypes, actionTypes, currentFilters }: Pr
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {/* Entity type dropdown */}
-      <Select value={entity || '__all__'} onValueChange={handleEntityChange}>
-        <SelectTrigger className="h-9 w-[160px] text-sm">
-          <SelectValue placeholder="כל הסוגים" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__all__">כל הסוגים</SelectItem>
-          {entityTypes.map((et) => (
-            <SelectItem key={et} value={et}>
-              {et}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Entity type dropdown */}
+        <Select value={entity || '__all__'} onValueChange={handleEntityChange}>
+          <SelectTrigger className="h-9 w-[160px] text-sm">
+            <SelectValue placeholder="כל הסוגים" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">כל הסוגים</SelectItem>
+            {entityTypes.map((et) => (
+              <SelectItem key={et} value={et}>
+                {et}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      {/* Action type dropdown */}
-      <Select value={action || '__all__'} onValueChange={handleActionChange}>
-        <SelectTrigger className="h-9 w-[140px] text-sm">
-          <SelectValue placeholder="כל הפעולות" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__all__">כל הפעולות</SelectItem>
-          {actionTypes.map((at) => (
-            <SelectItem key={at} value={at}>
-              {ACTION_LABELS[at] ?? at}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        {/* Action type dropdown */}
+        <Select value={action || '__all__'} onValueChange={handleActionChange}>
+          <SelectTrigger className="h-9 w-[140px] text-sm">
+            <SelectValue placeholder="כל הפעולות" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">כל הפעולות</SelectItem>
+            {actionTypes.map((at) => (
+              <SelectItem key={at} value={at}>
+                {ACTION_LABELS[at] ?? at}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      {/* Free-text search */}
-      <Input
-        value={search}
-        onChange={handleSearchChange}
-        placeholder="חיפוש..."
-        className="h-9 w-[180px] text-sm"
-      />
+        {/* Free-text search */}
+        <Input
+          value={search}
+          onChange={handleSearchChange}
+          placeholder="חיפוש..."
+          className="h-9 w-[180px] text-sm"
+        />
 
-      {/* Date range picker */}
-      <Popover>
-        <PopoverTrigger asChild>
+        {/* Date range picker */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-2 text-sm font-normal"
+            >
+              <CalendarIcon className="h-4 w-4" />
+              {dateRangeLabel()}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="range"
+              selected={dateRange}
+              onSelect={handleDateRangeChange}
+              locale={he}
+              numberOfMonths={2}
+            />
+          </PopoverContent>
+        </Popover>
+
+        {/* Clear filters button — only shown when filters are active */}
+        {hasActiveFilters && (
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="h-9 gap-2 text-sm font-normal"
+            onClick={handleClear}
+            className="h-9 gap-1 text-sm text-muted-foreground hover:text-foreground"
           >
-            <CalendarIcon className="h-4 w-4" />
-            {dateRangeLabel()}
+            <X className="h-3.5 w-3.5" />
+            נקה סינון
           </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="range"
-            selected={dateRange}
-            onSelect={handleDateRangeChange}
-            locale={he}
-            numberOfMonths={2}
-          />
-        </PopoverContent>
-      </Popover>
+        )}
+      </div>
 
-      {/* Clear filters button — only shown when filters are active */}
-      {hasActiveFilters && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleClear}
-          className="h-9 gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <X className="h-3.5 w-3.5" />
-          נקה סינון
-        </Button>
-      )}
+      {/* Loading indicator — shown while server re-renders after filter change */}
+      <LoadingIndicator isLoading={isPending} />
     </div>
   )
 }

@@ -12,9 +12,12 @@
  *   - Pagination: server-side (Previous/Next using URL params)
  *   - Filters: rendered above table via AuditLogFilters
  *   - Export: rendered in header via AuditLogExportButton
+ *
+ * Performance: useTransition on pagination → LoadingIndicator shown while
+ * server re-renders (replaces silent page refresh).
  */
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   useReactTable,
@@ -41,6 +44,7 @@ import { Badge } from '@/components/ui/badge'
 import { AuditDiffView } from './AuditDiffView'
 import { AuditLogFilters } from './AuditLogFilters'
 import { AuditLogExportButton } from './AuditLogExportButton'
+import { LoadingIndicator } from '@/components/shared/LoadingIndicator'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -234,6 +238,7 @@ export function AuditLogTable({
 }: Props) {
   const router = useRouter()
   const [expanded, setExpanded] = useState<ExpandedState>({})
+  const [isPending, startTransition] = useTransition()
 
   const columns = buildColumns()
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
@@ -263,7 +268,9 @@ export function AuditLogTable({
     if (currentFilters.from)    params.set('from', currentFilters.from)
     if (currentFilters.to)      params.set('to', currentFilters.to)
     params.set('page', String(page))
-    router.push('/admin/audit-log?' + params.toString())
+    startTransition(() => {
+      router.push('/admin/audit-log?' + params.toString())
+    })
   }
 
   // ---------------------------------------------------------------------------
@@ -282,8 +289,8 @@ export function AuditLogTable({
         <AuditLogExportButton currentFilters={currentFilters} />
       </div>
 
-      {/* Table */}
-      <div className="rounded-md border overflow-hidden">
+      {/* Table — dimmed while pagination transition is in progress */}
+      <div className={`rounded-md border overflow-hidden transition-opacity duration-200 ${isPending ? 'opacity-60 pointer-events-none' : ''}`}>
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -348,27 +355,31 @@ export function AuditLogTable({
         <span className="text-sm text-muted-foreground">
           {totalCount.toLocaleString('he-IL')} רשומות סה&quot;כ · עמוד {currentPage} מתוך {totalPages}
         </span>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => navigateToPage(currentPage - 1)}
-            disabled={currentPage <= 1}
-            title="עמוד קודם"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => navigateToPage(currentPage + 1)}
-            disabled={currentPage >= totalPages}
-            title="עמוד הבא"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-2">
+          {/* Loading indicator — shown during page navigation */}
+          <LoadingIndicator isLoading={isPending} size="sm" />
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => navigateToPage(currentPage - 1)}
+              disabled={currentPage <= 1 || isPending}
+              title="עמוד קודם"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => navigateToPage(currentPage + 1)}
+              disabled={currentPage >= totalPages || isPending}
+              title="עמוד הבא"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
