@@ -337,12 +337,11 @@ Plans:
 3. React.cache() מיושם — Server Actions נפוצים לא מבצעים ריבוי queries בבקשה אחת
 4. כפתורי שמירה בכל הדפים מציגים spinner בזמן שמירה — המשתמש לא לוחץ פעמיים מתוך חוסר וודאות
 
-**Plans:** TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 23-01: Dashboard RPC (get_dashboard_stats) — migration + server action refactor
-- [ ] 23-02: Vehicle card + driver list indexes + audit_log/projects/users composite indexes
-- [ ] 23-03: React.cache() audit + save button loading states across all forms
+- [ ] 23-01-PLAN.md — Dashboard RPC (get_dashboard_stats) migration 00037 + composite indexes + server action + page refactor
+- [ ] 23-02-PLAN.md — VehicleSuppliersPage save button fix (useTransition) + React.cache() audit
 
 ---
 
@@ -373,7 +372,7 @@ Plans:
 | 20. Performance Standards | v2.1 | 2/2 | Complete | 2026-03-09 |
 | 21. App Pages Suspense + Loading | v2.1 | 4/4 | Complete | 2026-03-09 |
 | 22. Admin Pages Suspense + Loading | v2.1 | 4/4 | Complete | 2026-03-09 |
-| 23. DB Optimization | v2.1 | 0/3 | Not started | - |
+| 23. DB Optimization | v2.1 | 0/2 | Not started | - |
 
 ## Coverage
 
@@ -386,4 +385,4 @@ v2.1: 26/26 requirements mapped (+ 1 reference SKEL-APP-05 = complete). Full tra
 ---
 
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-09 — v2.1 phases 20-23 added*
+*Last updated: 2026-03-09 — Phase 23 planned (2 plans)*
