@@ -6,24 +6,30 @@
  * Supports: Delek (CSV) and Dalkal/Gnergy (XLSX + CSV).
  * Auto-detects supplier, encoding, and column mapping from file headers.
  *
+ * Options:
+ *   - includeKm: import km records alongside fuel (default: ON)
+ *   - deleteBeforeImport: delete existing records (same supplier + date range) first
+ *
  * Flow: upload → preview (dry-run) → importing → complete
  */
 
 import { useState, useRef, useTransition } from 'react'
 import {
   Upload, Loader2, CheckCircle, AlertCircle, FileText,
-  ChevronDown, ChevronUp, Fuel, Gauge, CalendarRange, AlertTriangle,
+  ChevronDown, ChevronUp, Fuel, Gauge, CalendarRange, AlertTriangle, Trash2,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { Checkbox } from '@/components/ui/checkbox'
 import { formatDate, formatLicensePlate } from '@/lib/format'
 import {
   FUEL_SUPPLIER_LABELS,
   FUEL_TYPE_LABELS,
   type SupplierDryRunReport,
   type SupplierImportResult,
+  type SupplierPreviewRecord,
 } from '@/lib/fleet/fuel-types'
 import {
   dryRunSupplierImportAction,
@@ -41,8 +47,13 @@ export function FuelImportTab() {
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Import options
+  const [includeKm, setIncludeKm] = useState(true)
+  const [deleteBeforeImport, setDeleteBeforeImport] = useState(false)
+
   const [showUnmatched, setShowUnmatched] = useState(false)
   const [showParseErrors, setShowParseErrors] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
 
   // ── Handlers ──────────────────────────────────────────────
 
@@ -59,6 +70,8 @@ export function FuelImportTab() {
     startTransition(async () => {
       const formData = new FormData()
       formData.append('file', selectedFile)
+      formData.append('skipKm', (!includeKm).toString())
+      formData.append('deleteBeforeImport', deleteBeforeImport.toString())
       const res = await dryRunSupplierImportAction(formData)
 
       if (!res.success || !res.report) {
@@ -86,6 +99,8 @@ export function FuelImportTab() {
     startTransition(async () => {
       const formData = new FormData()
       formData.append('file', selectedFile)
+      formData.append('skipKm', (!includeKm).toString())
+      formData.append('deleteBeforeImport', deleteBeforeImport.toString())
       const res = await executeSupplierImportAction(formData)
 
       if (progressIntervalRef.current) {
@@ -107,6 +122,7 @@ export function FuelImportTab() {
     setProgress(0)
     setShowUnmatched(false)
     setShowParseErrors(false)
+    setShowPreview(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -137,9 +153,55 @@ export function FuelImportTab() {
               />
             </div>
 
+            {/* ── Import Options ── */}
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <p className="text-sm font-medium text-foreground">אפשרויות ייבוא</p>
+
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="includeKm"
+                  checked={includeKm}
+                  onCheckedChange={(checked) => setIncludeKm(checked === true)}
+                />
+                <div>
+                  <label htmlFor="includeKm" className="text-sm font-medium cursor-pointer">
+                    ייבוא נתוני ק&quot;מ
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    ייבוא קריאות מונה ק&quot;מ מתוך רשומות הדלק (ברירת מחדל: פעיל)
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="deleteBeforeImport"
+                  checked={deleteBeforeImport}
+                  onCheckedChange={(checked) => setDeleteBeforeImport(checked === true)}
+                />
+                <div>
+                  <label htmlFor="deleteBeforeImport" className="text-sm font-medium cursor-pointer">
+                    מחיקת נתונים קיימים לפני ייבוא
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    מוחק את כל הרשומות הקיימות מאותו ספק בטווח התאריכים של הקובץ, ומחליף בנתונים חדשים
+                  </p>
+                </div>
+              </div>
+
+              {deleteBeforeImport && (
+                <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>
+                    שים לב: כל הרשומות הקיימות מאותו ספק בטווח התאריכים יימחקו ויוחלפו בנתוני הקובץ.
+                  </span>
+                </div>
+              )}
+            </div>
+
             <p className="text-xs text-muted-foreground">
               המערכת תזהה אוטומטית את הספק (דלק / דלקל) ואת הקידוד מתוך כותרות הקובץ.
-              ניתן לייבא את אותו קובץ שוב — רשומות קיימות יעודכנו אוטומטית.
+              {!deleteBeforeImport && ' ניתן לייבא את אותו קובץ שוב — רשומות קיימות יעודכנו אוטומטית.'}
             </p>
 
             {error && (
@@ -195,20 +257,47 @@ export function FuelImportTab() {
                 <Badge variant="secondary" className="text-sm">
                   קידוד: {report.detectedEncoding}
                 </Badge>
+                {!includeKm && (
+                  <Badge variant="secondary" className="text-sm bg-blue-50 text-blue-700">
+                    ללא ק&quot;מ
+                  </Badge>
+                )}
+                {deleteBeforeImport && (
+                  <Badge variant="secondary" className="text-sm bg-red-50 text-red-700">
+                    <Trash2 className="h-3 w-3 ml-1" />
+                    מצב החלפה
+                  </Badge>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <StatBox label="סה״כ שורות" value={report.totalRows} />
                 <StatBox label="תדלוקים" value={report.fuelRecords} icon={<Fuel className="h-4 w-4" />} variant="success" />
-                <StatBox label='דיווחי ק"מ' value={report.kmRecords} icon={<Gauge className="h-4 w-4" />} variant="info" />
+                {includeKm && (
+                  <StatBox label='דיווחי ק"מ' value={report.kmRecords} icon={<Gauge className="h-4 w-4" />} variant="info" />
+                )}
                 <StatBox label="דולגו" value={report.skippedRows} variant="muted" />
               </div>
+
+              {/* Delete info — shown when deleteBeforeImport=true */}
+              {deleteBeforeImport && report.deleteInfo && (
+                <div className="flex items-center gap-2 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800">
+                  <Trash2 className="h-4 w-4 shrink-0 text-red-600" />
+                  <span>
+                    יימחקו: {report.deleteInfo.existingFuelCount.toLocaleString('he-IL')} תדלוקים
+                    {includeKm && report.deleteInfo.existingKmCount > 0 && (
+                      <> + {report.deleteInfo.existingKmCount.toLocaleString('he-IL')} רשומות ק&quot;מ</>
+                    )}
+                    {' '}קיימים מספק {FUEL_SUPPLIER_LABELS[report.detectedSupplier]} בטווח התאריכים
+                  </span>
+                </div>
+              )}
 
               {/* New vs Update breakdown */}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <StatBox label="תדלוקים חדשים" value={report.newFuelRecords} variant="success" />
                 <StatBox label="תדלוקים לעדכון" value={report.updatedFuelRecords} variant="warning" />
-                {report.kmRecords > 0 && (
+                {includeKm && report.kmRecords > 0 && (
                   <>
                     <StatBox label='ק"מ חדשים' value={report.newKmRecords} variant="success" />
                     <StatBox label='ק"מ לעדכון' value={report.updatedKmRecords} variant="warning" />
@@ -330,12 +419,60 @@ export function FuelImportTab() {
             </Card>
           )}
 
+          {/* Records preview */}
+          {report.newRecordsPreview.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between text-lg">
+                  רשומות חדשות שייווספו
+                  <button
+                    onClick={() => setShowPreview(!showPreview)}
+                    className="text-sm font-normal text-muted-foreground hover:text-foreground"
+                  >
+                    {showPreview ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />}
+                    {' '}{showPreview ? 'הסתר' : 'הצג'} ({report.newRecordsPreview.length}{report.newRecordsPreview.length >= 100 ? '+' : ''})
+                  </button>
+                </CardTitle>
+              </CardHeader>
+              {showPreview && (
+                <CardContent>
+                  <div className="max-h-[400px] overflow-auto rounded-md border">
+                    <table className="w-full text-sm" dir="rtl">
+                      <thead className="sticky top-0 bg-muted">
+                        <tr className="border-b text-right">
+                          <th className="px-2 py-1.5 font-medium">סוג</th>
+                          <th className="px-2 py-1.5 font-medium">רישוי</th>
+                          <th className="px-2 py-1.5 font-medium">תאריך</th>
+                          <th className="px-2 py-1.5 font-medium">שעה</th>
+                          <th className="px-2 py-1.5 font-medium">סוג דלק</th>
+                          <th className="px-2 py-1.5 font-medium">כמות</th>
+                          <th className="px-2 py-1.5 font-medium">נטו</th>
+                          <th className="px-2 py-1.5 font-medium">מונה ק&quot;מ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {report.newRecordsPreview.map((r, i) => (
+                          <PreviewRow key={i} record={r} />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {report.newRecordsPreview.length >= 100 && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      מוצגות 100 רשומות ראשונות מתוך {report.fuelRecords + report.kmRecords}
+                    </p>
+                  )}
+                </CardContent>
+              )}
+            </Card>
+          )}
+
           {/* Action buttons */}
           <div className="flex gap-3">
             <Button
               onClick={handleImport}
               disabled={(report.fuelRecords + report.kmRecords) === 0 || isPending}
-              className="min-h-[44px] min-w-[160px]"
+              className={`min-h-[44px] min-w-[160px] ${deleteBeforeImport ? 'bg-red-600 hover:bg-red-700' : ''}`}
             >
               {isPending ? (
                 <>
@@ -344,8 +481,12 @@ export function FuelImportTab() {
                 </>
               ) : (
                 <>
-                  <Upload className="ml-2 h-4 w-4" />
-                  אישור ייבוא ({report.newFuelRecords} חדשים{report.updatedFuelRecords > 0 ? ` + ${report.updatedFuelRecords} עדכונים` : ''}{report.kmRecords > 0 ? ` + ${report.kmRecords} ק״מ` : ''})
+                  {deleteBeforeImport ? (
+                    <Trash2 className="ml-2 h-4 w-4" />
+                  ) : (
+                    <Upload className="ml-2 h-4 w-4" />
+                  )}
+                  {deleteBeforeImport ? 'מחיקה וייבוא' : 'אישור ייבוא'} ({report.newFuelRecords} חדשים{report.updatedFuelRecords > 0 ? ` + ${report.updatedFuelRecords} עדכונים` : ''}{includeKm && report.kmRecords > 0 ? ` + ${report.kmRecords} ק״מ` : ''})
                 </>
               )}
             </Button>
@@ -363,7 +504,7 @@ export function FuelImportTab() {
             <div className="text-center">
               <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
               <p className="mt-3 text-lg font-medium">
-                מייבא {report ? report.fuelRecords + report.kmRecords : 0} רשומות...
+                {deleteBeforeImport ? 'מוחק ומייבא' : 'מייבא'} {report ? report.fuelRecords + report.kmRecords : 0} רשומות...
               </p>
               <p className="text-sm text-muted-foreground">
                 אנא המתן, התהליך עשוי להימשך מספר דקות
@@ -393,9 +534,24 @@ export function FuelImportTab() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Deletion summary */}
+            {(result.deletedFuelCount || result.deletedKmCount) && (
+              <div className="flex items-center gap-2 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800">
+                <Trash2 className="h-4 w-4 shrink-0 text-red-600" />
+                <span>
+                  נמחקו: {(result.deletedFuelCount ?? 0).toLocaleString('he-IL')} תדלוקים
+                  {(result.deletedKmCount ?? 0) > 0 && (
+                    <> + {(result.deletedKmCount ?? 0).toLocaleString('he-IL')} רשומות ק&quot;מ</>
+                  )}
+                </span>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <StatBox label="תדלוקים יובאו" value={result.fuelInserted} variant="success" />
-              <StatBox label='דיווחי ק"מ יובאו' value={result.kmInserted} variant="info" />
+              {includeKm && (
+                <StatBox label='דיווחי ק"מ יובאו' value={result.kmInserted} variant="info" />
+              )}
               <StatBox label="רשומות עודכנו" value={result.recordsUpdated} variant="warning" />
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -427,6 +583,29 @@ export function FuelImportTab() {
         </Card>
       )}
     </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// PreviewRow helper
+// ─────────────────────────────────────────────────────────────
+
+function PreviewRow({ record: r }: { record: SupplierPreviewRecord }) {
+  return (
+    <tr className="border-b last:border-0">
+      <td className="px-2 py-1">
+        <Badge variant="outline" className="text-xs">
+          {r.type === 'fuel' ? 'דלק' : 'ק"מ'}
+        </Badge>
+      </td>
+      <td className="px-2 py-1 font-mono text-xs">{formatLicensePlate(r.licensePlate)}</td>
+      <td className="px-2 py-1 text-xs">{formatDate(r.date)}</td>
+      <td className="px-2 py-1 text-xs">{r.time?.slice(0, 5) ?? '—'}</td>
+      <td className="px-2 py-1 text-xs">{r.fuelType ? (FUEL_TYPE_LABELS[r.fuelType] ?? r.fuelType) : '—'}</td>
+      <td className="px-2 py-1 text-xs tabular-nums">{r.quantityLiters > 0 ? r.quantityLiters.toFixed(2) : '—'}</td>
+      <td className="px-2 py-1 text-xs tabular-nums">{r.netAmount != null ? `₪${r.netAmount.toLocaleString('he-IL')}` : '—'}</td>
+      <td className="px-2 py-1 text-xs tabular-nums">{r.odometerKm ? r.odometerKm.toLocaleString('he-IL') : '—'}</td>
+    </tr>
   )
 }
 

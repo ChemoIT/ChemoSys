@@ -29,6 +29,8 @@ import {
   type HeaderPattern,
   type SupplierDryRunReport,
   type SupplierImportResult,
+  type SupplierImportOptions,
+  type SupplierPreviewRecord,
 } from '@/lib/fleet/fuel-types'
 
 // ─────────────────────────────────────────────────────────────
@@ -550,6 +552,7 @@ async function parseSupplierFile(buffer: Buffer, fileName: string): Promise<Pars
 export async function dryRunSupplierImport(
   fileBuffer: Buffer,
   fileName: string,
+  options: SupplierImportOptions = { skipKm: false, deleteBeforeImport: false },
 ): Promise<SupplierDryRunReport> {
   await verifySession()
   const admin = createImportClient()
@@ -568,7 +571,7 @@ export async function dryRunSupplierImport(
   // 3. Analyze
   const fuelRecords = records.filter(r => r.recordType === 'fuel')
   // km records: odometer-only rows + fuel rows that also have odometer
-  const kmRecords = records.filter(r =>
+  const kmRecords = options.skipKm ? [] : records.filter(r =>
     (r.recordType === 'km' && r.odometerKm) ||
     (r.recordType === 'fuel' && r.odometerKm)
   )
@@ -604,45 +607,122 @@ export async function dryRunSupplierImport(
   let updatedFuelRecords = 0
   let newKmRecords = kmRecords.length
   let updatedKmRecords = 0
+  let deleteInfo: { existingFuelCount: number; existingKmCount: number } | undefined
+  let fuelKeySet: Set<string> | null = null
+  let kmKeySet: Set<string> | null = null
 
   if (dateRange) {
-    // Query existing fuel records in the date range (paginated — may exceed 1000 rows)
+    // Query existing fuel records in the date range for this supplier (paginated)
     const existingFuel = await fetchAllRowsFiltered(
       admin, 'fuel_records',
-      'license_plate, fueling_date, fueling_time, quantity_liters',
+      'license_plate, fueling_date, fueling_time, quantity_liters, fuel_supplier',
       'fueling_date', dateRange.from, dateRange.to
     )
+    // Filter to same supplier for delete-info
+    const supplierFuel = existingFuel.filter(
+      (r: { fuel_supplier: string }) => r.fuel_supplier === supplier
+    )
+
+    // Build dedup key sets for fuel (used in both modes)
     if (existingFuel.length > 0) {
-      const fuelKeys = new Set(
-        existingFuel.map((r: { license_plate: string; fueling_date: string; fueling_time: string | null; quantity_liters: number }) =>
-          `${r.license_plate}|${r.fueling_date}|${r.fueling_time ?? '00:00:00'}|${r.quantity_liters}`
+      fuelKeySet = new Set(
+        existingFuel.map((r: { license_plate: string; fueling_date: string; fueling_time: string | null }) =>
+          `${r.license_plate}|${r.fueling_date}|${r.fueling_time ?? '00:00:00'}`
         )
       )
-      updatedFuelRecords = fuelRecords.filter(r =>
-        fuelKeys.has(`${r.licensePlate}|${r.date}|${r.time ?? '00:00:00'}|${r.quantityLiters}`)
-      ).length
-      newFuelRecords = fuelRecords.length - updatedFuelRecords
     }
 
-    // Query existing km records in the date range (paginated)
-    if (kmRecords.length > 0) {
-      const existingKm = await fetchAllRowsFiltered(
+    if (options.deleteBeforeImport) {
+      // In delete mode: all records are "new" (existing will be deleted first)
+      const existingKmAll = !options.skipKm ? await fetchAllRowsFiltered(
         admin, 'vehicle_km_log',
-        'license_plate, recorded_date, km_reading',
+        'license_plate, recorded_date, km_reading, source',
         'recorded_date', dateRange.from, dateRange.to
+      ) : []
+      const supplierKm = existingKmAll.filter(
+        (r: { source: string }) => r.source === `${supplier}_import`
       )
-      if (existingKm.length > 0) {
-        const kmKeys = new Set(
-          existingKm.map((r: { license_plate: string; recorded_date: string; km_reading: number }) =>
-            `${r.license_plate}|${r.recorded_date}|${r.km_reading}`
-          )
-        )
-        updatedKmRecords = kmRecords.filter(r =>
-          kmKeys.has(`${r.licensePlate}|${r.date}|${r.odometerKm}`)
+      deleteInfo = {
+        existingFuelCount: supplierFuel.length,
+        existingKmCount: supplierKm.length,
+      }
+      // All imported records will be new (since existing are deleted)
+      newFuelRecords = fuelRecords.length
+      updatedFuelRecords = 0
+      newKmRecords = kmRecords.length
+      updatedKmRecords = 0
+    } else {
+      // Normal upsert mode: compare dedup keys
+      if (fuelKeySet) {
+        updatedFuelRecords = fuelRecords.filter(r =>
+          fuelKeySet!.has(`${r.licensePlate}|${r.date}|${r.time ?? '00:00:00'}`)
         ).length
-        newKmRecords = kmRecords.length - updatedKmRecords
+        newFuelRecords = fuelRecords.length - updatedFuelRecords
+      }
+
+      // Query existing km records in the date range (paginated)
+      if (kmRecords.length > 0) {
+        const existingKm = await fetchAllRowsFiltered(
+          admin, 'vehicle_km_log',
+          'license_plate, recorded_date, km_reading',
+          'recorded_date', dateRange.from, dateRange.to
+        )
+        if (existingKm.length > 0) {
+          kmKeySet = new Set(
+            existingKm.map((r: { license_plate: string; recorded_date: string; km_reading: number }) =>
+              `${r.license_plate}|${r.recorded_date}|${r.km_reading}`
+            )
+          )
+          updatedKmRecords = kmRecords.filter(r =>
+            kmKeySet!.has(`${r.licensePlate}|${r.date}|${r.odometerKm}`)
+          ).length
+          newKmRecords = kmRecords.length - updatedKmRecords
+        }
       }
     }
+  }
+
+  // 7. Build preview records (up to 100 for display)
+  const PREVIEW_LIMIT = 100
+  const isNewFuel = (r: ParsedSupplierRecord) =>
+    options.deleteBeforeImport || !fuelKeySet ||
+    !fuelKeySet.has(`${r.licensePlate}|${r.date}|${r.time ?? '00:00:00'}`)
+  const isNewKm = (r: ParsedSupplierRecord) =>
+    options.deleteBeforeImport || !kmKeySet ||
+    !kmKeySet.has(`${r.licensePlate}|${r.date}|${r.odometerKm}`)
+
+  const newRecordsPreview: SupplierPreviewRecord[] = []
+  for (const r of fuelRecords) {
+    if (newRecordsPreview.length >= PREVIEW_LIMIT) break
+    if (!isNewFuel(r)) continue
+    newRecordsPreview.push({
+      type: 'fuel',
+      licensePlate: r.licensePlate,
+      date: r.date!,
+      time: r.time,
+      fuelType: r.fuelType,
+      quantityLiters: r.quantityLiters,
+      netAmount: r.netAmount,
+      odometerKm: r.odometerKm,
+      stationName: r.stationName,
+      isNew: true,
+    })
+  }
+  for (const r of kmRecords) {
+    if (newRecordsPreview.length >= PREVIEW_LIMIT) break
+    if (!isNewKm(r)) continue
+    newRecordsPreview.push({
+      type: 'km',
+      licensePlate: r.licensePlate,
+      date: r.date!,
+      time: r.time,
+      fuelType: null,
+      quantityLiters: 0,
+      netAmount: null,
+      odometerKm: r.odometerKm,
+      stationName: null,
+      isNew: true,
+    })
   }
 
   return {
@@ -668,6 +748,8 @@ export async function dryRunSupplierImport(
     updatedFuelRecords,
     newKmRecords,
     updatedKmRecords,
+    deleteInfo,
+    newRecordsPreview,
   }
 }
 
@@ -678,6 +760,7 @@ export async function dryRunSupplierImport(
 export async function executeSupplierImport(
   fileBuffer: Buffer,
   fileName: string,
+  options: SupplierImportOptions = { skipKm: false, deleteBeforeImport: false },
 ): Promise<SupplierImportResult> {
   const { userId } = await verifySession()
   const admin = createImportClient()
@@ -695,6 +778,7 @@ export async function executeSupplierImport(
   // 3. Determine source year from date range
   const dates = records.map(r => r.date).filter(Boolean) as string[]
   dates.sort()
+  const dateRange = dates.length > 0 ? { from: dates[0], to: dates[dates.length - 1] } : null
   const sourceYear = dates.length > 0
     ? parseInt(dates[0].substring(0, 4), 10)
     : new Date().getFullYear()
@@ -725,6 +809,31 @@ export async function executeSupplierImport(
   const batchId = batch.id
   let matchedCount = 0
   let unmatchedCount = 0
+  let deletedFuelCount = 0
+  let deletedKmCount = 0
+
+  // 4b. Delete existing records if requested
+  if (options.deleteBeforeImport && dateRange) {
+    // Delete fuel records for this supplier in the date range
+    const { count: fuelDeleted } = await admin
+      .from('fuel_records')
+      .delete({ count: 'exact' })
+      .eq('fuel_supplier', supplier)
+      .gte('fueling_date', dateRange.from)
+      .lte('fueling_date', dateRange.to)
+    deletedFuelCount = fuelDeleted ?? 0
+
+    // Delete km records from this supplier in the date range
+    if (!options.skipKm) {
+      const { count: kmDeleted } = await admin
+        .from('vehicle_km_log')
+        .delete({ count: 'exact' })
+        .eq('source', `${supplier}_import`)
+        .gte('recorded_date', dateRange.from)
+        .lte('recorded_date', dateRange.to)
+      deletedKmCount = kmDeleted ?? 0
+    }
+  }
 
   // 5. Prepare fuel rows
   const fuelRows = records
@@ -755,7 +864,7 @@ export async function executeSupplierImport(
     })
 
   // 6. Prepare km rows (any record with odometer — both fuel+odometer and odometer-only)
-  const kmRows = records
+  const kmRows = options.skipKm ? [] : records
     .filter(r => r.odometerKm)
     .map(r => {
       const vehicleId = plateToVehicle.get(r.licensePlate) ?? null
@@ -838,6 +947,8 @@ export async function executeSupplierImport(
     unmatchedCount,
     errors: errors.slice(0, 100),
     batchId,
+    deletedFuelCount: deletedFuelCount > 0 ? deletedFuelCount : undefined,
+    deletedKmCount: deletedKmCount > 0 ? deletedKmCount : undefined,
   }
 }
 
@@ -849,6 +960,14 @@ export type DryRunSupplierActionResult = {
   success: boolean
   report?: SupplierDryRunReport
   error?: string
+}
+
+/** Parse import options from FormData */
+function parseOptionsFromFormData(formData: FormData): SupplierImportOptions {
+  return {
+    skipKm: formData.get('skipKm') === 'true',
+    deleteBeforeImport: formData.get('deleteBeforeImport') === 'true',
+  }
 }
 
 export async function dryRunSupplierImportAction(
@@ -864,7 +983,8 @@ export async function dryRunSupplierImportAction(
       return { success: false, error: 'יש לבחור קובץ CSV או XLSX' }
     }
     const buffer = Buffer.from(await file.arrayBuffer())
-    const report = await dryRunSupplierImport(buffer, file.name)
+    const options = parseOptionsFromFormData(formData)
+    const report = await dryRunSupplierImport(buffer, file.name, options)
     return { success: true, report }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'שגיאה לא ידועה' }
@@ -884,7 +1004,8 @@ export async function executeSupplierImportAction(
       return { ...empty, errors: ['לא נבחר קובץ'] }
     }
     const buffer = Buffer.from(await file.arrayBuffer())
-    return await executeSupplierImport(buffer, file.name)
+    const options = parseOptionsFromFormData(formData)
+    return await executeSupplierImport(buffer, file.name, options)
   } catch (err) {
     return { ...empty, errors: [err instanceof Error ? err.message : 'שגיאה לא ידועה'] }
   }

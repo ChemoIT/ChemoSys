@@ -163,6 +163,27 @@ export type SupplierDryRunReport = {
   updatedFuelRecords: number
   newKmRecords: number
   updatedKmRecords: number
+  deleteInfo?: SupplierDryRunDeleteInfo  // present when deleteBeforeImport=true
+  newRecordsPreview: SupplierPreviewRecord[]  // first N new records for preview
+}
+
+/** Lightweight record for preview table — no DB IDs, just display fields */
+export type SupplierPreviewRecord = {
+  type: 'fuel' | 'km'
+  licensePlate: string
+  date: string
+  time: string | null
+  fuelType: string | null
+  quantityLiters: number
+  netAmount: number | null
+  odometerKm: number | null
+  stationName: string | null
+  isNew: boolean  // true = new record, false = will update existing
+}
+
+export type SupplierImportOptions = {
+  skipKm: boolean            // true = don't import km records
+  deleteBeforeImport: boolean // true = delete existing records (same supplier + date range) before importing
 }
 
 export type SupplierImportResult = {
@@ -174,6 +195,14 @@ export type SupplierImportResult = {
   unmatchedCount: number
   errors: string[]
   batchId: string | null
+  deletedFuelCount?: number
+  deletedKmCount?: number
+}
+
+// Delete-info returned in dry-run when deleteBeforeImport=true
+export type SupplierDryRunDeleteInfo = {
+  existingFuelCount: number
+  existingKmCount: number
 }
 
 // ─────────────────────────────────────────────────────────────
