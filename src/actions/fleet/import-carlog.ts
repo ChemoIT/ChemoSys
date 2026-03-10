@@ -412,9 +412,9 @@ export async function executeCarLogImport(fileBuffer: Buffer, fileName: string):
       }
     })
 
-  // 6. Prepare km rows
+  // 6. Prepare km rows — km-only records + fuel records that have odometer
   const kmRows = records
-    .filter(r => r.recordType === 'km' && r.odometerKm)
+    .filter(r => r.odometerKm && (r.recordType === 'km' || r.recordType === 'fuel'))
     .map(r => {
       const vehicleId = plateToVehicle.get(r.licensePlate) ?? null
       return {
@@ -422,7 +422,7 @@ export async function executeCarLogImport(fileBuffer: Buffer, fileName: string):
         license_plate: r.licensePlate,
         recorded_date: r.date,
         km_reading: r.odometerKm,
-        source: r.reportSource || 'import',
+        source: r.recordType === 'fuel' ? 'fuel_device' : (r.reportSource || 'import'),
         is_trusted: true,
         match_status: vehicleId ? 'matched' : 'unmatched',
         import_batch_id: batchId,
@@ -430,14 +430,26 @@ export async function executeCarLogImport(fileBuffer: Buffer, fileName: string):
       }
     })
 
-  // 7. Split into chunks
+  // 7. Deduplicate km rows — same plate+date+reading can appear from both fuel and km-only records
+  const kmDedup = new Map<string, typeof kmRows[0]>()
+  for (const row of kmRows) {
+    const key = `${row.license_plate}|${row.recorded_date}|${row.km_reading}`
+    const existing = kmDedup.get(key)
+    // Prefer fuel_device source over others (more reliable)
+    if (!existing || row.source === 'fuel_device') {
+      kmDedup.set(key, row)
+    }
+  }
+  const kmRowsDeduped = [...kmDedup.values()]
+
+  // 8. Split into chunks
   const fuelChunks: typeof fuelRows[] = []
   for (let i = 0; i < fuelRows.length; i += BATCH_SIZE) {
     fuelChunks.push(fuelRows.slice(i, i + BATCH_SIZE))
   }
-  const kmChunks: typeof kmRows[] = []
-  for (let i = 0; i < kmRows.length; i += BATCH_SIZE) {
-    kmChunks.push(kmRows.slice(i, i + BATCH_SIZE))
+  const kmChunks: typeof kmRowsDeduped[] = []
+  for (let i = 0; i < kmRowsDeduped.length; i += BATCH_SIZE) {
+    kmChunks.push(kmRowsDeduped.slice(i, i + BATCH_SIZE))
   }
 
   let fuelInserted = 0
