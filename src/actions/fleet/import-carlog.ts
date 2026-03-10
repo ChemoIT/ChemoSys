@@ -16,6 +16,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { verifySession } from '@/lib/dal'
+import { lbSerialToDate } from '@/lib/format'
 import {
   CARLOG_SUPPLIER_MAP,
   CARLOG_FUEL_TYPE_MAP,
@@ -57,16 +58,7 @@ async function fetchAllRows(client: any, table: string, select: string): Promise
   return all
 }
 
-/** Convert CarLog serial date (1901-01-01 base) to yyyy-mm-dd */
-function carlogSerialToDate(serial: number): string | null {
-  if (!serial || serial < 1) return null
-  const d = new Date(1901, 0, 1)
-  d.setDate(d.getDate() + serial)
-  if (isNaN(d.getTime())) return null
-  const year = d.getFullYear()
-  if (year < 2015 || year > 2030) return null
-  return d.toISOString().split('T')[0]
-}
+// lbSerialToDate imported from format.ts — all .top files use Liberty Basic serial dates
 
 /** Normalize time string to HH:MM:SS format */
 function normalizeTime(raw: string): string | null {
@@ -146,7 +138,7 @@ function parseCarLogFile(buffer: Buffer): {
 
     // Parse date
     const dateSerial = parseInt((f[3] ?? '').trim(), 10)
-    const date = carlogSerialToDate(dateSerial)
+    const date = lbSerialToDate(dateSerial)
     if (!date) {
       skippedLines++
       parseErrors.push(`שורה ${i + 1}: תאריך לא תקין (serial=${f[3]})`)
@@ -318,53 +310,30 @@ export async function dryRunCarLogImport(fileBuffer: Buffer, fileName: string): 
 const BATCH_SIZE = 500
 const PARALLEL_CHUNKS = 3
 
-/** Insert rows in batch; on duplicate error, split to individual inserts */
-async function batchInsert(
+/** Upsert rows via RPC — insert new, update existing (matched by dedup key) */
+async function batchUpsert(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   client: any,
-  table: string,
+  table: 'fuel_records' | 'vehicle_km_log',
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   rows: Record<string, any>[],
-): Promise<{ inserted: number; duplicates: number; errors: string[] }> {
-  // Try batch insert first (single API call for all rows)
-  const { data, error } = await client
-    .from(table)
-    .insert(rows)
-    .select('id')
+): Promise<{ inserted: number; updated: number; errors: string[] }> {
+  const rpcName = table === 'fuel_records' ? 'upsert_fuel_records' : 'upsert_km_records'
+  const paramName = 'p_records'
 
-  if (!error) {
-    return { inserted: data?.length ?? rows.length, duplicates: 0, errors: [] }
+  const { data, error } = await client.rpc(rpcName, { [paramName]: rows })
+
+  if (error) {
+    return { inserted: 0, updated: 0, errors: [error.message] }
   }
 
-  // Batch failed — if it's a duplicate error, split to individual inserts
-  if (error.code === '23505') {
-    let inserted = 0
-    let duplicates = 0
-    const errors: string[] = []
-
-    // Process individuals in parallel (groups of 10)
-    for (let i = 0; i < rows.length; i += 10) {
-      const slice = rows.slice(i, i + 10)
-      const results = await Promise.all(
-        slice.map(row =>
-          client.from(table).insert(row).select('id')
-        )
-      )
-      for (let j = 0; j < results.length; j++) {
-        const r = results[j]
-        if (r.error) {
-          if (r.error.code === '23505') duplicates++
-          else errors.push(`${slice[j].license_plate} ${slice[j].fueling_date ?? slice[j].recorded_date}: ${r.error.message}`)
-        } else {
-          inserted++
-        }
-      }
-    }
-    return { inserted, duplicates, errors }
+  // RPC returns a single row: { inserted, updated }
+  const result = Array.isArray(data) ? data[0] : data
+  return {
+    inserted: Number(result?.inserted ?? 0),
+    updated: Number(result?.updated ?? 0),
+    errors: [],
   }
-
-  // Non-duplicate error on batch
-  return { inserted: 0, duplicates: 0, errors: [error.message] }
 }
 
 export async function executeCarLogImport(fileBuffer: Buffer, fileName: string): Promise<CarLogImportResult> {
@@ -403,7 +372,7 @@ export async function executeCarLogImport(fileBuffer: Buffer, fileName: string):
       success: false,
       fuelInserted: 0,
       kmInserted: 0,
-      duplicatesSkipped: 0,
+      recordsUpdated: 0,
       matchedCount: 0,
       unmatchedCount: 0,
       errors: [`שגיאה ביצירת batch: ${batchErr?.message ?? 'unknown'}`],
@@ -472,35 +441,38 @@ export async function executeCarLogImport(fileBuffer: Buffer, fileName: string):
   }
 
   let fuelInserted = 0
+  let fuelUpdated = 0
   let kmInserted = 0
-  let duplicatesSkipped = 0
+  let kmUpdated = 0
   const errors: string[] = []
 
-  // 8. Insert fuel — parallel chunks (PARALLEL_CHUNKS at a time)
+  // 8. Upsert fuel — parallel chunks (PARALLEL_CHUNKS at a time)
   for (let i = 0; i < fuelChunks.length; i += PARALLEL_CHUNKS) {
     const wave = fuelChunks.slice(i, i + PARALLEL_CHUNKS)
     const results = await Promise.all(
-      wave.map(chunk => batchInsert(admin, 'fuel_records', chunk))
+      wave.map(chunk => batchUpsert(admin, 'fuel_records', chunk))
     )
     for (const r of results) {
       fuelInserted += r.inserted
-      duplicatesSkipped += r.duplicates
+      fuelUpdated += r.updated
       errors.push(...r.errors)
     }
   }
 
-  // 9. Insert km — parallel chunks (PARALLEL_CHUNKS at a time)
+  // 9. Upsert km — parallel chunks (PARALLEL_CHUNKS at a time)
   for (let i = 0; i < kmChunks.length; i += PARALLEL_CHUNKS) {
     const wave = kmChunks.slice(i, i + PARALLEL_CHUNKS)
     const results = await Promise.all(
-      wave.map(chunk => batchInsert(admin, 'vehicle_km_log', chunk))
+      wave.map(chunk => batchUpsert(admin, 'vehicle_km_log', chunk))
     )
     for (const r of results) {
       kmInserted += r.inserted
-      duplicatesSkipped += r.duplicates
+      kmUpdated += r.updated
       errors.push(...r.errors)
     }
   }
+
+  const recordsUpdated = fuelUpdated + kmUpdated
 
   // 10. Update batch with final counts
   await admin
@@ -511,7 +483,7 @@ export async function executeCarLogImport(fileBuffer: Buffer, fileName: string):
       matched_count: matchedCount,
       unmatched_count: unmatchedCount,
       skipped_count: records.length - fuelRows.length - kmRows.length,
-      duplicate_count: duplicatesSkipped,
+      updated_count: recordsUpdated,
       status: errors.length > 0 ? 'partial' : 'completed',
     })
     .eq('id', batchId)
@@ -520,7 +492,7 @@ export async function executeCarLogImport(fileBuffer: Buffer, fileName: string):
     success: errors.length === 0,
     fuelInserted,
     kmInserted,
-    duplicatesSkipped,
+    recordsUpdated,
     matchedCount,
     unmatchedCount,
     errors: errors.slice(0, 100),
@@ -557,7 +529,7 @@ export async function dryRunCarLogImportAction(formData: FormData): Promise<DryR
 
 export async function executeCarLogImportAction(formData: FormData): Promise<CarLogImportResult> {
   const empty: CarLogImportResult = {
-    success: false, fuelInserted: 0, kmInserted: 0, duplicatesSkipped: 0,
+    success: false, fuelInserted: 0, kmInserted: 0, recordsUpdated: 0,
     matchedCount: 0, unmatchedCount: 0, errors: [], batchId: null,
   }
   try {
@@ -598,7 +570,7 @@ export async function getCarLogImportBatches(): Promise<FuelImportBatch[]> {
     matchedCount: b.matched_count as number | null,
     unmatchedCount: b.unmatched_count as number | null,
     skippedCount: b.skipped_count as number | null,
-    duplicateCount: b.duplicate_count as number | null,
+    updatedCount: b.updated_count as number | null,
     status: b.status as string | null,
     createdAt: b.created_at as string,
   }))

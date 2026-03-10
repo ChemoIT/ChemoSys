@@ -14,7 +14,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { verifySession } from '@/lib/dal'
-import { normalizePhone } from '@/lib/format'
+import { normalizePhone, lbSerialToDate } from '@/lib/format'
 
 /**
  * Untyped admin client for import operations.
@@ -143,16 +143,7 @@ const COMPANY_NAMES: Record<string, string> = {
 // Helpers
 // ─────────────────────────────────────────────────────────────
 
-/** Convert Excel serial date to yyyy-mm-dd string */
-function serialToDate(serial: number): string | null {
-  if (!serial || serial < 1) return null
-  const ms = (serial - 25569) * 86400 * 1000
-  const d = new Date(ms)
-  if (isNaN(d.getTime())) return null
-  const year = d.getFullYear()
-  if (year < 1990 || year > 2060) return null  // 2060: allows far-future sentinel dates like 54422→2048
-  return d.toISOString().split('T')[0]
-}
+// lbSerialToDate imported from format.ts — all .top files use Liberty Basic serial dates
 
 /** Parse SplitStr: tilde-delimited groups of `step` fields */
 function parseSplitStr(raw: string, step: number): string[][] {
@@ -205,7 +196,7 @@ function parseDocuments(raw: string): ParsedDocument[] {
     docs.push({
       isActive: isActiveStr === '1',
       name: name.trim(),
-      expiryDate: expiryStr?.trim() ? serialToDate(parseInt(expiryStr.trim(), 10)) : null,
+      expiryDate: expiryStr?.trim() ? lbSerialToDate(parseInt(expiryStr.trim(), 10)) : null,
       alertOnExpiry: alertStr === '1',
     })
   }
@@ -263,14 +254,14 @@ export async function parseDriversFile(buffer: Buffer): Promise<ParseResult> {
     // Dates
     const rawLicExpiry = (f[4] ?? '').trim()
     const licExpirySerial = rawLicExpiry ? parseInt(rawLicExpiry, 10) : null
-    const licenseExpiryDate = licExpirySerial ? serialToDate(licExpirySerial) : null
+    const licenseExpiryDate = licExpirySerial ? lbSerialToDate(licExpirySerial) : null
     if (licExpirySerial && !licenseExpiryDate) {
       invalidDates.push({ empNum, field: 'licenseExpiryDate', rawValue: rawLicExpiry })
     }
 
     const rawOpenDate = (f[24] ?? '').trim()
     const openDateSerial = rawOpenDate ? parseInt(rawOpenDate, 10) : null
-    const driverFileOpenDate = openDateSerial ? serialToDate(openDateSerial) : null
+    const driverFileOpenDate = openDateSerial ? lbSerialToDate(openDateSerial) : null
     if (openDateSerial && !driverFileOpenDate) {
       invalidDates.push({ empNum, field: 'driverFileOpenDate', rawValue: rawOpenDate })
     }

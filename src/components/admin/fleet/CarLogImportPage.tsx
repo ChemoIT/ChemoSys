@@ -378,7 +378,7 @@ export function CarLogImportPage({ initialBatches }: Props) {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <StatBox label="תדלוקים יובאו" value={result.fuelInserted} variant="success" />
               <StatBox label='דיווחי ק"מ יובאו' value={result.kmInserted} variant="info" />
-              <StatBox label="כפילויות דולגו" value={result.duplicatesSkipped} variant="muted" />
+              <StatBox label="רשומות עודכנו" value={result.recordsUpdated} variant="warning" />
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <StatBox label="רכבים מותאמים" value={result.matchedCount} variant="success" />
@@ -432,7 +432,7 @@ export function CarLogImportPage({ initialBatches }: Props) {
                     <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground">ק״מ</th>
                     <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground hidden sm:table-cell">מותאמים</th>
                     <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground hidden sm:table-cell">חריגים</th>
-                    <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground hidden sm:table-cell">כפילויות</th>
+                    <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground hidden sm:table-cell">עודכנו</th>
                     <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground">סטטוס</th>
                   </tr>
                 </thead>
@@ -449,7 +449,7 @@ export function CarLogImportPage({ initialBatches }: Props) {
                       <td className="px-3 py-3 text-muted-foreground">{batch.kmCount ?? '—'}</td>
                       <td className="px-3 py-3 text-muted-foreground hidden sm:table-cell">{batch.matchedCount ?? '—'}</td>
                       <td className="px-3 py-3 text-muted-foreground hidden sm:table-cell">{batch.unmatchedCount ?? '—'}</td>
-                      <td className="px-3 py-3 text-muted-foreground hidden sm:table-cell">{batch.duplicateCount ?? '—'}</td>
+                      <td className="px-3 py-3 text-muted-foreground hidden sm:table-cell">{batch.updatedCount ?? '—'}</td>
                       <td className="px-3 py-3">
                         <ImportStatusBadge status={batch.status} />
                       </td>

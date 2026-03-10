@@ -103,6 +103,27 @@ export function formatNumber(n: number | null | undefined, decimals = 0): string
   }).format(n)
 }
 
+/**
+ * Convert Liberty Basic serial date to yyyy-mm-dd string.
+ * All .top files (CarLog, Drivers, CarList, SystemProject) use this format.
+ * LB serial 0 = 01/01/1901, serial 45724 = 10/03/2026.
+ *
+ * Formula: LB serial → Unix ms via offset 25202
+ * (25202 = days from 01/01/1901 to 01/01/1970 = 69×365 + 17 leap years)
+ *
+ * IMPORTANT: Do NOT confuse with Excel serial (1 = 01/01/1900, offset 25569).
+ * LB serial = Excel serial - 367.
+ */
+export function lbSerialToDate(serial: number): string | null {
+  if (!serial || serial < 1) return null
+  const ms = (serial - 25202) * 86400 * 1000
+  const d = new Date(ms)
+  if (isNaN(d.getTime())) return null
+  const year = d.getFullYear()
+  if (year < 1990 || year > 2060) return null
+  return d.toISOString().split('T')[0]
+}
+
 /** Days from today until a given date string. Negative = past. */
 export function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null

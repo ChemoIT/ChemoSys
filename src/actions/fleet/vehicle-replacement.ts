@@ -286,8 +286,8 @@ export async function addVehicleFuelCard(
   const { userId } = await verifyAppUser()
   const supabase = await createClient()
 
-  if (!/^\d+$/.test(cardNumber.trim())) {
-    return { success: false, error: 'מספר כרטיס חייב להכיל ספרות בלבד' }
+  if (!/^\d{6}$/.test(cardNumber.trim())) {
+    return { success: false, error: 'מספר כרטיס חייב להיות בדיוק 6 ספרות' }
   }
 
   const { data, error } = await supabase

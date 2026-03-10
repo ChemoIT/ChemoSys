@@ -1,5 +1,5 @@
 -- =============================================================================
--- Check Pending Migrations (00030–00035)
+-- Check Pending Migrations (00030–00037)
 -- Paste in Supabase Dashboard → SQL Editor → Run
 -- Each row shows: migration name, status (✅ APPLIED / ❌ MISSING)
 -- =============================================================================
@@ -55,6 +55,22 @@ FROM (
       EXISTS (
         SELECT 1 FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'fuel_import_batches'
+      )
+    ),
+
+    -- 00036: fuel_records_enriched view + get_fuel_stats RPC + composite indexes
+    ('00036_fuel_performance',
+      EXISTS (
+        SELECT 1 FROM pg_proc
+        WHERE proname = 'get_fuel_stats' AND pronamespace = 'public'::regnamespace
+      )
+    ),
+
+    -- 00037: get_dashboard_stats RPC + admin composite indexes + vehicle_documents index
+    ('00037_db_optimization',
+      EXISTS (
+        SELECT 1 FROM pg_proc
+        WHERE proname = 'get_dashboard_stats' AND pronamespace = 'public'::regnamespace
       )
     )
 

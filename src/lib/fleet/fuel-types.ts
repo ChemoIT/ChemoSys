@@ -91,6 +91,92 @@ export const KM_SOURCE_LABELS: Record<string, string> = {
 }
 
 // ─────────────────────────────────────────────────────────────
+// SUPPLIER IMPORT — dynamic column detection + device prefix map
+// ─────────────────────────────────────────────────────────────
+
+/** Pattern for matching a header name to an internal field */
+export type HeaderPattern = {
+  field: string
+  patterns: string[]
+  exact?: boolean
+}
+
+/** Delek CSV — Hebrew header name → internal field key */
+export const DELEK_HEADER_MAP: HeaderPattern[] = [
+  { field: 'LICENSE_PLATE',    patterns: ['מספר רכב'] },
+  { field: 'CUSTOMER_NAME',   patterns: ['שם תת לקוח'] },
+  { field: 'STATION_NAME',    patterns: ['תחנת תדלוק'] },
+  { field: 'FUELING_DATE',    patterns: ['תאריך עסקה'] },
+  { field: 'FUELING_TIME',    patterns: ['שעת עסקה'] },
+  { field: 'DEVICE_NUMBER',   patterns: ['מספר אמצעי'] },
+  { field: 'ODOMETER',        patterns: ['מונה קמ'] },
+  { field: 'FUEL_TYPE',       patterns: ['סוג דלק'] },
+  { field: 'QUANTITY',        patterns: ['סכה ליטרים'] },
+  { field: 'GROSS_AMOUNT',    patterns: ['סכום רכישה ברוטו'] },
+  { field: 'NET_AMOUNT',      patterns: ['סכום רכישה נטו'] },
+]
+
+/** Dalkal/Gnergy (R1 + R2) — Hebrew header name → internal field key */
+export const DALKAL_HEADER_MAP: HeaderPattern[] = [
+  { field: 'LICENSE_PLATE',    patterns: ["מס' רכב"] },
+  { field: 'CUSTOMER_NAME',   patterns: ['שם לקוח'] },
+  { field: 'STATION_NAME',    patterns: ['תחנה'], exact: true },
+  { field: 'FUELING_DATE',    patterns: ['תאריך רכישה'] },
+  { field: 'FUELING_TIME',    patterns: ['שעה'], exact: true },
+  { field: 'ODOMETER',        patterns: ["מונה ק'מ", 'מונה קמ'] },
+  { field: 'FUEL_CODE',       patterns: ["מק'ט", 'מקט'], exact: true },
+  { field: 'FUEL_DESC',       patterns: ["תאור מק'ט", 'תאור מקט'] },
+  { field: 'QUANTITY',        patterns: ['כמות בליטרים'] },
+  { field: 'NET_AMOUNT',      patterns: ["סה'כ לפני מע'מ"] },
+  { field: 'FUEL_COMPANY',    patterns: ['קוד חברת דלק'] },
+]
+
+/** Delek device number prefix → fueling method + whether it has a card number */
+export const DELEK_DEVICE_PREFIX_MAP: Record<string, { method: string; hasCard: boolean }> = {
+  '854': { method: 'device', hasCard: false },
+  '856': { method: 'device', hasCard: false },
+  '857': { method: 'device', hasCard: false },
+  '855': { method: 'card', hasCard: true },   // master card — last 6 digits
+  '859': { method: 'card', hasCard: true },   // cash card — last 6 digits
+}
+
+// ─────────────────────────────────────────────────────────────
+// SUPPLIER IMPORT TYPES
+// ─────────────────────────────────────────────────────────────
+
+export type SupplierDryRunReport = {
+  fileName: string
+  detectedSupplier: 'delek' | 'dalkal'
+  detectedEncoding: string
+  totalRows: number
+  fuelRecords: number
+  kmRecords: number
+  skippedRows: number
+  matchedPlates: number
+  unmatchedPlates: number
+  unmatchedDetails: { licensePlate: string; count: number }[]
+  dateRange: { from: string; to: string } | null
+  fuelTypeBreakdown: { fuelType: string; count: number }[]
+  customerWarnings: number
+  parseErrors: string[]
+  newFuelRecords: number
+  updatedFuelRecords: number
+  newKmRecords: number
+  updatedKmRecords: number
+}
+
+export type SupplierImportResult = {
+  success: boolean
+  fuelInserted: number
+  kmInserted: number
+  recordsUpdated: number
+  matchedCount: number
+  unmatchedCount: number
+  errors: string[]
+  batchId: string | null
+}
+
+// ─────────────────────────────────────────────────────────────
 // FUEL RECORD TYPE — single fueling transaction
 // ─────────────────────────────────────────────────────────────
 
@@ -173,7 +259,7 @@ export type FuelImportBatch = {
   matchedCount: number | null
   unmatchedCount: number | null
   skippedCount: number | null
-  duplicateCount: number | null
+  updatedCount: number | null
   status: string | null
   createdAt: string
 }
@@ -201,7 +287,7 @@ export type CarLogImportResult = {
   success: boolean
   fuelInserted: number
   kmInserted: number
-  duplicatesSkipped: number
+  recordsUpdated: number
   matchedCount: number
   unmatchedCount: number
   errors: string[]

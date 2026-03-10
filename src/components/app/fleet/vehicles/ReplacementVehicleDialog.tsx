@@ -91,8 +91,8 @@ function FuelCardsList({
 
   async function handleAdd() {
     const trimmed = newCard.trim()
-    if (!/^\d+$/.test(trimmed)) {
-      toast.error('מספר כרטיס חייב להכיל ספרות בלבד')
+    if (!/^\d{6}$/.test(trimmed)) {
+      toast.error('מספר כרטיס חייב להיות בדיוק 6 ספרות')
       return
     }
     setIsAdding(true)

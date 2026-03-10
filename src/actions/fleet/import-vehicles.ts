@@ -14,7 +14,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { verifySession } from '@/lib/dal'
-import { normalizePhone } from '@/lib/format'
+import { normalizePhone, lbSerialToDate } from '@/lib/format'
 
 function createImportClient() {
   return createClient(
@@ -156,16 +156,7 @@ async function fetchAllRows(client: any, table: string, select: string): Promise
   return all
 }
 
-/** Convert Excel serial date to yyyy-mm-dd string */
-function serialToDate(serial: number): string | null {
-  if (!serial || serial < 1) return null
-  const ms = (serial - 25569) * 86400 * 1000
-  const d = new Date(ms)
-  if (isNaN(d.getTime())) return null
-  const year = d.getFullYear()
-  if (year < 1990 || year > 2060) return null
-  return d.toISOString().split('T')[0]
-}
+// lbSerialToDate imported from format.ts — all .top files use Liberty Basic serial dates
 
 /** Parse SplitStr: tilde-delimited groups of `step` fields */
 function parseSplitStr(raw: string, step: number): string[][] {
@@ -264,7 +255,7 @@ export async function parseCarListFile(buffer: Buffer): Promise<CarListParseResu
       if (!raw) return null
       const serial = parseInt(raw, 10)
       if (isNaN(serial)) return null
-      const result = serialToDate(serial)
+      const result = lbSerialToDate(serial)
       if (serial > 0 && !result) {
         invalidDates.push({ plate, field: fieldName, rawValue: raw })
       }
@@ -286,35 +277,35 @@ export async function parseCarListFile(buffer: Buffer): Promise<CarListParseResu
 
     // ── SplitStr: Monthly costs (col 14, step=2) ──
     const monthlyCosts: ParsedMonthlyCost[] = parseSplitStr(f[14] ?? '', 2).map(([dateStr, costStr]) => ({
-      date: dateStr?.trim() ? serialToDate(parseInt(dateStr.trim(), 10)) : null,
+      date: dateStr?.trim() ? lbSerialToDate(parseInt(dateStr.trim(), 10)) : null,
       amount: costStr?.trim() ? parseFloat(costStr.trim()) : 0,
     })).filter(c => c.amount > 0)
 
     // ── SplitStr: Driver history (col 27, step=3) ──
     const driverHistory: ParsedDriverHistoryEntry[] = parseSplitStr(f[27] ?? '', 3).map(([dateStr, companyNum, empNum]) => ({
-      date: dateStr?.trim() ? serialToDate(parseInt(dateStr.trim(), 10)) : null,
+      date: dateStr?.trim() ? lbSerialToDate(parseInt(dateStr.trim(), 10)) : null,
       companyNum: (companyNum ?? '').trim(),
       empNum: (empNum ?? '').trim(),
     })).filter(d => d.empNum)
 
     // ── SplitStr: Project assignments (col 34, step=3) ──
     const projectAssignments: ParsedProjectAssignment[] = parseSplitStr(f[34] ?? '', 3).map(([dateStr, projectNum]) => ({
-      date: dateStr?.trim() ? serialToDate(parseInt(dateStr.trim(), 10)) : null,
+      date: dateStr?.trim() ? lbSerialToDate(parseInt(dateStr.trim(), 10)) : null,
       projectNum: (projectNum ?? '').trim(),
     })).filter(p => p.projectNum)
 
     // ── SplitStr: Documents (col 37, step=7) ──
     const documents: ParsedVehicleDocument[] = parseSplitStr(f[37] ?? '', 7).map(([name, , , , expiryStr]) => ({
       name: (name ?? '').trim(),
-      expiryDate: expiryStr?.trim() ? serialToDate(parseInt(expiryStr.trim(), 10)) : null,
+      expiryDate: expiryStr?.trim() ? lbSerialToDate(parseInt(expiryStr.trim(), 10)) : null,
     })).filter(d => d.name)
 
     // ── SplitStr: Replacement vehicles (col 39, step=8) ──
     const replacementVehicles: ParsedReplacement[] = parseSplitStr(f[39] ?? '', 8).map(([vehNum, entryDateStr, entryKmStr, exitDateStr, exitKmStr, reason, rvNotes, fuelCard]) => ({
       vehNum: (vehNum ?? '').trim(),
-      entryDate: entryDateStr?.trim() ? serialToDate(parseInt(entryDateStr.trim(), 10)) : null,
+      entryDate: entryDateStr?.trim() ? lbSerialToDate(parseInt(entryDateStr.trim(), 10)) : null,
       entryKm: entryKmStr?.trim() ? parseInt(entryKmStr.trim(), 10) : null,
-      exitDate: exitDateStr?.trim() ? serialToDate(parseInt(exitDateStr.trim(), 10)) : null,
+      exitDate: exitDateStr?.trim() ? lbSerialToDate(parseInt(exitDateStr.trim(), 10)) : null,
       exitKm: exitKmStr?.trim() ? parseInt(exitKmStr.trim(), 10) : null,
       reason: (reason ?? '').trim(),
       notes: (rvNotes ?? '').trim(),

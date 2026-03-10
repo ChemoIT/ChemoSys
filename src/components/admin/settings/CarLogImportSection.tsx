@@ -352,9 +352,9 @@ export function CarLogImportSection() {
               <div className="text-lg font-bold">{importResult.kmInserted}</div>
               <div className="text-[11px]">ק״מ יובאו</div>
             </div>
-            <div className="rounded border bg-background p-2 text-muted-foreground">
-              <div className="text-lg font-bold">{importResult.duplicatesSkipped}</div>
-              <div className="text-[11px]">כפילויות דולגו</div>
+            <div className="rounded border bg-amber-50 p-2 text-amber-700">
+              <div className="text-lg font-bold">{importResult.recordsUpdated}</div>
+              <div className="text-[11px]">רשומות עודכנו</div>
             </div>
           </div>
 
