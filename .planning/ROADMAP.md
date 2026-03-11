@@ -290,6 +290,15 @@ v2.0: 23/23 requirements mapped. See [REQUIREMENTS.md](REQUIREMENTS.md).
 
 v2.1: 26/26 requirements mapped and completed. See [v2.1 Requirements Archive](milestones/v2.1-REQUIREMENTS.md).
 
+### Phase 20: דוח חריגים דלק — דף נפרד ב-/app/fleet/exceptions/fuel עם 6 סוגי חריגים, KPI cards, פילטרים, accordion groups עם עמודות דינמיות, row expansion, וייצוא Excel
+
+**Goal:** [To be planned]
+**Depends on:** Phase 19
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 20 to break down)
+
 ---
 
 *Roadmap created: 2026-03-01*

@@ -241,12 +241,14 @@ export const getProjectsForFuelFilter = cache(async function getProjectsForFuelF
   await verifyAppUser()
   const supabase = await createClient()
 
-  const { data, error } = await supabase
-    .from('vehicle_project_journal')
-    .select('project_id, projects ( name )')
-    .is('end_date', null)
+  // IRON RULE: fetchAllRows — Supabase 1000-row limit
+  const { fetchAllRows } = await import('@/lib/supabase/fetch-all')
+  const data = await fetchAllRows<{ project_id: string; projects: { name: string } | null }>(
+    supabase, 'vehicle_project_journal', 'project_id, projects ( name )', {
+    filters: (q: any) => q.is('end_date', null),
+  })
 
-  if (error || !data) return []
+  if (!data) return []
 
   // Deduplicate projects
   const seen = new Set<string>()
@@ -254,10 +256,9 @@ export const getProjectsForFuelFilter = cache(async function getProjectsForFuelF
   for (const row of data) {
     if (!seen.has(row.project_id)) {
       seen.add(row.project_id)
-      const proj = row.projects as unknown as { name: string } | null
       projects.push({
         id: row.project_id,
-        name: proj?.name ?? '—',
+        name: row.projects?.name ?? '—',
       })
     }
   }

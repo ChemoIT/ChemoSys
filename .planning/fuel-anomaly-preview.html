@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>דוח חריגים דלק — Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ECF1F8;
+    --card-bg: #ffffff;
+    --border: #C8D5E2;
+    --sidebar: #152D3C;
+    --text: #1a1a2e;
+    --text-muted: #64748b;
+    --text-xs: #94a3b8;
+    --radius: 0.5rem;
+    --red-50: #fef2f2;
+    --red-100: #fee2e2;
+    --red-200: #fecaca;
+    --red-500: #ef4444;
+    --red-600: #dc2626;
+    --red-700: #b91c1c;
+    --amber-50: #fffbeb;
+    --amber-100: #fef3c7;
+    --amber-200: #fde68a;
+    --amber-500: #f59e0b;
+    --amber-600: #d97706;
+    --amber-700: #b45309;
+    --yellow-50: #fefce8;
+    --yellow-100: #fef9c3;
+    --yellow-200: #fef08a;
+    --yellow-500: #eab308;
+    --yellow-600: #ca8a04;
+    --yellow-700: #a16207;
+    --blue-50: #eff6ff;
+    --blue-500: #3b82f6;
+    --blue-600: #2563eb;
+    --teal-500: #14b8a6;
+    --green-500: #22c55e;
+    --green-600: #16a34a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Heebo', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Page Container ── */
+  .page {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px 32px;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .header h1 svg {
+    color: var(--amber-600);
+  }
+
+  .month-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 14px;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .month-nav button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+
+  .month-nav button:hover {
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    font-family: 'Heebo', sans-serif;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+  .btn-excel {
+    background: var(--green-500);
+    color: white;
+    border-color: var(--green-600);
+  }
+  .btn-excel:hover { background: var(--green-600); }
+
+  /* ── KPI Cards ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .kpi-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    border: 1px solid var(--border);
+    border-top: 4px solid;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .kpi-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transform: translateY(-1px);
+  }
+
+  .kpi-card.selected {
+    box-shadow: 0 0 0 2px var(--ring-color);
+  }
+
+  .kpi-card[data-severity="total"] { border-top-color: var(--blue-500); --ring-color: var(--blue-500); }
+  .kpi-card[data-severity="critical"] { border-top-color: var(--red-500); --ring-color: var(--red-500); }
+  .kpi-card[data-severity="warning"] { border-top-color: var(--amber-500); --ring-color: var(--amber-500); }
+  .kpi-card[data-severity="info"] { border-top-color: var(--yellow-500); --ring-color: var(--yellow-500); }
+
+  .kpi-number {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1.1;
+  }
+
+  .kpi-card[data-severity="total"] .kpi-number { color: var(--blue-600); }
+  .kpi-card[data-severity="critical"] .kpi-number { color: var(--red-600); }
+  .kpi-card[data-severity="warning"] .kpi-number { color: var(--amber-600); }
+  .kpi-card[data-severity="info"] .kpi-number { color: var(--yellow-600); }
+
+  .kpi-label {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-top: 2px;
+  }
+
+  .kpi-sub {
+    font-size: 0.75rem;
+    color: var(--text-xs);
+    margin-top: 2px;
+  }
+
+  .kpi-trend {
+    position: absolute;
+    top: 14px;
+    left: 16px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+  }
+
+  .trend-up {
+    background: var(--red-50);
+    color: var(--red-600);
+  }
+
+  .trend-down {
+    background: #f0fdf4;
+    color: var(--green-600);
+  }
+
+  /* ── Filters ── */
+  .filters-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+  }
+
+  .filter-select {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: 'Heebo', sans-serif;
+    font-size: 0.85rem;
+    background: white;
+    cursor: pointer;
+    min-width: 160px;
+  }
+
+  .severity-chips {
+    display: flex;
+    gap: 6px;
+  }
+
+  .severity-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 2px solid;
+    transition: all 0.15s;
+  }
+
+  .chip-critical {
+    background: var(--red-50);
+    border-color: var(--red-200);
+    color: var(--red-700);
+  }
+  .chip-critical.active {
+    background: var(--red-500);
+    border-color: var(--red-500);
+    color: white;
+  }
+
+  .chip-warning {
+    background: var(--amber-50);
+    border-color: var(--amber-200);
+    color: var(--amber-700);
+  }
+  .chip-warning.active {
+    background: var(--amber-500);
+    border-color: var(--amber-500);
+    color: white;
+  }
+
+  .chip-info {
+    background: var(--yellow-50);
+    border-color: var(--yellow-200);
+    color: var(--yellow-700);
+  }
+  .chip-info.active {
+    background: var(--yellow-500);
+    border-color: var(--yellow-500);
+    color: white;
+  }
+
+  .search-input {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: 'Heebo', sans-serif;
+    font-size: 0.85rem;
+    width: 220px;
+    margin-right: auto;
+  }
+
+  .search-input::placeholder { color: var(--text-xs); }
+
+  .filter-label {
+    font-size: 0.8rem;
+    color: var(--text-xs);
+    font-weight: 500;
+  }
+
+  /* ── Anomaly Groups ── */
+  .anomaly-group {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    overflow: hidden;
+    border-right: 4px solid;
+  }
+
+  .group-critical { border-right-color: var(--red-500); }
+  .group-warning { border-right-color: var(--amber-500); }
+  .group-info { border-right-color: var(--yellow-500); }
+
+  .group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+  }
+
+  .group-header:hover { background: #f8fafc; }
+
+  .group-arrow {
+    font-size: 0.8rem;
+    color: var(--text-xs);
+    transition: transform 0.2s;
+    width: 16px;
+  }
+
+  .group-arrow.open { transform: rotate(90deg); }
+
+  .severity-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dot-red { background: var(--red-500); }
+  .dot-amber { background: var(--amber-500); }
+  .dot-yellow { background: var(--yellow-500); }
+
+  .group-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    flex: 1;
+  }
+
+  .group-counts {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .group-count-badge {
+    background: #f1f5f9;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.78rem;
+  }
+
+  .group-body {
+    padding: 0 18px 14px;
+  }
+
+  /* ── Tables ── */
+  .anomaly-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+
+  .anomaly-table thead th {
+    padding: 8px 10px;
+    text-align: right;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+  }
+
+  .anomaly-table tbody tr {
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .anomaly-table tbody tr:hover {
+    background: #f8fafc;
+  }
+
+  .anomaly-table tbody td {
+    padding: 10px 10px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+  }
+
+  .plate-cell {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.5px;
+    color: var(--blue-600);
+  }
+
+  .plate-cell:hover { text-decoration: underline; }
+
+  .amount-cell {
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .status-sold { background: #f3e8ff; color: #7c3aed; }
+  .status-inactive { background: #fef2f2; color: #dc2626; }
+
+  .exceeded-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .bar-track {
+    width: 60px;
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--amber-500);
+  }
+
+  .bar-fill.high { background: var(--red-500); }
+
+  .exceeded-text {
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .exceeded-text.high { color: var(--red-600); }
+  .exceeded-text.mid { color: var(--amber-600); }
+
+  /* ── Row Detail (expansion) ── */
+  .row-detail {
+    background: #f8fafc;
+    border-top: 1px dashed var(--border);
+    padding: 12px 16px;
+  }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px 24px;
+    font-size: 0.82rem;
+  }
+
+  .detail-item {
+    display: flex;
+    gap: 6px;
+  }
+
+  .detail-label {
+    color: var(--text-xs);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .detail-value {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .detail-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--blue-600);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    margin-top: 8px;
+  }
+
+  .detail-link:hover { text-decoration: underline; }
+
+  /* ── Duplicate sub-rows ── */
+  .dup-sub-table {
+    width: 100%;
+    font-size: 0.82rem;
+    margin-top: 8px;
+  }
+
+  .dup-sub-table th {
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    text-align: right;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dup-sub-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  /* ── Empty state ── */
+  .empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text-muted);
+  }
+
+  .empty-state svg {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+  }
+
+  /* ── Preview Banner ── */
+  .preview-banner {
+    background: linear-gradient(135deg, #152D3C 0%, #1e4a5e 100%);
+    color: white;
+    padding: 10px 24px;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+
+  .preview-banner strong { color: #5eead4; }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .page { padding: 16px; }
+    .header { flex-direction: column; align-items: stretch; }
+    .filters-bar { flex-direction: column; align-items: stretch; }
+    .search-input { width: 100%; }
+    .detail-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Preview Banner -->
+<div class="preview-banner">
+  <strong>PREVIEW</strong> — תצוגה מקדימה של דוח חריגים דלק &middot; נתוני דמו &middot; פברואר 2026
+</div>
+
+<div class="page">
+
+  <!-- ══════════════════════════════════════════ HEADER ══════════════════════════════════════════ -->
+  <div class="header">
+    <div class="header-right">
+      <h1>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        דוח חריגים דלק
+      </h1>
+      <div class="month-nav">
+        <button title="חודש הבא">&#9664;</button>
+        <span>פברואר 2026</span>
+        <button title="חודש קודם">&#9654;</button>
+      </div>
+    </div>
+    <div class="header-left">
+      <button class="btn btn-excel">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        ייצוא Excel
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ KPI CARDS ══════════════════════════════════════════ -->
+  <div class="kpi-grid">
+    <div class="kpi-card" data-severity="total">
+      <span class="kpi-trend trend-up">&#8593;18% מינואר</span>
+      <div class="kpi-number">47</div>
+      <div class="kpi-label">סה"כ חריגים</div>
+      <div class="kpi-sub">31 רכבים מעורבים</div>
+    </div>
+    <div class="kpi-card" data-severity="critical">
+      <span class="kpi-trend trend-up">&#8593;3</span>
+      <div class="kpi-number">12</div>
+      <div class="kpi-label">קריטי</div>
+      <div class="kpi-sub">8 רכבים</div>
+    </div>
+    <div class="kpi-card" data-severity="warning">
+      <span class="kpi-trend trend-down">&#8595;12%</span>
+      <div class="kpi-number">28</div>
+      <div class="kpi-label">אזהרה</div>
+      <div class="kpi-sub">20 רכבים</div>
+    </div>
+    <div class="kpi-card" data-severity="info">
+      <span class="kpi-trend trend-down">&#8595;2</span>
+      <div class="kpi-number">7</div>
+      <div class="kpi-label">לתשומת לב</div>
+      <div class="kpi-sub">5 רכבים</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ FILTERS ══════════════════════════════════════════ -->
+  <div class="filters-bar">
+    <span class="filter-label">סינון:</span>
+    <select class="filter-select">
+      <option>כל סוגי החריגה (6)</option>
+      <option>רכב לא מוכר (5)</option>
+      <option>רכב לא פעיל (3)</option>
+      <option>חלופי פעיל (4)</option>
+      <option>חריגת כמות (15)</option>
+      <option>תדלוק כפול (13)</option>
+      <option>אזור אילת (7)</option>
+    </select>
+
+    <div class="severity-chips">
+      <span class="severity-chip chip-critical active" onclick="this.classList.toggle('active')">&#9679; קריטי (12)</span>
+      <span class="severity-chip chip-warning active" onclick="this.classList.toggle('active')">&#9679; אזהרה (28)</span>
+      <span class="severity-chip chip-info active" onclick="this.classList.toggle('active')">&#9679; לתשומת לב (7)</span>
+    </div>
+
+    <input type="text" class="search-input" placeholder="&#128269; חיפוש לפי רישוי, נהג או פרויקט..." />
+  </div>
+
+  <!-- ══════════════════════════════════════════ GROUP 1: UNKNOWN ══════════════════════════════════════════ -->
+  <div class="anomaly-group group-critical">
+    <div class="group-header" onclick="toggleGroup(this)">
+      <span class="group-arrow open">&#9654;</span>
+      <span class="severity-dot dot-red"></span>
+      <span class="group-title">רכב לא מוכר במערכת</span>
+      <div class="group-counts">
+        <span class="group-count-badge">5 תדלוקים</span>
+        <span class="group-count-badge">3 רכבים</span>
+      </div>
+    </div>
+    <div class="group-body">
+      <table class="anomaly-table">
+        <thead>
+          <tr>
+            <th>מס' רישוי</th>
+            <th>תאריך</th>
+            <th>שעה</th>
+            <th>ספק</th>
+            <th>כמות (ליטר)</th>
+            <th>סכום נטו</th>
+            <th>תחנה</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr onclick="toggleDetail(this)">
+            <td class="plate-cell">12-345-67</td>
+            <td>03/02/2026</td>
+            <td>14:32</td>
+            <td>דלק</td>
+            <td class="amount-cell">45.2</td>
+            <td class="amount-cell">&#8362;382</td>
+            <td>סונול - ראשון לציון</td>
+          </tr>
+          <tr class="row-detail-row" style="display:none">
+            <td colspan="7">
+              <div class="row-detail">
+                <div class="detail-grid">
+                  <div class="detail-item"><span class="detail-label">סוג דלק:</span><span class="detail-value">בנזין 95</span></div>
+                  <div class="detail-item"><span class="detail-label">אמצעי תדלוק:</span><span class="detail-value">דלקן</span></div>
+                  <div class="detail-item"><span class="detail-label">מונה ק"מ:</span><span class="detail-value">87,432</span></div>
+                  <div class="detail-item"><span class="detail-label">סכום ברוטו:</span><span class="detail-value">&#8362;412</span></div>
+                  <div class="detail-item"><span class="detail-label">מס' כרטיס:</span><span class="detail-value">—</span></div>
+                </div>
+                <div style="color:var(--red-600); font-size:0.82rem; margin-top:8px; font-weight:500">
+                  &#9888; רכב לא קיים במערכת — לא ניתן לפתוח כרטיס רכב
+                </div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td class="plate-cell">12-345-67</td>
+            <td>17/02/2026</td>
+            <td>09:15</td>
+            <td>דלק</td>
+            <td class="amount-cell">42.8</td>
+            <td class="amount-cell">&#8362;363</td>
+            <td>סונול - ראשון לציון</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">98-765-43</td>
+            <td>08/02/2026</td>
+            <td>16:45</td>
+            <td>דלקל</td>
+            <td class="amount-cell">60.1</td>
+            <td class="amount-cell">—</td>
+            <td>דלקל - חדרה</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">55-274-00</td>
+            <td>22/02/2026</td>
+            <td>11:20</td>
+            <td>דלק</td>
+            <td class="amount-cell">38.5</td>
+            <td class="amount-cell">&#8362;327</td>
+            <td>פז - הרצליה</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">55-274-00</td>
+            <td>25/02/2026</td>
+            <td>08:05</td>
+            <td>דלק</td>
+            <td class="amount-cell">41.0</td>
+            <td class="amount-cell">&#8362;348</td>
+            <td>דור אלון - נתניה</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ GROUP 2: INACTIVE ══════════════════════════════════════════ -->
+  <div class="anomaly-group group-critical">
+    <div class="group-header" onclick="toggleGroup(this)">
+      <span class="group-arrow open">&#9654;</span>
+      <span class="severity-dot dot-red"></span>
+      <span class="group-title">רכב לא פעיל בזמן התדלוק</span>
+      <div class="group-counts">
+        <span class="group-count-badge">3 תדלוקים</span>
+        <span class="group-count-badge">2 רכבים</span>
+      </div>
+    </div>
+    <div class="group-body">
+      <table class="anomaly-table">
+        <thead>
+          <tr>
+            <th>מס' רישוי</th>
+            <th>יצרן / דגם</th>
+            <th>סטטוס</th>
+            <th>תאריך</th>
+            <th>כמות (ליטר)</th>
+            <th>סכום נטו</th>
+            <th>נהג</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr onclick="toggleDetail(this)">
+            <td class="plate-cell">78-432-16</td>
+            <td>טויוטה היילקס</td>
+            <td><span class="status-badge status-sold">נמכר</span></td>
+            <td>12/02/2026</td>
+            <td class="amount-cell">55.0</td>
+            <td class="amount-cell">&#8362;467</td>
+            <td>אבי לוי</td>
+          </tr>
+          <tr class="row-detail-row" style="display:none">
+            <td colspan="7">
+              <div class="row-detail">
+                <div class="detail-grid">
+                  <div class="detail-item"><span class="detail-label">מס' עובד:</span><span class="detail-value">4521</span></div>
+                  <div class="detail-item"><span class="detail-label">פרויקט:</span><span class="detail-value">קו גז 401</span></div>
+                  <div class="detail-item"><span class="detail-label">בעלות:</span><span class="detail-value">שלמה סיקסט</span></div>
+                  <div class="detail-item"><span class="detail-label">סוג דלק:</span><span class="detail-value">סולר 050</span></div>
+                  <div class="detail-item"><span class="detail-label">תחנה:</span><span class="detail-value">פז - אשדוד</span></div>
+                  <div class="detail-item"><span class="detail-label">מונה ק"מ:</span><span class="detail-value">123,450</span></div>
+                </div>
+                <a href="#" class="detail-link" title="פתיחה בטאב חדש">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  פתח כרטיס רכב
+                </a>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td class="plate-cell">78-432-16</td>
+            <td>טויוטה היילקס</td>
+            <td><span class="status-badge status-sold">נמכר</span></td>
+            <td>19/02/2026</td>
+            <td class="amount-cell">48.3</td>
+            <td class="amount-cell">&#8362;410</td>
+            <td>אבי לוי</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">33-218-79</td>
+            <td>פורד טרנזיט</td>
+            <td><span class="status-badge status-inactive">לא פעיל</span></td>
+            <td>05/02/2026</td>
+            <td class="amount-cell">72.5</td>
+            <td class="amount-cell">&#8362;615</td>
+            <td>מוחמד חאלד</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ GROUP 3: REPLACEMENT ══════════════════════════════════════════ -->
+  <div class="anomaly-group group-critical">
+    <div class="group-header" onclick="toggleGroup(this)">
+      <span class="group-arrow open">&#9654;</span>
+      <span class="severity-dot dot-red"></span>
+      <span class="group-title">רכב מושבת עם חלופי פעיל</span>
+      <div class="group-counts">
+        <span class="group-count-badge">4 תדלוקים</span>
+        <span class="group-count-badge">2 רכבים</span>
+      </div>
+    </div>
+    <div class="group-body">
+      <table class="anomaly-table">
+        <thead>
+          <tr>
+            <th>מס' רישוי (מקורי)</th>
+            <th>רכב חלופי</th>
+            <th>יצרן / דגם</th>
+            <th>תאריך</th>
+            <th>כמות (ליטר)</th>
+            <th>סכום נטו</th>
+            <th>נהג</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="plate-cell">45-678-90</td>
+            <td style="color:var(--teal-500); font-weight:600">52-999-11</td>
+            <td>יונדאי טוסון</td>
+            <td>07/02/2026</td>
+            <td class="amount-cell">40.0</td>
+            <td class="amount-cell">&#8362;340</td>
+            <td>דוד כהן</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">45-678-90</td>
+            <td style="color:var(--teal-500); font-weight:600">52-999-11</td>
+            <td>יונדאי טוסון</td>
+            <td>14/02/2026</td>
+            <td class="amount-cell">38.5</td>
+            <td class="amount-cell">&#8362;327</td>
+            <td>דוד כהן</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">61-234-88</td>
+            <td style="color:var(--teal-500); font-weight:600">48-111-22</td>
+            <td>סקודה אוקטביה</td>
+            <td>10/02/2026</td>
+            <td class="amount-cell">35.2</td>
+            <td class="amount-cell">&#8362;299</td>
+            <td>יוסי מזרחי</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">61-234-88</td>
+            <td style="color:var(--teal-500); font-weight:600">48-111-22</td>
+            <td>סקודה אוקטביה</td>
+            <td>24/02/2026</td>
+            <td class="amount-cell">37.8</td>
+            <td class="amount-cell">&#8362;321</td>
+            <td>יוסי מזרחי</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ GROUP 4: QUANTITY ══════════════════════════════════════════ -->
+  <div class="anomaly-group group-warning">
+    <div class="group-header" onclick="toggleGroup(this)">
+      <span class="group-arrow open">&#9654;</span>
+      <span class="severity-dot dot-amber"></span>
+      <span class="group-title">חריגת כמות מול מכסה חודשית</span>
+      <div class="group-counts">
+        <span class="group-count-badge">15 תדלוקים</span>
+        <span class="group-count-badge">5 רכבים</span>
+      </div>
+    </div>
+    <div class="group-body">
+      <table class="anomaly-table">
+        <thead>
+          <tr>
+            <th>מס' רישוי</th>
+            <th>יצרן / דגם</th>
+            <th>סה"כ חודשי (ליטר)</th>
+            <th>מכסה (ליטר)</th>
+            <th>חריגה</th>
+            <th>נהג</th>
+            <th>פרויקט</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr onclick="toggleDetail(this)">
+            <td class="plate-cell">22-876-54</td>
+            <td>מיצובישי L200</td>
+            <td class="amount-cell" style="font-weight:700">485</td>
+            <td class="amount-cell">300</td>
+            <td>
+              <div class="exceeded-bar">
+                <div class="bar-track"><div class="bar-fill high" style="width:100%"></div></div>
+                <span class="exceeded-text high">+185 ל' (62%)</span>
+              </div>
+            </td>
+            <td>חיים ברק</td>
+            <td>קו גז מערבי</td>
+          </tr>
+          <tr class="row-detail-row" style="display:none">
+            <td colspan="7">
+              <div class="row-detail">
+                <div style="font-size:0.82rem; font-weight:600; margin-bottom:8px; color:var(--text-muted)">פירוט 4 תדלוקים בחודש:</div>
+                <table class="dup-sub-table">
+                  <thead>
+                    <tr><th>תאריך</th><th>שעה</th><th>כמות</th><th>סכום</th><th>תחנה</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>02/02</td><td>07:30</td><td>120 ל'</td><td>&#8362;1,020</td><td>סונול - אשדוד</td></tr>
+                    <tr><td>09/02</td><td>14:10</td><td>115 ל'</td><td>&#8362;978</td><td>פז - באר שבע</td></tr>
+                    <tr><td>16/02</td><td>08:45</td><td>130 ל'</td><td>&#8362;1,105</td><td>סונול - אשדוד</td></tr>
+                    <tr><td>23/02</td><td>16:20</td><td>120 ל'</td><td>&#8362;1,020</td><td>דור אלון - קריית גת</td></tr>
+                  </tbody>
+                </table>
+                <a href="#" class="detail-link">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  פתח כרטיס רכב
+                </a>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td class="plate-cell">44-555-12</td>
+            <td>פורד ריינג'ר</td>
+            <td class="amount-cell" style="font-weight:700">380</td>
+            <td class="amount-cell">300</td>
+            <td>
+              <div class="exceeded-bar">
+                <div class="bar-track"><div class="bar-fill" style="width:53%"></div></div>
+                <span class="exceeded-text mid">+80 ל' (27%)</span>
+              </div>
+            </td>
+            <td>עמית שלום</td>
+            <td>תחנת כוח רוטנברג</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">77-321-09</td>
+            <td>טויוטה היילקס</td>
+            <td class="amount-cell" style="font-weight:700">342</td>
+            <td class="amount-cell">300</td>
+            <td>
+              <div class="exceeded-bar">
+                <div class="bar-track"><div class="bar-fill" style="width:28%"></div></div>
+                <span class="exceeded-text mid">+42 ל' (14%)</span>
+              </div>
+            </td>
+            <td>רון אלקלעי</td>
+            <td>קו גז 401</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">88-112-33</td>
+            <td>איסוזו D-MAX</td>
+            <td class="amount-cell" style="font-weight:700">520</td>
+            <td class="amount-cell">400</td>
+            <td>
+              <div class="exceeded-bar">
+                <div class="bar-track"><div class="bar-fill high" style="width:60%"></div></div>
+                <span class="exceeded-text high">+120 ל' (30%)</span>
+              </div>
+            </td>
+            <td>נסים כדורי</td>
+            <td>מאגר תמר</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">19-876-22</td>
+            <td>מיצובישי אאוטלנדר</td>
+            <td class="amount-cell" style="font-weight:700">195</td>
+            <td class="amount-cell">180</td>
+            <td>
+              <div class="exceeded-bar">
+                <div class="bar-track"><div class="bar-fill" style="width:17%"></div></div>
+                <span class="exceeded-text mid">+15 ל' (8%)</span>
+              </div>
+            </td>
+            <td>אורן חזן</td>
+            <td>קו גז מערבי</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ GROUP 5: DUPLICATE ══════════════════════════════════════════ -->
+  <div class="anomaly-group group-warning">
+    <div class="group-header" onclick="toggleGroup(this)">
+      <span class="group-arrow open">&#9654;</span>
+      <span class="severity-dot dot-amber"></span>
+      <span class="group-title">תדלוק כפול באותו יום</span>
+      <div class="group-counts">
+        <span class="group-count-badge">13 תדלוקים</span>
+        <span class="group-count-badge">6 רכבים</span>
+      </div>
+    </div>
+    <div class="group-body">
+      <table class="anomaly-table">
+        <thead>
+          <tr>
+            <th>מס' רישוי</th>
+            <th>יצרן / דגם</th>
+            <th>תאריך</th>
+            <th>מס' תדלוקים</th>
+            <th>סה"כ כמות</th>
+            <th>סה"כ סכום</th>
+            <th>נהג</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr onclick="toggleDetail(this)">
+            <td class="plate-cell">66-443-21</td>
+            <td>מרצדס ספרינטר</td>
+            <td>11/02/2026</td>
+            <td style="font-weight:700; color:var(--amber-600)">3</td>
+            <td class="amount-cell">185.0</td>
+            <td class="amount-cell">&#8362;1,573</td>
+            <td>סמי עבדאללה</td>
+          </tr>
+          <tr class="row-detail-row" style="display:none">
+            <td colspan="7">
+              <div class="row-detail">
+                <div style="font-size:0.82rem; font-weight:600; margin-bottom:8px; color:var(--text-muted)">3 תדלוקים ב-11/02/2026:</div>
+                <table class="dup-sub-table">
+                  <thead>
+                    <tr><th>שעה</th><th>כמות</th><th>סכום</th><th>תחנה</th><th>ספק</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>06:15</td><td>65 ל'</td><td>&#8362;553</td><td>סונול - ת"א</td><td>דלק</td></tr>
+                    <tr><td>12:40</td><td>55 ל'</td><td>&#8362;468</td><td>פז - רחובות</td><td>דלק</td></tr>
+                    <tr><td>18:30</td><td>65 ל'</td><td>&#8362;553</td><td>דור אלון - אשדוד</td><td>דלק</td></tr>
+                  </tbody>
+                </table>
+                <a href="#" class="detail-link">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  פתח כרטיס רכב
+                </a>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td class="plate-cell">22-876-54</td>
+            <td>מיצובישי L200</td>
+            <td>16/02/2026</td>
+            <td style="font-weight:700; color:var(--amber-600)">2</td>
+            <td class="amount-cell">130.0</td>
+            <td class="amount-cell">&#8362;1,105</td>
+            <td>חיים ברק</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">88-112-33</td>
+            <td>איסוזו D-MAX</td>
+            <td>09/02/2026</td>
+            <td style="font-weight:700; color:var(--amber-600)">2</td>
+            <td class="amount-cell">95.0</td>
+            <td class="amount-cell">&#8362;808</td>
+            <td>נסים כדורי</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">44-555-12</td>
+            <td>פורד ריינג'ר</td>
+            <td>21/02/2026</td>
+            <td style="font-weight:700; color:var(--amber-600)">2</td>
+            <td class="amount-cell">110.0</td>
+            <td class="amount-cell">&#8362;935</td>
+            <td>עמית שלום</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">77-321-09</td>
+            <td>טויוטה היילקס</td>
+            <td>05/02/2026</td>
+            <td style="font-weight:700; color:var(--amber-600)">2</td>
+            <td class="amount-cell">88.5</td>
+            <td class="amount-cell">&#8362;752</td>
+            <td>רון אלקלעי</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">19-876-22</td>
+            <td>מיצובישי אאוטלנדר</td>
+            <td>28/02/2026</td>
+            <td style="font-weight:700; color:var(--amber-600)">2</td>
+            <td class="amount-cell">72.0</td>
+            <td class="amount-cell">&#8362;612</td>
+            <td>אורן חזן</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ GROUP 6: EILAT (COLLAPSED) ══════════════════════════════════════════ -->
+  <div class="anomaly-group group-info">
+    <div class="group-header" onclick="toggleGroup(this)">
+      <span class="group-arrow">&#9654;</span>
+      <span class="severity-dot dot-yellow"></span>
+      <span class="group-title">תדלוק באזור אילת</span>
+      <div class="group-counts">
+        <span class="group-count-badge">7 תדלוקים</span>
+        <span class="group-count-badge">5 רכבים</span>
+      </div>
+    </div>
+    <div class="group-body" style="display:none">
+      <table class="anomaly-table">
+        <thead>
+          <tr>
+            <th>מס' רישוי</th>
+            <th>יצרן / דגם</th>
+            <th>תאריך</th>
+            <th>כמות (ליטר)</th>
+            <th>סכום נטו</th>
+            <th>תחנה</th>
+            <th>נהג</th>
+            <th>פרויקט</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="plate-cell">51-234-87</td>
+            <td>טויוטה היילקס</td>
+            <td>04/02/2026</td>
+            <td class="amount-cell">65.0</td>
+            <td class="amount-cell">&#8362;553</td>
+            <td style="font-weight:600; color:var(--yellow-700)">סונול - אילת</td>
+            <td>מאיר דיין</td>
+            <td>צינור אילת-אשקלון</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">51-234-87</td>
+            <td>טויוטה היילקס</td>
+            <td>06/02/2026</td>
+            <td class="amount-cell">58.0</td>
+            <td class="amount-cell">&#8362;493</td>
+            <td style="font-weight:600; color:var(--yellow-700)">פז - יטבתה</td>
+            <td>מאיר דיין</td>
+            <td>צינור אילת-אשקלון</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">39-876-11</td>
+            <td>פורד ריינג'ר</td>
+            <td>10/02/2026</td>
+            <td class="amount-cell">72.3</td>
+            <td class="amount-cell">&#8362;615</td>
+            <td style="font-weight:600; color:var(--yellow-700)">דלק - מצפה רמון</td>
+            <td>אלי שושן</td>
+            <td>מאגר תמר</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">82-456-33</td>
+            <td>איסוזו D-MAX</td>
+            <td>15/02/2026</td>
+            <td class="amount-cell">80.0</td>
+            <td class="amount-cell">&#8362;680</td>
+            <td style="font-weight:600; color:var(--yellow-700)">סונול - באר אורה</td>
+            <td>נחמן גולד</td>
+            <td>קו גז דרומי</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">82-456-33</td>
+            <td>איסוזו D-MAX</td>
+            <td>18/02/2026</td>
+            <td class="amount-cell">75.5</td>
+            <td class="amount-cell">&#8362;642</td>
+            <td style="font-weight:600; color:var(--yellow-700)">פז - תמנע</td>
+            <td>נחמן גולד</td>
+            <td>קו גז דרומי</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">14-789-55</td>
+            <td>מיצובישי L200</td>
+            <td>20/02/2026</td>
+            <td class="amount-cell">60.0</td>
+            <td class="amount-cell">&#8362;510</td>
+            <td style="font-weight:600; color:var(--yellow-700)">דור אלון - ערבה</td>
+            <td>סאלח חמדאן</td>
+            <td>צינור אילת-אשקלון</td>
+          </tr>
+          <tr>
+            <td class="plate-cell">67-123-44</td>
+            <td>סקודה אוקטביה</td>
+            <td>25/02/2026</td>
+            <td class="amount-cell">35.0</td>
+            <td class="amount-cell">&#8362;298</td>
+            <td style="font-weight:600; color:var(--yellow-700)">דלק - אילת</td>
+            <td>עופר מלכה</td>
+            <td>ביקורת שנתית</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function toggleGroup(header) {
+    const arrow = header.querySelector('.group-arrow');
+    const body = header.nextElementSibling;
+    const isOpen = arrow.classList.contains('open');
+
+    if (isOpen) {
+      arrow.classList.remove('open');
+      body.style.display = 'none';
+    } else {
+      arrow.classList.add('open');
+      body.style.display = '';
+    }
+  }
+
+  function toggleDetail(row) {
+    const detailRow = row.nextElementSibling;
+    if (detailRow && detailRow.classList.contains('row-detail-row')) {
+      detailRow.style.display = detailRow.style.display === 'none' ? '' : 'none';
+    }
+  }
+</script>
+
+</body>
+</html>

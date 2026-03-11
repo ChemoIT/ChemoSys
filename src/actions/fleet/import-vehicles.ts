@@ -74,7 +74,13 @@ export type ParsedVehicle = {
   documents: ParsedVehicleDocument[]
   replacementVehicles: ParsedReplacement[]
   monthlyFuelLimitLiters: number | null
-  // Responsible (last entry from SplitStr)
+  monthlyFuelLimitAlert: boolean
+  serviceIntervalKm: number | null
+  serviceIntervalAlert: boolean
+  annualKmLimit: number | null
+  annualKmLimitAlert: boolean
+  // Responsible (f[30] type + f[25] SplitStr for custom)
+  campResponsibleType: 'project_manager' | 'other'
   campResponsibleName: string | null
   campResponsiblePhone: string | null
 }
@@ -312,22 +318,34 @@ export async function parseCarListFile(buffer: Buffer): Promise<CarListParseResu
       fuelCard: (fuelCard ?? '').trim(),
     })).filter(r => r.vehNum)
 
-    // ── SplitStr: Monthly fuel limit (col 23, step=2) — take last non-zero value ──
-    const fuelEntries = parseSplitStr(f[23] ?? '', 2)
-    let monthlyFuelLimitLiters: number | null = null
-    for (const [, maxLiters] of fuelEntries) {
-      const val = maxLiters?.trim() ? parseInt(maxLiters.trim(), 10) : 0
-      if (val > 0) monthlyFuelLimitLiters = val
+    // ── SplitStr: Alert~Value~ pattern (single pair) ──
+    // f[23] = הגבלת דלק בליטרים, f[40] = תדירות טיפולים בק"מ, f[48] = הגבלת ק"מ
+    function parseAlertValue(fieldIdx: number): { alert: boolean; value: number | null } {
+      const entries = parseSplitStr(f[fieldIdx] ?? '', 2)
+      if (entries.length === 0) return { alert: false, value: null }
+      const [alertStr, valStr] = entries[entries.length - 1]
+      const alert = alertStr?.trim() === '1'
+      const val = valStr?.trim() ? parseInt(valStr.trim(), 10) : 0
+      return { alert, value: val > 0 ? val : null }
     }
 
-    // ── SplitStr: Responsible history (col 25, step=3) — take last entry ──
-    const responsibleEntries = parseSplitStr(f[25] ?? '', 3)
+    const fuelLimit = parseAlertValue(23)
+    const serviceInterval = parseAlertValue(40)
+    const kmLimit = parseAlertValue(48)
+
+    // ── Camp responsible: f[30] = type, f[25] = custom name/phone ──
+    // f[30]='1' → project_manager (use project's main manager)
+    // f[30]='' → custom (take name+phone from f[25] SplitStr: date~Name~Phone~)
+    const campResponsibleType = (f[30] ?? '').trim() === '1' ? 'project_manager' : 'other'
     let campResponsibleName: string | null = null
     let campResponsiblePhone: string | null = null
-    if (responsibleEntries.length > 0) {
-      const last = responsibleEntries[responsibleEntries.length - 1]
-      campResponsibleName = (last[1] ?? '').trim() || null
-      campResponsiblePhone = normalizePhone((last[2] ?? '').trim())
+    if (campResponsibleType === 'other') {
+      const responsibleEntries = parseSplitStr(f[25] ?? '', 3)
+      if (responsibleEntries.length > 0) {
+        const last = responsibleEntries[responsibleEntries.length - 1]
+        campResponsibleName = (last[1] ?? '').trim() || null
+        campResponsiblePhone = normalizePhone((last[2] ?? '').trim())
+      }
     }
 
     const isActive = !f[20] || f[20].trim() === ''
@@ -360,7 +378,13 @@ export async function parseCarListFile(buffer: Buffer): Promise<CarListParseResu
       projectAssignments,
       documents,
       replacementVehicles,
-      monthlyFuelLimitLiters,
+      monthlyFuelLimitLiters: fuelLimit.value,
+      monthlyFuelLimitAlert: fuelLimit.alert,
+      serviceIntervalKm: serviceInterval.value,
+      serviceIntervalAlert: serviceInterval.alert,
+      annualKmLimit: kmLimit.value,
+      annualKmLimitAlert: kmLimit.alert,
+      campResponsibleType,
       campResponsibleName,
       campResponsiblePhone,
     })
@@ -596,13 +620,14 @@ export async function executeVehicleImport(fileBuffer: Buffer): Promise<VehicleI
     }
   }
 
-  // ── 2. Process each vehicle ──
-  for (const item of deduped) {
-    const { parsed, mode, existingVehicleId } = item
+  // ── 2. Separate by mode ──
+  const toUpdate = deduped.filter(i => i.mode === 'update' && i.existingVehicleId)
+  const toInsert = deduped.filter(i => i.mode === 'insert')
 
+  // Helper: build vehicleData object from parsed record
+  function buildVehicleData(parsed: ParsedVehicle) {
     const supplierId = parsed.owner ? (supplierMap.get(parsed.owner) ?? null) : null
-
-    const vehicleData = {
+    return {
       license_plate: parsed.licensePlate,
       vehicle_type: parsed.vehicleType,
       tozeret_nm: parsed.manufacturer || null,
@@ -626,240 +651,279 @@ export async function executeVehicleImport(fileBuffer: Buffer): Promise<VehicleI
       toll_road_permits: parsed.tollRoadPermits,
       weekend_holiday_permit: parsed.weekendHolidayPermit,
       monthly_fuel_limit_liters: parsed.monthlyFuelLimitLiters,
+      monthly_fuel_limit_alert: parsed.monthlyFuelLimitAlert,
+      service_interval_km: parsed.serviceIntervalKm,
+      service_interval_alert: parsed.serviceIntervalAlert,
+      annual_km_limit: parsed.annualKmLimit,
+      annual_km_limit_alert: parsed.annualKmLimitAlert,
+      camp_responsible_type: parsed.campResponsibleType,
       camp_responsible_name: parsed.campResponsibleName,
       camp_responsible_phone: parsed.campResponsiblePhone,
       updated_by: userId,
     }
+  }
 
-    let vehicleId: string
+  // ── 3. Soft-delete cleanup (batch — replaces per-vehicle sequential deletes) ──
+  const softDeletedIds = toInsert
+    .filter(i => i.existingVehicleId)
+    .map(i => i.existingVehicleId!)
 
-    if (mode === 'update' && existingVehicleId) {
-      const { error: updateErr } = await admin
-        .from('vehicles')
-        .update(vehicleData)
-        .eq('id', existingVehicleId)
+  if (softDeletedIds.length > 0) {
+    // Get all replacement record IDs for fuel card cleanup
+    const { data: allRecs } = await admin
+      .from('vehicle_replacement_records').select('id').in('vehicle_id', softDeletedIds)
+    const allRecIds = allRecs?.map((r: { id: string }) => r.id) ?? []
 
-      if (updateErr) {
-        result.errors.push(`עדכון רכב ${parsed.licensePlate}: ${updateErr.message}`)
-        continue
-      }
-      result.vehiclesUpdated++
-      vehicleId = existingVehicleId
+    await Promise.all([
+      admin.from('vehicle_monthly_costs').delete().in('vehicle_id', softDeletedIds),
+      admin.from('vehicle_documents').delete().in('vehicle_id', softDeletedIds),
+      allRecIds.length > 0
+        ? admin.from('vehicle_fuel_cards').delete().in('replacement_record_id', allRecIds)
+        : Promise.resolve(),
+      admin.from('vehicle_driver_journal').delete().in('vehicle_id', softDeletedIds),
+      admin.from('vehicle_project_journal').delete().in('vehicle_id', softDeletedIds),
+      admin.from('vehicle_images').delete().in('vehicle_id', softDeletedIds),
+    ])
+    await admin.from('vehicle_replacement_records').delete().in('vehicle_id', softDeletedIds)
+    await admin.from('vehicles').delete().in('id', softDeletedIds)
+  }
 
+  // ── 4. Batch INSERT new vehicles (one call instead of N) ──
+  const vehicleIdMap = new Map<string, string>() // "plate|contract" → vehicleId
+
+  if (toInsert.length > 0) {
+    const insertRows = toInsert.map(i => ({ ...buildVehicleData(i.parsed), created_by: userId }))
+    const { data: inserted, error: insertErr } = await admin
+      .from('vehicles')
+      .insert(insertRows)
+      .select('id, license_plate, contract_number')
+
+    if (insertErr) {
+      result.errors.push(`הוספת רכבים: ${insertErr.message}`)
     } else {
-      // If soft-deleted exists, hard-delete first — all deletions in parallel
-      if (existingVehicleId) {
-        // Fuel cards need replacement_record_ids first
-        const { data: existingRecs } = await admin
-          .from('vehicle_replacement_records').select('id').eq('vehicle_id', existingVehicleId)
-        const recIds = existingRecs?.map((r: { id: string }) => r.id) ?? []
-
-        await Promise.all([
-          admin.from('vehicle_monthly_costs').delete().eq('vehicle_id', existingVehicleId),
-          admin.from('vehicle_documents').delete().eq('vehicle_id', existingVehicleId),
-          recIds.length > 0
-            ? admin.from('vehicle_fuel_cards').delete().in('replacement_record_id', recIds)
-            : Promise.resolve(),
-          admin.from('vehicle_driver_journal').delete().eq('vehicle_id', existingVehicleId),
-          admin.from('vehicle_project_journal').delete().eq('vehicle_id', existingVehicleId),
-          admin.from('vehicle_images').delete().eq('vehicle_id', existingVehicleId),
-        ])
-        // These must be sequential: replacement_records after fuel_cards, then vehicles
-        await admin.from('vehicle_replacement_records').delete().eq('vehicle_id', existingVehicleId)
-        await admin.from('vehicles').delete().eq('id', existingVehicleId)
+      for (const v of inserted ?? []) {
+        const key = `${v.license_plate}|${v.contract_number ?? ''}`
+        vehicleIdMap.set(key, v.id)
       }
-
-      const { data: vehicleRow, error: vehicleErr } = await admin
-        .from('vehicles')
-        .insert({ ...vehicleData, created_by: userId })
-        .select('id')
-        .single()
-
-      if (vehicleErr || !vehicleRow) {
-        result.errors.push(`רכב ${parsed.licensePlate}: ${vehicleErr?.message ?? 'שגיאה'}`)
-        continue
-      }
-      result.vehiclesCreated++
-      vehicleId = vehicleRow.id
+      result.vehiclesCreated = inserted?.length ?? 0
     }
+  }
 
-    // ── Child records — batch delete then batch insert ──
+  // ── 5. Parallel UPDATE existing vehicles (chunks of 50) ──
+  const CHUNK = 50
+  for (let i = 0; i < toUpdate.length; i += CHUNK) {
+    const chunk = toUpdate.slice(i, i + CHUNK)
+    const updateResults = await Promise.all(
+      chunk.map(item =>
+        admin.from('vehicles')
+          .update(buildVehicleData(item.parsed))
+          .eq('id', item.existingVehicleId!)
+      )
+    )
+    for (let j = 0; j < updateResults.length; j++) {
+      if (updateResults[j].error) {
+        result.errors.push(`עדכון רכב ${chunk[j].parsed.licensePlate}: ${updateResults[j].error!.message}`)
+      } else {
+        result.vehiclesUpdated++
+        const key = `${chunk[j].parsed.licensePlate}|${chunk[j].parsed.contractNumber}`
+        vehicleIdMap.set(key, chunk[j].existingVehicleId!)
+      }
+    }
+  }
 
-    // Build all batch arrays first, then delete+insert per table
-    const deletePromises: PromiseLike<unknown>[] = []
+  // ── 6. Batch delete child records for ALL processed vehicles ──
+  // Only delete tables that have data in CarList (preserve manually-added data)
+  const idsWithCosts: string[] = []
+  const idsWithDocs: string[] = []
+  const idsWithDrivers: string[] = []
+  const idsWithProjects: string[] = []
+  const idsWithReplacements: string[] = []
+
+  for (const item of deduped) {
+    const key = `${item.parsed.licensePlate}|${item.parsed.contractNumber}`
+    const vid = vehicleIdMap.get(key)
+    if (!vid) continue
+    if (item.parsed.monthlyCosts.length > 0) idsWithCosts.push(vid)
+    if (item.parsed.documents.length > 0) idsWithDocs.push(vid)
+    if (item.parsed.driverHistory.length > 0) idsWithDrivers.push(vid)
+    if (item.parsed.projectAssignments.length > 0) idsWithProjects.push(vid)
+    if (item.parsed.replacementVehicles.length > 0) idsWithReplacements.push(vid)
+  }
+
+  // Replacement cleanup: need to delete fuel_cards before replacement_records
+  if (idsWithReplacements.length > 0) {
+    const { data: existingRecs } = await admin
+      .from('vehicle_replacement_records').select('id').in('vehicle_id', idsWithReplacements)
+    const recIds = existingRecs?.map((r: { id: string }) => r.id) ?? []
+    if (recIds.length > 0) {
+      await admin.from('vehicle_fuel_cards').delete().in('replacement_record_id', recIds)
+    }
+  }
+
+  // Delete all child records in parallel (one call per table instead of per-vehicle)
+  await Promise.all([
+    idsWithCosts.length > 0
+      ? admin.from('vehicle_monthly_costs').delete().in('vehicle_id', idsWithCosts)
+      : Promise.resolve(),
+    idsWithDocs.length > 0
+      ? admin.from('vehicle_documents').delete().in('vehicle_id', idsWithDocs)
+      : Promise.resolve(),
+    idsWithDrivers.length > 0
+      ? admin.from('vehicle_driver_journal').delete().in('vehicle_id', idsWithDrivers)
+      : Promise.resolve(),
+    idsWithProjects.length > 0
+      ? admin.from('vehicle_project_journal').delete().in('vehicle_id', idsWithProjects)
+      : Promise.resolve(),
+    idsWithReplacements.length > 0
+      ? admin.from('vehicle_replacement_records').delete().in('vehicle_id', idsWithReplacements)
+      : Promise.resolve(),
+  ])
+
+  // ── 7. Build ALL child rows ──
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allCostRows: any[] = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allDocRows: any[] = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allDriverRows: any[] = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allProjectRows: any[] = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allReplacementRows: any[] = []
+  const allDocNames = new Set<string>()
+
+  type FuelCardPending = { vehicleId: string; plate: string; entryDate: string; fuelCard: string }
+  const pendingFuelCards: FuelCardPending[] = []
+
+  for (const item of deduped) {
+    const key = `${item.parsed.licensePlate}|${item.parsed.contractNumber}`
+    const vehicleId = vehicleIdMap.get(key)
+    if (!vehicleId) continue
+    const parsed = item.parsed
 
     // Monthly costs
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const costRows: any[] = []
-    if (parsed.monthlyCosts.length > 0) {
-      deletePromises.push(admin.from('vehicle_monthly_costs').delete().eq('vehicle_id', vehicleId))
-      for (let i = 0; i < parsed.monthlyCosts.length; i++) {
-        const cost = parsed.monthlyCosts[i]
-        if (!cost.date) continue
-        const endDate = i < parsed.monthlyCosts.length - 1 ? parsed.monthlyCosts[i + 1].date : null
-        costRows.push({
-          vehicle_id: vehicleId, start_date: cost.date, end_date: endDate,
-          amount: cost.amount, created_by: userId, updated_by: userId,
-        })
-      }
+    for (let i = 0; i < parsed.monthlyCosts.length; i++) {
+      const cost = parsed.monthlyCosts[i]
+      if (!cost.date) continue
+      const endDate = i < parsed.monthlyCosts.length - 1 ? parsed.monthlyCosts[i + 1].date : null
+      allCostRows.push({
+        vehicle_id: vehicleId, start_date: cost.date, end_date: endDate,
+        amount: cost.amount, created_by: userId, updated_by: userId,
+      })
     }
 
     // Documents
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const docRows: any[] = []
-    const docNames = new Set<string>()
-    if (parsed.documents.length > 0) {
-      deletePromises.push(admin.from('vehicle_documents').delete().eq('vehicle_id', vehicleId))
-      for (const doc of parsed.documents) {
-        docRows.push({
-          vehicle_id: vehicleId, document_name: doc.name, expiry_date: doc.expiryDate,
-          alert_enabled: !!doc.expiryDate, created_by: userId, updated_by: userId,
-        })
-        docNames.add(doc.name)
-      }
+    for (const doc of parsed.documents) {
+      allDocRows.push({
+        vehicle_id: vehicleId, document_name: doc.name, expiry_date: doc.expiryDate,
+        alert_enabled: !!doc.expiryDate, created_by: userId, updated_by: userId,
+      })
+      allDocNames.add(doc.name)
     }
 
     // Driver journal
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const driverRows: any[] = []
-    if (parsed.driverHistory.length > 0) {
-      deletePromises.push(admin.from('vehicle_driver_journal').delete().eq('vehicle_id', vehicleId))
-      for (let i = 0; i < parsed.driverHistory.length; i++) {
-        const entry = parsed.driverHistory[i]
-        const driverId = resolveDriverId(entry.empNum, entry.companyNum)
-        if (!driverId || !entry.date) continue
-        const endDate = i < parsed.driverHistory.length - 1 ? parsed.driverHistory[i + 1].date : null
-        driverRows.push({
-          vehicle_id: vehicleId, driver_id: driverId, start_date: entry.date,
-          end_date: endDate, created_by: userId,
-        })
-      }
+    for (let i = 0; i < parsed.driverHistory.length; i++) {
+      const entry = parsed.driverHistory[i]
+      const driverId = resolveDriverId(entry.empNum, entry.companyNum)
+      if (!driverId || !entry.date) continue
+      const endDate = i < parsed.driverHistory.length - 1 ? parsed.driverHistory[i + 1].date : null
+      allDriverRows.push({
+        vehicle_id: vehicleId, driver_id: driverId, start_date: entry.date,
+        end_date: endDate, created_by: userId,
+      })
     }
 
     // Project journal
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const projectRows: any[] = []
-    if (parsed.projectAssignments.length > 0) {
-      deletePromises.push(admin.from('vehicle_project_journal').delete().eq('vehicle_id', vehicleId))
-      for (let i = 0; i < parsed.projectAssignments.length; i++) {
-        const entry = parsed.projectAssignments[i]
-        const projectId = projectLookup.get(entry.projectNum)
-        if (!projectId || !entry.date) continue
-        const endDate = i < parsed.projectAssignments.length - 1 ? parsed.projectAssignments[i + 1].date : null
-        projectRows.push({
-          vehicle_id: vehicleId, project_id: projectId, start_date: entry.date,
-          end_date: endDate, created_by: userId,
-        })
+    for (let i = 0; i < parsed.projectAssignments.length; i++) {
+      const entry = parsed.projectAssignments[i]
+      const projectId = projectLookup.get(entry.projectNum)
+      if (!projectId || !entry.date) continue
+      const endDate = i < parsed.projectAssignments.length - 1 ? parsed.projectAssignments[i + 1].date : null
+      allProjectRows.push({
+        vehicle_id: vehicleId, project_id: projectId, start_date: entry.date,
+        end_date: endDate, created_by: userId,
+      })
+    }
+
+    // Replacement vehicles
+    for (const rv of parsed.replacementVehicles) {
+      if (!rv.entryDate) continue
+      allReplacementRows.push({
+        vehicle_id: vehicleId, license_plate: rv.vehNum, entry_date: rv.entryDate,
+        entry_km: rv.entryKm, return_date: rv.exitDate, return_km: rv.exitKm,
+        reason: 'other', reason_other: rv.reason || null,
+        status: rv.exitDate ? 'returned' : 'active',
+        notes: rv.notes || null, created_by: userId, updated_by: userId,
+      })
+      if (rv.fuelCard) {
+        pendingFuelCards.push({ vehicleId, plate: rv.vehNum, entryDate: rv.entryDate, fuelCard: rv.fuelCard })
       }
     }
+  }
 
-    // Replacement vehicles — need IDs back for fuel cards, so handle separately
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const replacementRows: any[] = []
-    const replacementFuelCards: { index: number; fuelCard: string }[] = []
-    if (parsed.replacementVehicles.length > 0) {
-      const { data: existingRecs } = await admin
-        .from('vehicle_replacement_records').select('id').eq('vehicle_id', vehicleId)
-      if (existingRecs?.length) {
-        await admin.from('vehicle_fuel_cards').delete().in('replacement_record_id',
-          existingRecs.map((r: { id: string }) => r.id))
+  // ── 8. Batch INSERT all child records (6 calls instead of ~11,000) ──
+  const [costRes, docRes, drvRes, projRes] = await Promise.all([
+    allCostRows.length > 0
+      ? admin.from('vehicle_monthly_costs').insert(allCostRows)
+      : { error: null },
+    allDocRows.length > 0
+      ? admin.from('vehicle_documents').insert(allDocRows)
+      : { error: null },
+    allDriverRows.length > 0
+      ? admin.from('vehicle_driver_journal').insert(allDriverRows)
+      : { error: null },
+    allProjectRows.length > 0
+      ? admin.from('vehicle_project_journal').insert(allProjectRows)
+      : { error: null },
+  ])
+
+  if (!costRes.error) result.monthlyCostsCreated = allCostRows.length
+  else result.errors.push(`עלויות: ${costRes.error.message}`)
+  if (!docRes.error) result.documentsCreated = allDocRows.length
+  else result.errors.push(`מסמכים: ${docRes.error.message}`)
+  if (!drvRes.error) result.driverJournalCreated = allDriverRows.length
+  else result.errors.push(`יומן נהגים: ${drvRes.error.message}`)
+  if (!projRes.error) result.projectJournalCreated = allProjectRows.length
+  else result.errors.push(`יומן פרויקטים: ${projRes.error.message}`)
+
+  // Replacement vehicles — need IDs back for fuel cards
+  if (allReplacementRows.length > 0) {
+    const { data: repData, error: repErr } = await admin
+      .from('vehicle_replacement_records')
+      .insert(allReplacementRows)
+      .select('id, vehicle_id, license_plate, entry_date')
+
+    if (repErr || !repData) {
+      result.errors.push(`רכבים חלופיים: ${repErr?.message ?? 'שגיאה'}`)
+    } else {
+      result.replacementsCreated = repData.length
+
+      // Map fuel cards using composite key
+      if (pendingFuelCards.length > 0) {
+        const recLookup = new Map<string, string>()
+        for (const rec of repData) {
+          recLookup.set(`${rec.vehicle_id}|${rec.license_plate}|${rec.entry_date}`, rec.id)
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fuelCardRows: any[] = []
+        for (const fc of pendingFuelCards) {
+          const recId = recLookup.get(`${fc.vehicleId}|${fc.plate}|${fc.entryDate}`)
+          if (recId) {
+            fuelCardRows.push({ replacement_record_id: recId, card_number: fc.fuelCard, created_by: userId })
+          }
+        }
+        if (fuelCardRows.length > 0) {
+          await admin.from('vehicle_fuel_cards').insert(fuelCardRows)
+        }
       }
-      deletePromises.push(admin.from('vehicle_replacement_records').delete().eq('vehicle_id', vehicleId))
-
-      for (const rv of parsed.replacementVehicles) {
-        if (!rv.entryDate) continue
-        const idx = replacementRows.length
-        replacementRows.push({
-          vehicle_id: vehicleId, license_plate: rv.vehNum, entry_date: rv.entryDate,
-          entry_km: rv.entryKm, return_date: rv.exitDate, return_km: rv.exitKm,
-          reason: 'other', reason_other: rv.reason || null,
-          status: rv.exitDate ? 'returned' : 'active',
-          notes: rv.notes || null, created_by: userId, updated_by: userId,
-        })
-        if (rv.fuelCard) replacementFuelCards.push({ index: idx, fuelCard: rv.fuelCard })
-      }
     }
+  }
 
-    // Execute all deletes in parallel
-    if (deletePromises.length > 0) await Promise.all(deletePromises)
-
-    // Execute all batch inserts in parallel
-    const insertPromises: PromiseLike<void>[] = []
-
-    if (costRows.length > 0) {
-      insertPromises.push(
-        admin.from('vehicle_monthly_costs').insert(costRows).then(({ error }: { error: unknown }) => {
-          if (!error) result.monthlyCostsCreated += costRows.length
-          else result.errors.push(`עלויות ${parsed.licensePlate}: ${(error as { message: string }).message}`)
-        })
-      )
-    }
-
-    if (docRows.length > 0) {
-      insertPromises.push(
-        admin.from('vehicle_documents').insert(docRows).then(({ error }: { error: unknown }) => {
-          if (!error) result.documentsCreated += docRows.length
-          else result.errors.push(`מסמכים ${parsed.licensePlate}: ${(error as { message: string }).message}`)
-        })
-      )
-    }
-
-    if (driverRows.length > 0) {
-      insertPromises.push(
-        admin.from('vehicle_driver_journal').insert(driverRows).then(({ error }: { error: unknown }) => {
-          if (!error) result.driverJournalCreated += driverRows.length
-          else result.errors.push(`נהגים ${parsed.licensePlate}: ${(error as { message: string }).message}`)
-        })
-      )
-    }
-
-    if (projectRows.length > 0) {
-      insertPromises.push(
-        admin.from('vehicle_project_journal').insert(projectRows).then(({ error }: { error: unknown }) => {
-          if (!error) result.projectJournalCreated += projectRows.length
-          else result.errors.push(`פרויקטים ${parsed.licensePlate}: ${(error as { message: string }).message}`)
-        })
-      )
-    }
-
-    // Replacement vehicles — need IDs for fuel cards
-    if (replacementRows.length > 0) {
-      insertPromises.push(
-        admin.from('vehicle_replacement_records').insert(replacementRows).select('id').then(async ({ data, error }: { data: { id: string }[] | null; error: unknown }) => {
-          if (error || !data) {
-            result.errors.push(`חלופיים ${parsed.licensePlate}: ${(error as { message: string })?.message ?? 'שגיאה'}`)
-            return
-          }
-          result.replacementsCreated += data.length
-          // Batch insert fuel cards
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const fuelCardRows: any[] = []
-          for (const fc of replacementFuelCards) {
-            if (data[fc.index]) {
-              fuelCardRows.push({
-                replacement_record_id: data[fc.index].id,
-                card_number: fc.fuelCard,
-                created_by: userId,
-              })
-            }
-          }
-          if (fuelCardRows.length > 0) {
-            await admin.from('vehicle_fuel_cards').insert(fuelCardRows)
-          }
-        })
-      )
-    }
-
-    // Document name autocomplete — batch unique names
-    if (docNames.size > 0) {
-      insertPromises.push(
-        Promise.all([...docNames].map(name =>
-          admin.rpc('increment_vehicle_document_name_usage', { p_name: name })
-        )).then(() => {})
-      )
-    }
-
-    if (insertPromises.length > 0) await Promise.all(insertPromises)
+  // ── 9. Document name autocomplete (batch — moved out of per-vehicle loop) ──
+  if (allDocNames.size > 0) {
+    await Promise.all([...allDocNames].map(name =>
+      admin.rpc('increment_vehicle_document_name_usage', { p_name: name })
+    ))
   }
 
   if (result.errors.length > 0) result.success = false

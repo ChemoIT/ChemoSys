@@ -7,9 +7,11 @@
  */
 
 import { useState, useTransition } from 'react'
-import { Fuel, Droplets, Receipt, Banknote, Loader2 } from 'lucide-react'
+import { Fuel, Droplets, Receipt, Banknote, Loader2, FileSpreadsheet, AlertTriangle } from 'lucide-react'
 import { FuelFilters } from './FuelFilters'
 import { FuelTable } from './FuelTable'
+import { PriorityExportDialog } from './PriorityExportDialog'
+import { FuelAnomalyDialog } from './FuelAnomalyDialog'
 import { getFuelRecords, getFuelStats } from '@/actions/fleet/fuel'
 import { formatNumber, formatCurrency } from '@/lib/format'
 import type {
@@ -40,6 +42,8 @@ export function FuelRecordsPage({
   const [stats, setStats] = useState(initialStats)
   const [filters, setFilters] = useState(initialFilters)
   const [isPending, startTransition] = useTransition()
+  const [priorityDialogOpen, setPriorityDialogOpen] = useState(false)
+  const [anomalyDialogOpen, setAnomalyDialogOpen] = useState(false)
 
   const applyFilters = (newFilters: FuelFiltersType) => {
     setFilters(newFilters)
@@ -73,7 +77,25 @@ export function FuelRecordsPage({
     <div className="max-w-[calc(100%-6cm)] mx-auto w-full space-y-5">
       {/* ── Header ──────────────────────────────────────── */}
       <div>
-        <h1 className="text-[22px] font-bold text-foreground tracking-tight">תדלוקים</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-[22px] font-bold text-foreground tracking-tight">תדלוקים</h1>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setAnomalyDialogOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-orange-200 bg-orange-50 text-orange-700 text-xs font-medium hover:bg-orange-100 transition-colors cursor-pointer"
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />
+              דוח חריגים
+            </button>
+            <button
+              onClick={() => setPriorityDialogOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-teal-200 bg-teal-50 text-teal-700 text-xs font-medium hover:bg-teal-100 transition-colors cursor-pointer"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              ייצוא לפריוריטי
+            </button>
+          </div>
+        </div>
         {/* Stat chips */}
         <div className="flex items-center gap-2 mt-2 flex-wrap">
           <StatChip
@@ -135,6 +157,16 @@ export function FuelRecordsPage({
         sortBy={filters.sortBy}
         sortDir={filters.sortDir}
         onSort={handleSort}
+      />
+
+      {/* ── Dialogs ─────────────────────────────────────────── */}
+      <PriorityExportDialog
+        open={priorityDialogOpen}
+        onOpenChange={setPriorityDialogOpen}
+      />
+      <FuelAnomalyDialog
+        open={anomalyDialogOpen}
+        onOpenChange={setAnomalyDialogOpen}
       />
     </div>
   )

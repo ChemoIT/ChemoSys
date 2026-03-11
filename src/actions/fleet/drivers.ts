@@ -306,33 +306,31 @@ export async function getActiveEmployeesWithoutDriver(): Promise<EmployeeOption[
   await verifyAppUser()
   const supabase = await createClient()
 
-  // Fetch all active employees
-  const { data: employees, error: empError } = await supabase
-    .from('employees')
-    .select('id, first_name, last_name, employee_number, companies ( name )')
-    .eq('status', 'active')
-    .is('deleted_at', null)
-    .order('last_name', { ascending: true })
+  // IRON RULE: fetchAllRows — Supabase 1000-row limit
+  const { fetchAllRows } = await import('@/lib/supabase/fetch-all')
 
-  if (empError) throw new Error(empError.message)
+  // Fetch all active employees
+  const employees = await fetchAllRows<{ id: string; first_name: string; last_name: string; employee_number: string; companies: { name: string } | null }>(
+    supabase, 'employees',
+    'id, first_name, last_name, employee_number, companies ( name )', {
+    filters: (q: any) => q.eq('status', 'active').is('deleted_at', null),
+    order: { column: 'last_name', ascending: true },
+  })
 
   // Fetch employee IDs that already have a driver card
-  const { data: drivers, error: drvError } = await supabase
-    .from('drivers')
-    .select('employee_id')
-    .is('deleted_at', null)
+  const drivers = await fetchAllRows(supabase, 'drivers', 'employee_id', {
+    filters: (q: any) => q.is('deleted_at', null),
+  })
 
-  if (drvError) throw new Error(drvError.message)
+  const driverEmployeeIds = new Set(drivers.map((d: any) => d.employee_id))
 
-  const driverEmployeeIds = new Set((drivers ?? []).map((d) => d.employee_id))
-
-  return (employees ?? [])
+  return employees
     .filter((e) => !driverEmployeeIds.has(e.id))
     .map((e) => ({
       id: e.id,
       fullName: `${e.first_name} ${e.last_name}`,
       employeeNumber: e.employee_number,
-      companyName: ((e.companies as unknown) as { name: string } | null)?.name ?? '',
+      companyName: e.companies?.name ?? '',
     }))
 }
 

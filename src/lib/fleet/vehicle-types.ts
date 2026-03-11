@@ -334,4 +334,7 @@ export type VehicleProjectJournal = {
 export type DriverOptionForAssignment = {
   id: string        // drivers.id (not employees.id)
   fullName: string
+  employeeNumber: string | null
+  idNumber: string | null
+  companyName: string | null
 }

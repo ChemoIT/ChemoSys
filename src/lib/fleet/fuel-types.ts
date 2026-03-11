@@ -206,6 +206,69 @@ export type SupplierDryRunDeleteInfo = {
 }
 
 // ─────────────────────────────────────────────────────────────
+// PRIORITY FUEL REPORT — row returned from get_priority_fuel_report RPC
+// ─────────────────────────────────────────────────────────────
+
+/** Raw row from get_priority_fuel_report RPC (before JS aggregation) */
+export type PriorityFuelRawRow = {
+  license_plate: string
+  vehicle_category: string   // 'camp' | 'assigned'
+  employee_number: string | null
+  project_number: string | null
+  project_name: string | null
+  expense_number: string | null
+  quantity_liters: number
+  net_amount: number | null
+  fueling_date: string
+  original_plate: string | null
+}
+
+/** Aggregated row for Priority Excel export */
+export type PriorityFuelRow = {
+  licensePlate: string
+  employeeNumber: string       // employee_number / "99999" / "דו''ח חריגים"
+  pricePerLiter: number
+  totalQuantity: number
+  projectNumber: string
+  projectName: string
+  expenseNumber: string
+  originalPlate: string        // replacement vehicle original plate (empty if not replacement)
+}
+
+// ─────────────────────────────────────────────────────────────
+// FUEL ANOMALY REPORT — row returned from get_fuel_anomaly_report RPC
+// ─────────────────────────────────────────────────────────────
+
+/** Raw row from get_fuel_anomaly_report RPC (one row per fueling transaction) */
+export type FuelAnomalyRawRow = {
+  license_plate: string
+  fueling_date: string
+  fueling_time: string | null
+  fuel_supplier: string
+  fuel_type: string
+  fueling_method: string | null
+  fuel_card_number: string | null
+  quantity_liters: number
+  net_amount: number | null
+  gross_amount: number | null
+  odometer_km: number | null
+  station_name: string | null
+  vehicle_id: string | null
+  vehicle_category: string | null  // 'camp' | 'assigned'
+  vehicle_status: string | null    // 'active' | 'suspended' | 'returned' | ...
+  owner_name: string | null
+  vehicle_group: string | null
+  tozeret_nm: string | null
+  degem_nm: string | null
+  monthly_fuel_limit: number | null
+  driver_name: string | null
+  employee_number: string | null
+  project_name: string | null
+  original_plate: string | null
+  has_active_replacement: boolean
+}
+
+// ─────────────────────────────────────────────────────────────
 // FUEL RECORD TYPE — single fueling transaction
 // ─────────────────────────────────────────────────────────────
 

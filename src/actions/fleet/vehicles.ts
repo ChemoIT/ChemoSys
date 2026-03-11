@@ -969,8 +969,11 @@ export async function getActiveDriversForAssignment(): Promise<DriverOptionForAs
       employees!inner (
         first_name,
         last_name,
+        employee_number,
+        id_number,
         status,
-        deleted_at
+        deleted_at,
+        company:companies ( name )
       )
     `)
     .is('deleted_at', null)
@@ -990,10 +993,16 @@ export async function getActiveDriversForAssignment(): Promise<DriverOptionForAs
       const emp = (row.employees as unknown) as {
         first_name: string
         last_name: string
+        employee_number: string | null
+        id_number: string | null
+        company: { name: string } | null
       }
       return {
         id: row.id,
         fullName: `${emp.first_name} ${emp.last_name}`,
+        employeeNumber: emp.employee_number ?? null,
+        idNumber: emp.id_number ?? null,
+        companyName: emp.company?.name ?? null,
       }
     })
 }

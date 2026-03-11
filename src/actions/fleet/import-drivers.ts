@@ -234,7 +234,8 @@ export async function parseDriversFile(buffer: Buffer): Promise<ParseResult> {
     if (!empNum) { skipped.emptyNumber++; continue }
     if (empNum === '0') { skipped.templateRows++; continue }
     if ((f[16] ?? '').trim() !== '') { skipped.skipFlag++; continue }
-    if (empNum.startsWith('EX-') || empNum.startsWith('EX')) { skipped.exPrefix++; continue }
+    // EX- prefix filtering removed — let employee matching decide.
+    // EX-001 (אייל נחמן) is a real employee in the DB.
 
     // License
     const { categories, categoryYears } = parseLicenseGrades(f[3] ?? '')
@@ -562,145 +563,155 @@ export async function executeDriverImport(fileBuffer: Buffer): Promise<ImportRes
     }
   }
 
-  // ── 3. Process each driver ──
-  for (const item of importReady) {
-    const { parsed, employeeId, phoneOverride, mode, existingDriverId } = item
+  // ── 3. Separate by mode ──
+  const toUpdate = importReady.filter(i => i.mode === 'update' && i.existingDriverId)
+  const toInsert = importReady.filter(i => i.mode === 'insert')
 
-    let driverId: string
+  // ── 4. Soft-delete cleanup (batch — replaces per-driver sequential deletes) ──
+  const softDeletedIds = toInsert
+    .filter(i => i.existingDriverId)
+    .map(i => i.existingDriverId!)
 
-    if (mode === 'update' && existingDriverId) {
-      // ── UPDATE existing active driver ──
-      const { error: updateErr } = await admin
-        .from('drivers')
-        .update({
-          phone_override: phoneOverride,
-          is_equipment_operator: parsed.isEquipmentOperator,
-          opened_at: parsed.driverFileOpenDate ?? undefined,
-          notes: parsed.notes,
-          updated_by: userId,
-        })
-        .eq('id', existingDriverId)
+  if (softDeletedIds.length > 0) {
+    await Promise.all([
+      admin.from('driver_violations').delete().in('driver_id', softDeletedIds),
+      admin.from('driver_documents').delete().in('driver_id', softDeletedIds),
+      admin.from('driver_licenses').delete().in('driver_id', softDeletedIds),
+    ])
+    await admin.from('drivers').delete().in('id', softDeletedIds)
+  }
 
-      if (updateErr) {
-        result.errors.push(`עדכון נהג ${parsed.employeeNumber} (${parsed.driverName}): ${updateErr.message}`)
-        continue
-      }
-      result.driversUpdated++
-      driverId = existingDriverId
+  // ── 5. Batch INSERT new drivers (one call instead of N) ──
+  const driverIdMap = new Map<string, string>() // employeeId → driverId
 
-      // Update license: upsert (delete old + insert new)
-      if (parsed.licenseNumber || parsed.licenseCategories.length > 0 || parsed.licenseExpiryDate) {
-        await admin.from('driver_licenses').delete().eq('driver_id', driverId)
-        const { error: licErr } = await admin
-          .from('driver_licenses')
-          .insert({
-            driver_id: driverId,
-            license_number: parsed.licenseNumber,
-            license_categories: parsed.licenseCategories,
-            category_issue_years: parsed.categoryIssueYears,
-            expiry_date: parsed.licenseExpiryDate,
-            created_by: userId,
-            updated_by: userId,
-          })
-        if (licErr) {
-          result.errors.push(`רשיון נהג ${parsed.employeeNumber}: ${licErr.message}`)
-        } else {
-          result.licensesUpdated++
-        }
-      }
+  if (toInsert.length > 0) {
+    const insertRows = toInsert.map(item => ({
+      employee_id: item.employeeId,
+      phone_override: item.phoneOverride,
+      is_occasional_camp_driver: false,
+      is_equipment_operator: item.parsed.isEquipmentOperator,
+      opened_at: item.parsed.driverFileOpenDate ?? new Date().toISOString().split('T')[0],
+      notes: item.parsed.notes,
+      created_by: userId,
+      updated_by: userId,
+    }))
 
-      // Batch documents: delete all + re-insert as batch
-      await admin.from('driver_documents').delete().eq('driver_id', driverId)
-      if (parsed.documents.length > 0) {
-        const docRows = parsed.documents.map(doc => ({
-          driver_id: driverId,
-          document_name: doc.name,
-          expiry_date: doc.expiryDate,
-          alert_enabled: doc.alertOnExpiry,
-          deleted_at: doc.isActive ? null : new Date().toISOString(),
-          created_by: userId,
-          updated_by: userId,
-        }))
-        const { error: docErr } = await admin.from('driver_documents').insert(docRows)
-        if (docErr) {
-          result.errors.push(`מסמכים נהג ${parsed.employeeNumber}: ${docErr.message}`)
-        } else {
-          result.documentsUpdated += docRows.length
-        }
-      }
+    const { data: inserted, error: insertErr } = await admin
+      .from('drivers')
+      .insert(insertRows)
+      .select('id, employee_id')
 
+    if (insertErr) {
+      result.errors.push(`הוספת נהגים: ${insertErr.message}`)
     } else {
-      // ── INSERT new driver ──
-
-      // If soft-deleted driver exists, hard-delete it first — in parallel
-      if (existingDriverId) {
-        await Promise.all([
-          admin.from('driver_violations').delete().eq('driver_id', existingDriverId),
-          admin.from('driver_documents').delete().eq('driver_id', existingDriverId),
-          admin.from('driver_licenses').delete().eq('driver_id', existingDriverId),
-        ])
-        await admin.from('drivers').delete().eq('id', existingDriverId)
+      for (const d of inserted ?? []) {
+        driverIdMap.set(d.employee_id, d.id)
       }
+      result.driversCreated = inserted?.length ?? 0
+    }
+  }
 
-      const { data: driverRow, error: driverErr } = await admin
-        .from('drivers')
-        .insert({
-          employee_id: employeeId,
-          phone_override: phoneOverride,
-          is_occasional_camp_driver: false,
-          is_equipment_operator: parsed.isEquipmentOperator,
-          opened_at: parsed.driverFileOpenDate ?? new Date().toISOString().split('T')[0],
-          notes: parsed.notes,
-          created_by: userId,
-          updated_by: userId,
-        })
-        .select('id')
-        .single()
-
-      if (driverErr || !driverRow) {
-        result.errors.push(`נהג ${parsed.employeeNumber} (${parsed.driverName}): ${driverErr?.message ?? 'שגיאה לא ידועה'}`)
-        continue
-      }
-      result.driversCreated++
-      driverId = driverRow.id
-
-      // Insert license
-      if (parsed.licenseNumber || parsed.licenseCategories.length > 0 || parsed.licenseExpiryDate) {
-        const { error: licErr } = await admin
-          .from('driver_licenses')
-          .insert({
-            driver_id: driverId,
-            license_number: parsed.licenseNumber,
-            license_categories: parsed.licenseCategories,
-            category_issue_years: parsed.categoryIssueYears,
-            expiry_date: parsed.licenseExpiryDate,
-            created_by: userId,
+  // ── 6. Parallel UPDATE existing drivers (chunks of 50 instead of sequential) ──
+  const CHUNK = 50
+  for (let i = 0; i < toUpdate.length; i += CHUNK) {
+    const chunk = toUpdate.slice(i, i + CHUNK)
+    const updateResults = await Promise.all(
+      chunk.map(item =>
+        admin.from('drivers')
+          .update({
+            phone_override: item.phoneOverride,
+            is_equipment_operator: item.parsed.isEquipmentOperator,
+            opened_at: item.parsed.driverFileOpenDate ?? undefined,
+            notes: item.parsed.notes,
             updated_by: userId,
           })
-        if (licErr) {
-          result.errors.push(`רשיון נהג ${parsed.employeeNumber}: ${licErr.message}`)
-        } else {
-          result.licensesCreated++
-        }
+          .eq('id', item.existingDriverId!)
+      )
+    )
+    for (let j = 0; j < updateResults.length; j++) {
+      if (updateResults[j].error) {
+        result.errors.push(`עדכון נהג ${chunk[j].parsed.employeeNumber}: ${updateResults[j].error!.message}`)
+      } else {
+        result.driversUpdated++
+        driverIdMap.set(chunk[j].employeeId, chunk[j].existingDriverId!)
       }
+    }
+  }
 
-      // Batch insert documents
-      if (parsed.documents.length > 0) {
-        const docRows = parsed.documents.map(doc => ({
-          driver_id: driverId,
-          document_name: doc.name,
-          expiry_date: doc.expiryDate,
-          alert_enabled: doc.alertOnExpiry,
-          deleted_at: doc.isActive ? null : new Date().toISOString(),
-          created_by: userId,
-          updated_by: userId,
-        }))
-        const { error: docErr } = await admin.from('driver_documents').insert(docRows)
-        if (docErr) {
-          result.errors.push(`מסמכים נהג ${parsed.employeeNumber}: ${docErr.message}`)
-        } else {
-          result.documentsCreated += docRows.length
-        }
+  // ── 7. Batch delete ALL licenses + docs for processed drivers ──
+  const allDriverIds = [...driverIdMap.values()]
+  if (allDriverIds.length > 0) {
+    await Promise.all([
+      admin.from('driver_licenses').delete().in('driver_id', allDriverIds),
+      admin.from('driver_documents').delete().in('driver_id', allDriverIds),
+    ])
+  }
+
+  // ── 8. Build ALL child rows ──
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allLicenseRows: any[] = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allDocRows: any[] = []
+
+  for (const item of importReady) {
+    const driverId = driverIdMap.get(item.employeeId)
+    if (!driverId) continue
+
+    if (item.parsed.licenseNumber || item.parsed.licenseCategories.length > 0 || item.parsed.licenseExpiryDate) {
+      allLicenseRows.push({
+        driver_id: driverId,
+        license_number: item.parsed.licenseNumber,
+        license_categories: item.parsed.licenseCategories,
+        category_issue_years: item.parsed.categoryIssueYears,
+        expiry_date: item.parsed.licenseExpiryDate,
+        created_by: userId,
+        updated_by: userId,
+      })
+    }
+
+    for (const doc of item.parsed.documents) {
+      allDocRows.push({
+        driver_id: driverId,
+        document_name: doc.name,
+        expiry_date: doc.expiryDate,
+        alert_enabled: doc.alertOnExpiry,
+        deleted_at: doc.isActive ? null : new Date().toISOString(),
+        created_by: userId,
+        updated_by: userId,
+      })
+    }
+  }
+
+  // ── 9. Batch INSERT all children (2 calls instead of ~1100) ──
+  const [licResult, docResult] = await Promise.all([
+    allLicenseRows.length > 0
+      ? admin.from('driver_licenses').insert(allLicenseRows)
+      : { error: null },
+    allDocRows.length > 0
+      ? admin.from('driver_documents').insert(allDocRows)
+      : { error: null },
+  ])
+
+  if (licResult.error) {
+    result.errors.push(`רשיונות: ${licResult.error.message}`)
+  } else {
+    for (const item of importReady) {
+      if (!driverIdMap.has(item.employeeId)) continue
+      if (item.parsed.licenseNumber || item.parsed.licenseCategories.length > 0 || item.parsed.licenseExpiryDate) {
+        if (item.mode === 'update') result.licensesUpdated++
+        else result.licensesCreated++
+      }
+    }
+  }
+
+  if (docResult.error) {
+    result.errors.push(`מסמכים: ${docResult.error.message}`)
+  } else {
+    for (const item of importReady) {
+      if (!driverIdMap.has(item.employeeId)) continue
+      if (item.parsed.documents.length > 0) {
+        if (item.mode === 'update') result.documentsUpdated += item.parsed.documents.length
+        else result.documentsCreated += item.parsed.documents.length
       }
     }
   }

@@ -19,7 +19,7 @@
  *  - Inline forms (collapse/expand) — NOT Dialog
  */
 
-import { useState, useTransition, useEffect, useCallback } from 'react'
+import { useState, useTransition, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -31,8 +31,24 @@ import {
   ChevronUp,
   Phone,
   User,
+  Search,
+  Check,
+  ChevronsUpDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from '@/components/ui/command'
 import { FleetDateInput } from '@/components/app/fleet/shared/FleetDateInput'
 import {
   getActiveDriversForAssignment,
@@ -154,11 +170,16 @@ export function VehicleAssignmentSection({
   const [drivers, setDrivers] = useState<DriverOptionForAssignment[]>([])
   const [loadingDrivers, setLoadingDrivers] = useState(false)
   const [selectedDriverId, setSelectedDriverId] = useState('')
+  const [driverPopoverOpen, setDriverPopoverOpen] = useState(false)
   const [driverStartDate, setDriverStartDate] = useState('')
   const [isAssigningDriver, startAssignDriverTransition] = useTransition()
   const [isEndingDriver, startEndDriverTransition] = useTransition()
 
   const activeDriverEntry = driverJournal.find((e) => e.endDate === null)
+  const selectedDriverLabel = useMemo(() => {
+    if (!selectedDriverId) return null
+    return drivers.find((d) => d.id === selectedDriverId)
+  }, [selectedDriverId, drivers])
 
   // Load drivers when form opens
   const openDriverForm = useCallback(() => {
@@ -546,20 +567,71 @@ export function VehicleAssignmentSection({
                 <>
                   <div>
                     <label className="text-xs text-muted-foreground block mb-1">בחר נהג</label>
-                    <select
-                      value={selectedDriverId}
-                      onChange={(e) => setSelectedDriverId(e.target.value)}
-                      className={selectClass}
-                      style={{ borderColor: '#C8D5E2' }}
-                      disabled={isAssigningDriver}
-                    >
-                      <option value="">בחר נהג...</option>
-                      {drivers.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.fullName}
-                        </option>
-                      ))}
-                    </select>
+                    <Popover open={driverPopoverOpen} onOpenChange={setDriverPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          disabled={isAssigningDriver}
+                          className="flex items-center justify-between w-full min-w-[180px] border rounded-lg px-3 py-2 text-sm bg-background text-right hover:bg-accent/50 transition-colors disabled:opacity-50"
+                          style={{ borderColor: '#C8D5E2' }}
+                        >
+                          {selectedDriverLabel ? (
+                            <span className="truncate">{selectedDriverLabel.fullName}</span>
+                          ) : (
+                            <span className="text-muted-foreground">חפש נהג...</span>
+                          )}
+                          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50 mr-2" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-[340px] p-0"
+                        align="start"
+                        dir="rtl"
+                      >
+                        <Command dir="rtl">
+                          <CommandInput placeholder="חפש לפי שם, ת.ז., מספר עובד..." className="text-right" />
+                          <CommandList>
+                            <CommandEmpty>לא נמצאו נהגים</CommandEmpty>
+                            <CommandGroup>
+                              {drivers.map((d) => (
+                                <CommandItem
+                                  key={d.id}
+                                  value={d.id}
+                                  keywords={[
+                                    d.fullName,
+                                    d.idNumber ?? '',
+                                    d.employeeNumber ?? '',
+                                    d.companyName ?? '',
+                                  ]}
+                                  onSelect={() => {
+                                    setSelectedDriverId(d.id)
+                                    setDriverPopoverOpen(false)
+                                  }}
+                                  className="flex items-center gap-2 cursor-pointer"
+                                >
+                                  <Check
+                                    className={`h-4 w-4 shrink-0 ${
+                                      selectedDriverId === d.id ? 'opacity-100' : 'opacity-0'
+                                    }`}
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium truncate">{d.fullName}</p>
+                                    <p className="text-xs text-muted-foreground truncate">
+                                      {[
+                                        d.employeeNumber && `עובד #${d.employeeNumber}`,
+                                        d.companyName,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(' · ') || '\u00A0'}
+                                    </p>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   <div>
